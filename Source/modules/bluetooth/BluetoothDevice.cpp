@@ -15,6 +15,13 @@ BluetoothDevice::BluetoothDevice(const String& instanceId)
 {
 }
 
+BluetoothDevice::BluetoothDevice(const String& instanceId,
+                                 const String& name)
+    : m_instanceId(instanceId)
+    , m_name(name)
+{
+}
+
 BluetoothDevice* BluetoothDevice::create(const WebBluetoothDevice& webDevice)
 {
     return new BluetoothDevice(webDevice.instanceId);

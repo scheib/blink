@@ -25,7 +25,10 @@ class BluetoothDevice final
     , public ScriptWrappable {
     DEFINE_WRAPPERTYPEINFO();
 public:
+    // FIXME: Remove after http://crrev.com/XXXXXXXXXXXXX-Content-Side
     BluetoothDevice(const String& instanceId);
+    BluetoothDevice(const String& instanceId,
+                    const String& name);
 
     static BluetoothDevice* create(const WebBluetoothDevice&);
 
@@ -39,9 +42,11 @@ public:
 
     // IDL exposed interface:
     String instanceId() { return m_instanceId; }
+    String name() { return m_name; }
 
 private:
     String m_instanceId;
+    String m_name;
 };
 
 } // namespace blink
