@@ -24,7 +24,8 @@ BluetoothDevice::BluetoothDevice(const String& instanceId,
 
 BluetoothDevice* BluetoothDevice::create(const WebBluetoothDevice& webDevice)
 {
-    return new BluetoothDevice(webDevice.instanceId);
+    return new BluetoothDevice(webDevice.instanceId,
+                               webDevice.name);
 }
 
 BluetoothDevice* BluetoothDevice::take(ScriptPromiseResolver*, WebBluetoothDevice* webDeviceRawPointer)
