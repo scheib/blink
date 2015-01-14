@@ -36,7 +36,8 @@ enum CompositeOperationType {
     FECOMPOSITE_OPERATOR_OUT        = 3,
     FECOMPOSITE_OPERATOR_ATOP       = 4,
     FECOMPOSITE_OPERATOR_XOR        = 5,
-    FECOMPOSITE_OPERATOR_ARITHMETIC = 6
+    FECOMPOSITE_OPERATOR_ARITHMETIC = 6,
+    FECOMPOSITE_OPERATOR_LIGHTER    = 7
 };
 
 class PLATFORM_EXPORT FEComposite : public FilterEffect {
@@ -73,6 +74,8 @@ private:
 
     PassRefPtr<SkImageFilter> createImageFilterInternal(SkiaImageFilterBuilder*, bool requiresPMColorValidation);
 
+    inline void platformArithmeticSoftware(Uint8ClampedArray* source, Uint8ClampedArray* destination,
+        float k1, float k2, float k3, float k4);
     template <int b1, int b4>
     static inline void computeArithmeticPixelsNeon(unsigned char* source, unsigned  char* destination,
         unsigned pixelArrayLength, float k1, float k2, float k3, float k4);

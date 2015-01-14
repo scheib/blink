@@ -32,12 +32,12 @@
 #define WebView_h
 
 #include "../platform/WebColor.h"
+#include "../platform/WebPageVisibilityState.h"
 #include "../platform/WebString.h"
 #include "../platform/WebVector.h"
 #include "WebDragOperation.h"
 #include "WebHistoryCommitType.h"
 #include "WebHistoryItem.h"
-#include "WebPageVisibilityState.h"
 #include "WebWidget.h"
 
 namespace blink {
@@ -91,8 +91,6 @@ public:
     virtual void setMainFrame(WebFrame*) = 0;
 
     // Initializes the various client interfaces.
-    // FIXME: remove. See http://crbug.com/425756
-    virtual void setAutofillClient(WebAutofillClient*) = 0;
     virtual void setCredentialManagerClient(WebCredentialManagerClient*) = 0;
     virtual void setDevToolsAgentClient(WebDevToolsAgentClient*) = 0;
     virtual void setPrerendererClient(WebPrerendererClient*) = 0;

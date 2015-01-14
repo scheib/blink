@@ -40,6 +40,7 @@
 #include "core/animation/Interpolation.h"
 #include "core/animation/KeyframeEffectModel.h"
 #include "core/dom/Element.h"
+#include "core/dom/NodeRenderStyle.h"
 #include "core/frame/UseCounter.h"
 #include "core/rendering/RenderLayer.h"
 
@@ -204,11 +205,10 @@ double Animation::calculateTimeToEffectChange(bool forwards, double localTime, d
         if (forwards) {
             // Need service to apply fill / fire events.
             const double timeToEnd = end - localTime;
-            if (hasEvents()) {
+            if (requiresIterationEvents()) {
                 return std::min(timeToEnd, timeToNextIteration);
-            } else {
-                return timeToEnd;
             }
+            return timeToEnd;
         }
         return 0;
     case PhaseAfter:
@@ -248,8 +248,11 @@ void Animation::notifyElementDestroyed()
 
 bool Animation::isCandidateForAnimationOnCompositor(double playerPlaybackRate) const
 {
-    if (!effect() || !m_target)
+    if (!effect()
+        || !m_target
+        || (m_target->renderStyle() && m_target->renderStyle()->hasMotionPath()))
         return false;
+
     return CompositorAnimations::instance()->isCandidateForAnimationOnCompositor(specifiedTiming(), *effect(), playerPlaybackRate);
 }
 
@@ -291,8 +294,8 @@ void Animation::cancelAnimationOnCompositor()
         return;
     if (!m_target || !m_target->renderer())
         return;
-    for (size_t i = 0; i < m_compositorAnimationIds.size(); ++i)
-        CompositorAnimations::instance()->cancelAnimationOnCompositor(*m_target, m_compositorAnimationIds[i]);
+    for (const auto& compositorAnimationId : m_compositorAnimationIds)
+        CompositorAnimations::instance()->cancelAnimationOnCompositor(*m_target, compositorAnimationId);
     m_compositorAnimationIds.clear();
     player()->setCompositorPending(true);
 }
@@ -302,8 +305,8 @@ void Animation::pauseAnimationForTestingOnCompositor(double pauseTime)
     ASSERT(hasActiveAnimationsOnCompositor());
     if (!m_target || !m_target->renderer())
         return;
-    for (size_t i = 0; i < m_compositorAnimationIds.size(); ++i)
-        CompositorAnimations::instance()->pauseAnimationForTestingOnCompositor(*m_target, m_compositorAnimationIds[i], pauseTime);
+    for (const auto& compositorAnimationId : m_compositorAnimationIds)
+        CompositorAnimations::instance()->pauseAnimationForTestingOnCompositor(*m_target, compositorAnimationId, pauseTime);
 }
 
 void Animation::trace(Visitor* visitor)

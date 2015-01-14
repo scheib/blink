@@ -101,7 +101,7 @@ private:
     void populateGridPositions(const GridSizingData&, LayoutUnit availableSpaceForColumns, LayoutUnit availableSpaceForRows);
 
     typedef LayoutUnit (RenderGrid::* SizingFunction)(RenderBox&, GridTrackSizingDirection, Vector<GridTrack>&);
-    typedef LayoutUnit (GridTrack::* AccumulatorGetter)() const;
+    typedef const LayoutUnit& (GridTrack::* AccumulatorGetter)() const;
     typedef void (GridTrack::* AccumulatorGrowFunction)(LayoutUnit);
     typedef bool (GridTrackSize::* FilterFunction)() const;
     void resolveContentBasedTrackSizingFunctionsForItems(GridTrackSizingDirection, GridSizingData&, GridItemWithSpan&, FilterFunction, SizingFunction, AccumulatorGetter, AccumulatorGrowFunction, FilterFunction growAboveMaxBreadthFilterFunction = nullptr);
@@ -116,21 +116,22 @@ private:
     LayoutUnit maxContentForChild(RenderBox&, GridTrackSizingDirection, Vector<GridTrack>& columnTracks);
     LayoutUnit startOfColumnForChild(const RenderBox& child) const;
     LayoutUnit endOfColumnForChild(const RenderBox& child) const;
-    LayoutUnit columnPositionAlignedWithGridContainerStart(const RenderBox&) const;
-    LayoutUnit columnPositionAlignedWithGridContainerEnd(const RenderBox&) const;
+    LayoutUnit columnPositionLeft(const RenderBox&) const;
+    LayoutUnit columnPositionRight(const RenderBox&) const;
     LayoutUnit centeredColumnPositionForChild(const RenderBox&) const;
     LayoutUnit columnPositionForChild(const RenderBox&) const;
     LayoutUnit startOfRowForChild(const RenderBox& child) const;
     LayoutUnit endOfRowForChild(const RenderBox& child) const;
     LayoutUnit centeredRowPositionForChild(const RenderBox&) const;
     LayoutUnit rowPositionForChild(const RenderBox&) const;
-    LayoutUnit contentPositionAndDistributionOffset(LayoutUnit availableFreeSpace, ContentPosition, ContentDistributionType, unsigned numberOfItems) const;
-    LayoutPoint findChildLogicalPosition(const RenderBox&) const;
+    LayoutUnit contentPositionAndDistributionColumnOffset(LayoutUnit availableFreeSpace, ContentPosition, ContentDistributionType, unsigned numberOfItems) const;
+    LayoutPoint findChildLogicalPosition(const RenderBox&, LayoutSize contentAlignmentOffset) const;
     GridCoordinate cachedGridCoordinate(const RenderBox&) const;
 
     LayoutUnit gridAreaBreadthForChild(const RenderBox& child, GridTrackSizingDirection, const Vector<GridTrack>&) const;
 
     virtual void paintChildren(const PaintInfo&, const LayoutPoint&) override;
+    bool allowedToStretchLogicalHeightForChild(const RenderBox& child) const;
     bool needToStretchChildLogicalHeight(const RenderBox&) const;
     LayoutUnit childIntrinsicHeight(const RenderBox&) const;
     LayoutUnit childIntrinsicWidth(const RenderBox&) const;

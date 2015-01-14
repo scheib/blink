@@ -48,7 +48,7 @@ function test()
         function testFileSystems(next)
         {
             InspectorTest.createWorkspace();
-            var manager = InspectorTest.createIsolatedFileSystemManager(InspectorTest.testWorkspace, InspectorTest.testFileSystemMapping);
+            var manager = InspectorTest.createIsolatedFileSystemManager(InspectorTest.testWorkspace);
             var uiSourceCodes = [];
 
             InspectorTest.waitForWorkspaceUISourceCodeAddedEvent(uiSourceCodeAdded, 3);
@@ -77,17 +77,17 @@ function test()
                 dumpUISourceCodeLocations(uiSourceCodes, 5);
                 InspectorTest.addResult("UISourceCode uri to url mappings:");
                 for (var i = 0; i < uiSourceCodes.length; ++i) {
-                    var url = uiSourceCodes[i].url;
+                    var url = InspectorTest.testNetworkMapping.networkURL(uiSourceCodes[i]);
                     if (!url)
                         continue;
-                    InspectorTest.addResult("    " + uiSourceCodes[i].uri() + " -> " + uiSourceCodes[i].url);
+                    InspectorTest.addResult("    " + uiSourceCodes[i].uri() + " -> " + url);
                 }
                 InspectorTest.addResult("UISourceCode url to uri mappings:");
                 for (var i = 0; i < uiSourceCodes.length; ++i) {
-                    var url = uiSourceCodes[i].url;
+                    var url = InspectorTest.testNetworkMapping.networkURL(uiSourceCodes[i]);
                     if (!url)
                         continue;
-                    var uri = InspectorTest.testWorkspace.uiSourceCodeForURL(url).uri();
+                    var uri = InspectorTest.testNetworkMapping.uiSourceCodeForURL(url).uri();
                     InspectorTest.addResult("    " + url + " -> " + uri);
                 }
                 InspectorTest.testWorkspace.addEventListener(WebInspector.Workspace.Events.UISourceCodeContentCommitted, contentCommitted, this);

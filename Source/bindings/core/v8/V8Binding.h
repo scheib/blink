@@ -50,10 +50,11 @@
 namespace blink {
 
 class DOMWindow;
-class Document;
 class EventListener;
+class EventTarget;
 class ExecutionContext;
 class ExceptionState;
+class Frame;
 class LocalDOMWindow;
 class LocalFrame;
 class NodeFilter;
@@ -770,7 +771,7 @@ inline bool toV8Sequence(v8::Handle<v8::Value> value, uint32_t& length, v8::Isol
 
 template<>
 struct NativeValueTraits<String> {
-    static inline String nativeValue(const v8::Handle<v8::Value>& value, v8::Isolate* isolate, ExceptionState& exceptionState)
+    static inline String nativeValue(const v8::Local<v8::Value>& value, v8::Isolate* isolate, ExceptionState& exceptionState)
     {
         V8StringResource<> stringValue(value);
         if (!stringValue.prepare(exceptionState))
@@ -781,7 +782,7 @@ struct NativeValueTraits<String> {
 
 template<>
 struct NativeValueTraits<int> {
-    static inline int nativeValue(const v8::Handle<v8::Value>& value, v8::Isolate* isolate, ExceptionState& exceptionState)
+    static inline int nativeValue(const v8::Local<v8::Value>& value, v8::Isolate* isolate, ExceptionState& exceptionState)
     {
         return toInt32(value, exceptionState);
     }
@@ -789,7 +790,7 @@ struct NativeValueTraits<int> {
 
 template<>
 struct NativeValueTraits<unsigned> {
-    static inline unsigned nativeValue(const v8::Handle<v8::Value>& value, v8::Isolate* isolate, ExceptionState& exceptionState)
+    static inline unsigned nativeValue(const v8::Local<v8::Value>& value, v8::Isolate* isolate, ExceptionState& exceptionState)
     {
         return toUInt32(value, exceptionState);
     }
@@ -797,7 +798,7 @@ struct NativeValueTraits<unsigned> {
 
 template<>
 struct NativeValueTraits<float> {
-    static inline float nativeValue(const v8::Handle<v8::Value>& value, v8::Isolate* isolate, ExceptionState& exceptionState)
+    static inline float nativeValue(const v8::Local<v8::Value>& value, v8::Isolate* isolate, ExceptionState& exceptionState)
     {
         return toFloat(value, exceptionState);
     }
@@ -805,15 +806,15 @@ struct NativeValueTraits<float> {
 
 template<>
 struct NativeValueTraits<double> {
-    static inline double nativeValue(const v8::Handle<v8::Value>& value, v8::Isolate* isolate, ExceptionState& exceptionState)
+    static inline double nativeValue(const v8::Local<v8::Value>& value, v8::Isolate* isolate, ExceptionState& exceptionState)
     {
         return toDouble(value, exceptionState);
     }
 };
 
 template<>
-struct NativeValueTraits<v8::Handle<v8::Value> > {
-    static inline v8::Handle<v8::Value> nativeValue(const v8::Handle<v8::Value>& value, v8::Isolate* isolate, ExceptionState&)
+struct NativeValueTraits<v8::Local<v8::Value> > {
+    static inline v8::Local<v8::Value> nativeValue(const v8::Local<v8::Value>& value, v8::Isolate* isolate, ExceptionState&)
     {
         return value;
     }
@@ -821,7 +822,7 @@ struct NativeValueTraits<v8::Handle<v8::Value> > {
 
 template<>
 struct NativeValueTraits<ScriptValue> {
-    static inline ScriptValue nativeValue(const v8::Handle<v8::Value>& value, v8::Isolate* isolate, ExceptionState&)
+    static inline ScriptValue nativeValue(const v8::Local<v8::Value>& value, v8::Isolate* isolate, ExceptionState&)
     {
         return ScriptValue(ScriptState::current(isolate), value);
     }
@@ -829,7 +830,7 @@ struct NativeValueTraits<ScriptValue> {
 
 template <typename T>
 struct NativeValueTraits<Vector<T> > {
-    static inline Vector<T> nativeValue(const v8::Handle<v8::Value>& value, v8::Isolate* isolate, ExceptionState& exceptionState)
+    static inline Vector<T> nativeValue(const v8::Local<v8::Value>& value, v8::Isolate* isolate, ExceptionState& exceptionState)
     {
         return toImplArray<T>(value, 0, isolate, exceptionState);
     }
@@ -850,13 +851,15 @@ ExecutionContext* callingExecutionContext(v8::Isolate*);
 // Returns a V8 context associated with a ExecutionContext and a DOMWrapperWorld.
 // This method returns an empty context if there is no frame or the frame is already detached.
 v8::Local<v8::Context> toV8Context(ExecutionContext*, DOMWrapperWorld&);
-// Returns a V8 context associated with a LocalFrame and a DOMWrapperWorld.
+// Returns a V8 context associated with a Frame and a DOMWrapperWorld.
 // This method returns an empty context if the frame is already detached.
-v8::Local<v8::Context> toV8Context(LocalFrame*, DOMWrapperWorld&);
+v8::Local<v8::Context> toV8Context(Frame*, DOMWrapperWorld&);
 
 // Returns the frame object of the window object associated with
 // a context, if the window is currently being displayed in the LocalFrame.
 LocalFrame* toFrameIfNotDetached(v8::Handle<v8::Context>);
+
+EventTarget* toEventTarget(v8::Isolate*, v8::Handle<v8::Value>);
 
 // If the current context causes out of memory, JavaScript setting
 // is disabled and it returns true.
@@ -906,25 +909,33 @@ enum DeleteResult {
 
 class V8IsolateInterruptor : public ThreadState::Interruptor {
 public:
-    explicit V8IsolateInterruptor(v8::Isolate* isolate) : m_isolate(isolate) { }
+    explicit V8IsolateInterruptor(v8::Isolate* isolate)
+        : m_isolate(isolate)
+        , m_canceled(false)
+    {
+    }
 
     static void onInterruptCallback(v8::Isolate* isolate, void* data)
     {
-        reinterpret_cast<V8IsolateInterruptor*>(data)->onInterrupted();
+        V8IsolateInterruptor* interruptor = reinterpret_cast<V8IsolateInterruptor*>(data);
+        if (!interruptor->m_canceled)
+            interruptor->onInterrupted();
     }
 
     virtual void requestInterrupt() override
     {
+        m_canceled = false;
         m_isolate->RequestInterrupt(&onInterruptCallback, this);
     }
 
     virtual void clearInterrupt() override
     {
-        m_isolate->ClearInterrupt();
+        m_canceled = true;
     }
 
 private:
     v8::Isolate* m_isolate;
+    bool m_canceled;
 };
 
 class V8TestingScope {
@@ -956,7 +967,7 @@ private:
     v8::TryCatch& m_block;
 };
 
-typedef void (*InstallTemplateFunction)(v8::Handle<v8::FunctionTemplate>, v8::Isolate*);
+typedef void (*InstallTemplateFunction)(v8::Local<v8::FunctionTemplate>, v8::Isolate*);
 
 } // namespace blink
 

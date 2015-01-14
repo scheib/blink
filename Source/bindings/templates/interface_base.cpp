@@ -78,7 +78,7 @@ static void (*{{method.name}}MethodForPartialInterface)(const v8::FunctionCallba
 {% if has_constructor_attributes %}
 static void {{cpp_class}}ConstructorGetter(v8::Local<v8::String>, const v8::PropertyCallbackInfo<v8::Value>& info)
 {
-    v8::Handle<v8::Value> data = info.Data();
+    v8::Local<v8::Value> data = info.Data();
     ASSERT(data->IsExternal());
     V8PerContextData* perContextData = V8PerContextData::from(info.Holder()->CreationContext());
     if (!perContextData)
@@ -109,7 +109,7 @@ static void {{cpp_class}}ForceSetAttributeOnThis(v8::Local<v8::String> name, v8:
     }
     {% endif %}
     if (info.This()->IsObject())
-        v8::Handle<v8::Object>::Cast(info.This())->ForceSet(name, v8Value);
+        v8::Local<v8::Object>::Cast(info.This())->ForceSet(name, v8Value);
 }
 
 static void {{cpp_class}}ForceSetAttributeOnThisCallback(v8::Local<v8::String> name, v8::Local<v8::Value> v8Value, const v8::PropertyCallbackInfo<void>& info)
@@ -263,9 +263,9 @@ static const V8DOMConfiguration::MethodConfiguration {{v8_class}}Methods[] = {
 {% from 'attributes.cpp' import attribute_configuration with context %}
 {% from 'constants.cpp' import install_constants with context %}
 {% if has_partial_interface or is_partial %}
-void {{v8_class_or_partial}}::install{{v8_class}}Template(v8::Handle<v8::FunctionTemplate> functionTemplate, v8::Isolate* isolate)
+void {{v8_class_or_partial}}::install{{v8_class}}Template(v8::Local<v8::FunctionTemplate> functionTemplate, v8::Isolate* isolate)
 {% else %}
-static void install{{v8_class}}Template(v8::Handle<v8::FunctionTemplate> functionTemplate, v8::Isolate* isolate)
+static void install{{v8_class}}Template(v8::Local<v8::FunctionTemplate> functionTemplate, v8::Isolate* isolate)
 {% endif %}
 {
     {% if is_partial %}
@@ -358,7 +358,7 @@ static void install{{v8_class}}Template(v8::Handle<v8::FunctionTemplate> functio
     {% set indexed_property_enumerator_callback =
            'indexedPropertyEnumerator<%s>' % cpp_class
            if indexed_property_getter.is_enumerable else '0' %}
-    functionTemplate->{{set_on_template}}()->SetIndexedPropertyHandler({{indexed_property_getter_callback}}, {{indexed_property_setter_callback}}, {{indexed_property_query_callback}}, {{indexed_property_deleter_callback}}, {{indexed_property_enumerator_callback}});
+    functionTemplate->{{set_on_template}}()->SetHandler(v8::IndexedPropertyHandlerConfiguration({{indexed_property_getter_callback}}, {{indexed_property_setter_callback}}, {{indexed_property_query_callback}}, {{indexed_property_deleter_callback}}, {{indexed_property_enumerator_callback}}));
     {% endif %}
     {% if named_property_getter %}
     {# if have named properties, MUST have a named property getter #}
@@ -376,7 +376,7 @@ static void install{{v8_class}}Template(v8::Handle<v8::FunctionTemplate> functio
     {% set named_property_enumerator_callback =
            '%sV8Internal::namedPropertyEnumeratorCallback' % cpp_class
            if named_property_getter.is_enumerable else '0' %}
-    functionTemplate->{{set_on_template}}()->SetNamedPropertyHandler({{named_property_getter_callback}}, {{named_property_setter_callback}}, {{named_property_query_callback}}, {{named_property_deleter_callback}}, {{named_property_enumerator_callback}});
+    functionTemplate->{{set_on_template}}()->SetHandler(v8::NamedPropertyHandlerConfiguration({{named_property_getter_callback}}, {{named_property_setter_callback}}, {{named_property_query_callback}}, {{named_property_deleter_callback}}, {{named_property_enumerator_callback}}));
     {% endif %}
     {% if iterator_method %}
     static const V8DOMConfiguration::SymbolKeyedMethodConfiguration symbolKeyedIteratorConfiguration = { v8::Symbol::GetIterator, {{cpp_class_or_partial}}V8Internal::iteratorMethodCallback, 0, V8DOMConfiguration::ExposedToAllScripts };
@@ -393,6 +393,12 @@ static void install{{v8_class}}Template(v8::Handle<v8::FunctionTemplate> functio
     {% for method in custom_registration_methods %}
     {# install_custom_signature #}
     {% filter conditional(method.conditional_string) %}
+    {% filter per_context_enabled(method.overloads.per_context_enabled_function_all
+                                  if method.overloads else
+                                  method.per_context_enabled_function) %}
+    {% filter exposed(method.overloads.exposed_test_all
+                      if method.overloads else
+                      method.exposed_test) %}
     {% filter runtime_enabled(method.overloads.runtime_enabled_function_all
                               if method.overloads else
                               method.runtime_enabled_function) %}
@@ -402,13 +408,15 @@ static void install{{v8_class}}Template(v8::Handle<v8::FunctionTemplate> functio
     {{install_custom_signature(method) | indent}}
     {% endif %}{# is_do_not_check_security #}
     {% endfilter %}{# runtime_enabled() #}
+    {% endfilter %}{# exposed() #}
+    {% endfilter %}{# per_context_enabled() #}
     {% endfilter %}{# conditional() #}
     {% endfor %}
     {% for attribute in attributes if attribute.is_static %}
     {% set getter_callback = '%sV8Internal::%sAttributeGetterCallback' %
            (cpp_class, attribute.name) %}
     {% filter conditional(attribute.conditional_string) %}
-    functionTemplate->SetNativeDataProperty(v8AtomicString(isolate, "{{attribute.name}}"), {{getter_callback}}, {{attribute.setter_callback}}, v8::External::New(isolate, 0), static_cast<v8::PropertyAttribute>(v8::None), v8::Handle<v8::AccessorSignature>(), static_cast<v8::AccessControl>(v8::DEFAULT));
+    functionTemplate->SetNativeDataProperty(v8AtomicString(isolate, "{{attribute.name}}"), {{getter_callback}}, {{attribute.setter_callback}}, v8::External::New(isolate, 0), static_cast<v8::PropertyAttribute>(v8::None), v8::Local<v8::AccessorSignature>(), static_cast<v8::AccessControl>(v8::DEFAULT));
     {% endfilter %}
     {% endfor %}
     {# Special interfaces #}

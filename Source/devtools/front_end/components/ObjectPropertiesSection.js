@@ -26,7 +26,7 @@
 
 /**
  * @constructor
- * @extends {WebInspector.PropertiesSection}
+ * @extends {WebInspector.Section}
  * @param {!WebInspector.RemoteObject} object
  * @param {?string|!Element=} title
  * @param {string=} subtitle
@@ -45,7 +45,7 @@ WebInspector.ObjectPropertiesSection = function(object, title, subtitle, emptyPl
     this.editable = true;
     this.skipProto = false;
 
-    WebInspector.PropertiesSection.call(this, title || "", subtitle);
+    WebInspector.Section.call(this, title || "", subtitle);
 }
 
 /** @const */
@@ -115,7 +115,7 @@ WebInspector.ObjectPropertiesSection.prototype = {
         this.propertiesForTest = properties;
     },
 
-    __proto__: WebInspector.PropertiesSection.prototype
+    __proto__: WebInspector.Section.prototype
 }
 
 /**
@@ -356,7 +356,7 @@ WebInspector.ObjectPropertyTreeElement.prototype = {
         }
 
         var proxyElement = this._prompt.attachAndStartEditing(elementToEdit, blurListener.bind(this));
-        this.listItemElement.window().getSelection().setBaseAndExtent(elementToEdit, 0, elementToEdit, 1);
+        this.listItemElement.getComponentSelection().setBaseAndExtent(elementToEdit, 0, elementToEdit, 1);
         proxyElement.addEventListener("keydown", this._promptKeyDown.bind(this, context), false);
     },
 
@@ -444,11 +444,20 @@ WebInspector.ObjectPropertyTreeElement.prototype = {
     },
 
     /**
+     * @override
+     * @return {*}
+     */
+    elementIdentity: function()
+    {
+        return this.propertyPath();
+    },
+
+    /**
      * @return {string|undefined}
      */
     propertyPath: function()
     {
-        if ("_cachedPropertyPath" in this)
+        if (this._cachedPropertyPath)
             return this._cachedPropertyPath;
 
         var current = this;
@@ -817,6 +826,7 @@ WebInspector.ArrayGroupingTreeElement = function(object, fromIndex, toIndex, pro
 
 WebInspector.ArrayGroupingTreeElement._bucketThreshold = 100;
 WebInspector.ArrayGroupingTreeElement._sparseIterationThreshold = 250000;
+WebInspector.ArrayGroupingTreeElement._getOwnPropertyNamesThreshold = 500000;
 
 /**
  * @param {!TreeContainerNode} treeNode
@@ -839,47 +849,55 @@ WebInspector.ArrayGroupingTreeElement._populateArray = function(treeNode, object
  */
 WebInspector.ArrayGroupingTreeElement._populateRanges = function(treeNode, object, fromIndex, toIndex, topLevel)
 {
-    object.callFunctionJSON(packRanges, [{value: fromIndex}, {value: toIndex}, {value: WebInspector.ArrayGroupingTreeElement._bucketThreshold}, {value: WebInspector.ArrayGroupingTreeElement._sparseIterationThreshold}], callback);
+    object.callFunctionJSON(packRanges, [
+        { value: fromIndex },
+        { value: toIndex },
+        { value: WebInspector.ArrayGroupingTreeElement._bucketThreshold },
+        { value: WebInspector.ArrayGroupingTreeElement._sparseIterationThreshold },
+        { value: WebInspector.ArrayGroupingTreeElement._getOwnPropertyNamesThreshold }
+    ], callback);
 
     /**
+     * Note: must declare params as optional.
+     * @param {number=} fromIndex
+     * @param {number=} toIndex
+     * @param {number=} bucketThreshold
+     * @param {number=} sparseIterationThreshold
+     * @param {number=} getOwnPropertyNamesThreshold
      * @suppressReceiverCheck
      * @this {Object}
-     * @param {number=} fromIndex // must declare optional
-     * @param {number=} toIndex // must declare optional
-     * @param {number=} bucketThreshold // must declare optional
-     * @param {number=} sparseIterationThreshold // must declare optional
      */
-    function packRanges(fromIndex, toIndex, bucketThreshold, sparseIterationThreshold)
+    function packRanges(fromIndex, toIndex, bucketThreshold, sparseIterationThreshold, getOwnPropertyNamesThreshold)
     {
         var ownPropertyNames = null;
+        var consecutiveRange = (toIndex - fromIndex >= sparseIterationThreshold) && ArrayBuffer.isView(this);
+        var skipGetOwnPropertyNames = consecutiveRange && (toIndex - fromIndex >= getOwnPropertyNamesThreshold);
 
-        /**
-         * @this {Object}
-         */
-        function doLoop(iterationCallback)
+        function* arrayIndexes(object)
         {
             if (toIndex - fromIndex < sparseIterationThreshold) {
                 for (var i = fromIndex; i <= toIndex; ++i) {
-                    if (i in this)
-                        iterationCallback(i);
+                    if (i in object)
+                        yield i;
                 }
             } else {
-                ownPropertyNames = ownPropertyNames || Object.getOwnPropertyNames(this);
+                ownPropertyNames = ownPropertyNames || Object.getOwnPropertyNames(object);
                 for (var i = 0; i < ownPropertyNames.length; ++i) {
                     var name = ownPropertyNames[i];
                     var index = name >>> 0;
-                    if (String(index) === name && fromIndex <= index && index <= toIndex)
-                        iterationCallback(index);
+                    if (("" + index) === name && fromIndex <= index && index <= toIndex)
+                        yield index;
                 }
             }
         }
 
         var count = 0;
-        function countIterationCallback()
-        {
-            ++count;
+        if (consecutiveRange) {
+            count = toIndex - fromIndex + 1;
+        } else {
+            for (var i of arrayIndexes(this))
+                ++count;
         }
-        doLoop.call(this, countIterationCallback);
 
         var bucketSize = count;
         if (count <= bucketThreshold)
@@ -888,33 +906,43 @@ WebInspector.ArrayGroupingTreeElement._populateRanges = function(treeNode, objec
             bucketSize = Math.pow(bucketThreshold, Math.ceil(Math.log(count) / Math.log(bucketThreshold)) - 1);
 
         var ranges = [];
-        count = 0;
-        var groupStart = -1;
-        var groupEnd = 0;
-        function loopIterationCallback(i)
-        {
-            if (groupStart === -1)
-                groupStart = i;
-
-            groupEnd = i;
-            if (++count === bucketSize) {
-                ranges.push([groupStart, groupEnd, count]);
-                count = 0;
-                groupStart = -1;
+        if (consecutiveRange) {
+            for (var i = fromIndex; i <= toIndex; i += bucketSize) {
+                var groupStart = i;
+                var groupEnd = groupStart + bucketSize - 1;
+                if (groupEnd > toIndex)
+                    groupEnd = toIndex;
+                ranges.push([groupStart, groupEnd, groupEnd - groupStart + 1]);
             }
+        } else {
+            count = 0;
+            var groupStart = -1;
+            var groupEnd = 0;
+            for (var i of arrayIndexes(this)) {
+                if (groupStart === -1)
+                    groupStart = i;
+                groupEnd = i;
+                if (++count === bucketSize) {
+                    ranges.push([groupStart, groupEnd, count]);
+                    count = 0;
+                    groupStart = -1;
+                }
+            }
+            if (count > 0)
+                ranges.push([groupStart, groupEnd, count]);
         }
-        doLoop.call(this, loopIterationCallback);
 
-        if (count > 0)
-            ranges.push([groupStart, groupEnd, count]);
-        return ranges;
+        return { ranges: ranges, skipGetOwnPropertyNames: skipGetOwnPropertyNames };
     }
 
-    function callback(ranges)
+    function callback(result)
     {
-        if (ranges.length == 1)
+        if (!result)
+            return;
+        var ranges = /** @type {!Array.<!Array.<number>>} */ (result.ranges);
+        if (ranges.length == 1) {
             WebInspector.ArrayGroupingTreeElement._populateAsFragment(treeNode, object, ranges[0][0], ranges[0][1]);
-        else {
+        } else {
             for (var i = 0; i < ranges.length; ++i) {
                 var fromIndex = ranges[i][0];
                 var toIndex = ranges[i][1];
@@ -926,7 +954,7 @@ WebInspector.ArrayGroupingTreeElement._populateRanges = function(treeNode, objec
             }
         }
         if (topLevel)
-            WebInspector.ArrayGroupingTreeElement._populateNonIndexProperties(treeNode, object);
+            WebInspector.ArrayGroupingTreeElement._populateNonIndexProperties(treeNode, object, result.skipGetOwnPropertyNames);
     }
 }
 
@@ -999,19 +1027,23 @@ WebInspector.ArrayGroupingTreeElement._populateAsFragment = function(treeNode, o
 /**
  * @param {!TreeContainerNode} treeNode
  * @param {!WebInspector.RemoteObject} object
+ * @param {boolean} skipGetOwnPropertyNames
  * @this {WebInspector.ArrayGroupingTreeElement}
  */
-WebInspector.ArrayGroupingTreeElement._populateNonIndexProperties = function(treeNode, object)
+WebInspector.ArrayGroupingTreeElement._populateNonIndexProperties = function(treeNode, object, skipGetOwnPropertyNames)
 {
-    object.callFunction(buildObjectFragment, undefined, processObjectFragment.bind(this));
+    object.callFunction(buildObjectFragment, [{value: skipGetOwnPropertyNames}], processObjectFragment.bind(this));
 
     /**
+     * @param {boolean=} skipGetOwnPropertyNames
      * @suppressReceiverCheck
      * @this {Object}
      */
-    function buildObjectFragment()
+    function buildObjectFragment(skipGetOwnPropertyNames)
     {
-        var result = Object.create(this.__proto__);
+        var result = { __proto__: this.__proto__ };
+        if (skipGetOwnPropertyNames)
+            return result;
         var names = Object.getOwnPropertyNames(this);
         for (var i = 0; i < names.length; ++i) {
             var name = names[i];

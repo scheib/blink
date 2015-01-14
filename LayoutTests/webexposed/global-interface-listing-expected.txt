@@ -8,6 +8,7 @@ CONSOLE WARNING: 'webkitIDBFactory' is deprecated. Please use 'IDBFactory' inste
 CONSOLE WARNING: 'webkitIDBDatabase' is deprecated. Please use 'IDBDatabase' instead.
 CONSOLE WARNING: 'webkitIDBCursor' is deprecated. Please use 'IDBCursor' instead.
 CONSOLE WARNING: 'webkitIndexedDB' is deprecated. Please use 'indexedDB' instead.
+CONSOLE WARNING: 'webkitURL' is deprecated. Please use 'URL' instead.
 This test documents all interface attributes and methods on the global window object and element instances.
 
 On success, you will see a series of "PASS" messages, followed by "TEST COMPLETE".
@@ -209,6 +210,10 @@ interface CSSStyleSheet
     method deleteRule
     method insertRule
     method removeRule
+interface CSSSupportsRule
+    method constructor
+    method deleteRule
+    method insertRule
 interface CSSUnknownRule
     method constructor
 interface CSSViewportRule
@@ -287,6 +292,8 @@ interface ClientRect
 interface ClientRectList
     method constructor
     method item
+interface ClipboardEvent
+    method constructor
 interface CloseEvent
     method constructor
 interface Comment
@@ -567,8 +574,11 @@ interface Element
     method removeAttributeNode
     method requestFullscreen
     method requestPointerLock
+    method scroll
+    method scrollBy
     method scrollIntoView
     method scrollIntoViewIfNeeded
+    method scrollTo
     method setAttribute
     method setAttributeNS
     method setAttributeNode
@@ -743,6 +753,8 @@ interface HTMLContentElement
 interface HTMLDListElement
     method constructor
 interface HTMLDataListElement
+    method constructor
+interface HTMLDetailsElement
     method constructor
 interface HTMLDialogElement
     method close
@@ -973,6 +985,14 @@ interface HTMLVideoElement
 interface HashChangeEvent
     method constructor
     method initHashChangeEvent
+interface Headers
+    method append
+    method constructor
+    method delete
+    method get
+    method getAll
+    method has
+    method set
 interface History
     method back
     method constructor
@@ -1211,6 +1231,7 @@ interface NamedNodeMap
     method setNamedItem
     method setNamedItemNS
 interface Navigator
+    method connect
     method constructor
     method getBattery
     method getGamepads
@@ -1223,7 +1244,6 @@ interface Navigator
     method sendBeacon
     method unregisterProtocolHandler
     method vibrate
-    method webkitGetGamepads
     method webkitGetUserMedia
 interface NetworkInformation
     method constructor
@@ -1406,9 +1426,17 @@ interface Promise
     method chain
     method constructor
     method then
+interface PushManager
+    method constructor
+    method hasPermission
+    method register
+interface PushRegistration
+    method constructor
 interface RTCIceCandidate
     method constructor
 interface RTCSessionDescription
+    method constructor
+interface RadioNodeList
     method constructor
 interface Range
     attribute END_TO_END
@@ -1455,7 +1483,6 @@ interface ReadableStream
     method cancel
     method constructor
     method read
-    method wait
 interface ReferenceError
     attribute name
     getter stack
@@ -1474,6 +1501,20 @@ interface RegExp
     method toString
 interface RelatedEvent
     method constructor
+interface Request
+    method arrayBuffer
+    method blob
+    method clone
+    method constructor
+    method json
+    method text
+interface Response
+    method arrayBuffer
+    method blob
+    method clone
+    method constructor
+    method json
+    method text
 interface SVGAElement
     method constructor
 interface SVGAngle
@@ -2047,7 +2088,6 @@ interface ShadowRoot
     method cloneNode
     method constructor
     method elementFromPoint
-    method getElementById
     method getElementsByClassName
     method getElementsByTagName
     method getElementsByTagNameNS
@@ -2174,6 +2214,8 @@ interface TouchList
     method constructor
     method item
 interface TrackDefault
+    method constructor
+interface TrackDefaultList
     method constructor
 interface TrackEvent
     method constructor
@@ -2879,6 +2921,7 @@ interface Window
     method confirm
     method constructor
     method createImageBitmap
+    method fetch
     method find
     method focus
     method getComputedStyle

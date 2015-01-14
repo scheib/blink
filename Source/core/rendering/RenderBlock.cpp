@@ -32,6 +32,7 @@
 #include "core/dom/shadow/ShadowRoot.h"
 #include "core/editing/Editor.h"
 #include "core/editing/FrameSelection.h"
+#include "core/editing/htmlediting.h"
 #include "core/events/OverflowEvent.h"
 #include "core/fetch/ResourceLoadPriorityOptimizer.h"
 #include "core/frame/FrameView.h"
@@ -40,7 +41,7 @@
 #include "core/page/Page.h"
 #include "core/paint/BlockPainter.h"
 #include "core/paint/BoxPainter.h"
-#include "core/paint/DrawingRecorder.h"
+#include "core/paint/RenderDrawingRecorder.h"
 #include "core/rendering/HitTestLocation.h"
 #include "core/rendering/HitTestResult.h"
 #include "core/rendering/InlineIterator.h"
@@ -83,7 +84,7 @@ struct SameSizeAsRenderBlock : public RenderBox {
     uint32_t bitfields;
 };
 
-COMPILE_ASSERT(sizeof(RenderBlock) == sizeof(SameSizeAsRenderBlock), RenderBlock_should_stay_small);
+static_assert(sizeof(RenderBlock) == sizeof(SameSizeAsRenderBlock), "RenderBlock should stay small");
 
 typedef WTF::HashMap<const RenderBox*, OwnPtr<ColumnInfo> > ColumnInfoMap;
 static ColumnInfoMap* gColumnInfoMap = 0;
@@ -605,67 +606,69 @@ void RenderBlock::splitBlocks(RenderBlock* fromBlock, RenderBlock* toBlock,
                               RenderBlock* middleBlock,
                               RenderObject* beforeChild, RenderBoxModelObject* oldCont)
 {
-    // Create a clone of this inline.
-    RenderBlock* cloneBlock = clone();
-    if (!isAnonymousBlock())
-        cloneBlock->setContinuation(oldCont);
+    ASSERT(isDescendantOf(fromBlock));
 
     if (!beforeChild && isAfterContent(lastChild()))
         beforeChild = lastChild();
 
-    // Now take all of the children from beforeChild to the end and remove
-    // them from |this| and place them in the clone.
-    moveChildrenTo(cloneBlock, beforeChild, 0, true);
+    Vector<RenderBlock*> blocksToClone;
+    for (RenderObject* o = this; o != fromBlock; o = o->parent())
+        blocksToClone.append(toRenderBlock(o));
 
-    // Hook |clone| up as the continuation of the middle block.
-    if (!cloneBlock->isAnonymousBlock())
-        middleBlock->setContinuation(cloneBlock);
+    // Create a new clone of the top-most block.
+    RenderBlock* topMostBlockToClone = blocksToClone.last();
+    RenderBlock* cloneBlock = topMostBlockToClone->clone();
 
-    // We have been reparented and are now under the fromBlock.  We need
-    // to walk up our block parent chain until we hit the containing anonymous columns block.
-    // Once we hit the anonymous columns block we're done.
-    RenderBoxModelObject* curr = toRenderBoxModelObject(parent());
-    RenderBoxModelObject* currChild = this;
-    RenderObject* currChildNextSibling = currChild->nextSibling();
+    // Put |cloneBlock| as a child of |toBlock|.
+    toBlock->children()->appendChildNode(toBlock, cloneBlock);
 
-    while (curr && curr->isDescendantOf(fromBlock) && curr != fromBlock) {
-        ASSERT_WITH_SECURITY_IMPLICATION(curr->isRenderBlock());
+    // Now take all the children after |topMostBlockToClone| and remove them from the |fromBlock|
+    // and put them in the |toBlock|.
+    fromBlock->moveChildrenTo(toBlock, topMostBlockToClone->nextSibling(), nullptr, true);
 
-        RenderBlock* blockCurr = toRenderBlock(curr);
+    RenderBlock* currentBlockParent = topMostBlockToClone;
+    RenderBlock* cloneBlockParent = cloneBlock;
 
-        // Create a new clone.
-        RenderBlock* cloneChild = cloneBlock;
-        cloneBlock = blockCurr->clone();
-
-        // Insert our child clone as the first child.
-        cloneBlock->addChildIgnoringContinuation(cloneChild, 0);
-
-        // Hook the clone up as a continuation of |curr|.  Note we do encounter
-        // anonymous blocks possibly as we walk up the block chain.  When we split an
+    // Clone the blocks from top to down to ensure any new object will be added into a rooted tree.
+    // Note that we have already cloned the top-most one, so the loop begins from size - 2.
+    for (int i = static_cast<int>(blocksToClone.size()) - 2; i >= 0; --i) {
+        // Hook the clone up as a continuation of |currentBlockParent|. Note we do encounter
+        // anonymous blocks possibly as we walk down the block chain.  When we split an
         // anonymous block, there's no need to do any continuation hookup, since we haven't
         // actually split a real element.
-        if (!blockCurr->isAnonymousBlock()) {
-            oldCont = blockCurr->continuation();
-            blockCurr->setContinuation(cloneBlock);
+        if (!currentBlockParent->isAnonymousBlock()) {
+            RenderBoxModelObject* oldCont = currentBlockParent->continuation();
+            currentBlockParent->setContinuation(cloneBlock);
             cloneBlock->setContinuation(oldCont);
         }
 
-        // Now we need to take all of the children starting from the first child
-        // *after* currChild and append them all to the clone.
-        blockCurr->moveChildrenTo(cloneBlock, currChildNextSibling, 0, true);
+        // Create a new clone.
+        RenderBlock* currentBlock = blocksToClone[i];
+        cloneBlock = currentBlock->clone();
 
-        // Keep walking up the chain.
-        currChild = curr;
-        currChildNextSibling = currChild->nextSibling();
-        curr = toRenderBoxModelObject(curr->parent());
+        // Insert the |cloneBlock| as the first child of |cloneBlockParent|.
+        cloneBlockParent->addChildIgnoringContinuation(cloneBlock, nullptr);
+
+        // Take all the children after |currentBlock| and remove them from the |currentBlockParent|
+        // and put them to the end of the |cloneParent|.
+        currentBlockParent->moveChildrenTo(cloneBlockParent, currentBlock->nextSibling(), nullptr, true);
+
+        cloneBlockParent = cloneBlock;
+        currentBlockParent = currentBlock;
     }
 
-    // Now we are at the columns block level. We need to put the clone into the toBlock.
-    toBlock->children()->appendChildNode(toBlock, cloneBlock);
+    // The last block to clone is |this|, and the current |cloneBlock| is cloned from |this|.
+    ASSERT(this == blocksToClone.first());
 
-    // Now take all the children after currChild and remove them from the fromBlock
-    // and put them in the toBlock.
-    fromBlock->moveChildrenTo(toBlock, currChildNextSibling, 0, true);
+    // Hook |cloneBlock| up as the continuation of the |middleBlock|.
+    if (!isAnonymousBlock()) {
+        cloneBlock->setContinuation(oldCont);
+        middleBlock->setContinuation(cloneBlock);
+    }
+
+    // Now take all of the children from |beforeChild| to the end and remove
+    // them from |this| and place them in the |cloneBlock|.
+    moveChildrenTo(cloneBlock, beforeChild, nullptr, true);
 }
 
 void RenderBlock::splitFlow(RenderObject* beforeChild, RenderBlock* newBlockBox,
@@ -783,7 +786,8 @@ RenderBlockFlow* RenderBlock::columnsBlockForSpanningElement(RenderObject* newCh
     // This function currently supports (1) and (2).
     RenderBlockFlow* columnsBlockAncestor = 0;
     if (!newChild->isText() && newChild->style()->columnSpan() && !newChild->isBeforeOrAfterContent()
-        && !newChild->isFloatingOrOutOfFlowPositioned() && !newChild->isInline() && !isAnonymousColumnSpanBlock()) {
+        && !newChild->isFloatingOrOutOfFlowPositioned() && !newChild->isInline() && !newChild->isTablePart()
+        && !isAnonymousColumnSpanBlock()) {
         columnsBlockAncestor = containingColumnsBlock(false);
         if (columnsBlockAncestor) {
             // Make sure that none of the parent ancestors have a continuation.
@@ -2238,7 +2242,7 @@ bool RenderBlock::nodeAtPoint(const HitTestRequest& request, HitTestResult& resu
     if (style()->hasBorderRadius()) {
         LayoutRect borderRect = borderBoxRect();
         borderRect.moveBy(adjustedLocation);
-        RoundedRect border = style()->getRoundedBorderFor(borderRect);
+        FloatRoundedRect border = style()->getRoundedBorderFor(borderRect);
         if (!locationInContainer.intersects(border))
             return false;
     }
@@ -3215,7 +3219,7 @@ LayoutUnit RenderBlock::minLineHeightForReplacedRenderer(bool isFirstLine, Layou
         return replacedHeight;
 
     if (!(style(isFirstLine)->lineBoxContain() & LineBoxContainBlock))
-        return 0;
+        return LayoutUnit();
 
     return std::max<LayoutUnit>(replacedHeight, lineHeight(isFirstLine, isHorizontalWritingMode() ? HorizontalLine : VerticalLine, PositionOfInteriorLineBoxes));
 }
@@ -3248,7 +3252,7 @@ int RenderBlock::inlineBlockBaseline(LineDirectionMode direction) const
 {
     if (!style()->isOverflowVisible()) {
         // We are not calling RenderBox::baselinePosition here because the caller should add the margin-top/margin-right, not us.
-        return direction == HorizontalLine ? size().height() + m_marginBox.bottom() : size().width() + m_marginBox.left();
+        return direction == HorizontalLine ? size().height() + marginBottom() : size().width() + marginLeft();
     }
 
     return lastLineBoxBaseline(direction);
@@ -3445,7 +3449,7 @@ void RenderBlock::absoluteRects(Vector<IntRect>& rects, const LayoutPoint& accum
         // FIXME: This is wrong for vertical writing-modes.
         // https://bugs.webkit.org/show_bug.cgi?id=46781
         LayoutRect rect(accumulatedOffset, size());
-        rect.expand(collapsedMarginBox());
+        rect.expand(collapsedMarginBoxLogicalOutsets());
         rects.append(pixelSnappedIntRect(rect));
         continuation()->absoluteRects(rects, accumulatedOffset - toLayoutSize(location() +
                 inlineElementContinuation()->containingBlock()->location()));
@@ -3462,7 +3466,7 @@ void RenderBlock::absoluteQuads(Vector<FloatQuad>& quads, bool* wasFixed) const
         // FIXME: This is wrong for vertical writing-modes.
         // https://bugs.webkit.org/show_bug.cgi?id=46781
         LayoutRect localRect(LayoutPoint(), size());
-        localRect.expand(collapsedMarginBox());
+        localRect.expand(collapsedMarginBoxLogicalOutsets());
         quads.append(localToAbsoluteQuad(FloatRect(localRect), 0 /* mode */, wasFixed));
         continuation()->absoluteQuads(quads, wasFixed);
     } else {
@@ -3511,10 +3515,17 @@ void RenderBlock::updateHitTestResult(HitTestResult& result, const LayoutPoint& 
     }
 }
 
+// An inline-block uses its inlineBox as the inlineBoxWrapper,
+// so the firstChild() is nullptr if the only child is an empty inline-block.
+inline bool RenderBlock::isInlineBoxWrapperActuallyChild() const
+{
+    return isInlineBlockOrInlineTable() && !size().isEmpty() && node() && editingIgnoresContent(node());
+}
+
 LayoutRect RenderBlock::localCaretRect(InlineBox* inlineBox, int caretOffset, LayoutUnit* extraWidthToEndOfLine)
 {
     // Do the normal calculation in most cases.
-    if (firstChild())
+    if (firstChild() || isInlineBoxWrapperActuallyChild())
         return RenderBox::localCaretRect(inlineBox, caretOffset, extraWidthToEndOfLine);
 
     LayoutRect caretRect = localCaretRectForEmptyElement(size().width(), textIndentOffset());
@@ -3873,6 +3884,26 @@ bool RenderBlock::recalcOverflowAfterStyleChange()
         layer()->scrollableArea()->updateAfterOverflowRecalc();
 
     return !hasOverflowClip();
+}
+
+// Called when a positioned object moves but doesn't necessarily change size.  A simplified layout is attempted
+// that just updates the object's position. If the size does change, the object remains dirty.
+bool RenderBlock::tryLayoutDoingPositionedMovementOnly()
+{
+    LayoutUnit oldWidth = logicalWidth();
+    LogicalExtentComputedValues computedValues;
+    logicalExtentAfterUpdatingLogicalWidth(logicalTop(), computedValues);
+    // If we shrink to fit our width may have changed, so we still need full layout.
+    if (oldWidth != computedValues.m_extent)
+        return false;
+    setLogicalWidth(computedValues.m_extent);
+    setLogicalLeft(computedValues.m_position);
+    setMarginStart(computedValues.m_margins.m_start);
+    setMarginEnd(computedValues.m_margins.m_end);
+
+    LayoutUnit oldHeight = logicalHeight();
+    updateLogicalHeight();
+    return !hasPercentHeightDescendants() || oldHeight == logicalHeight();
 }
 
 #if ENABLE(ASSERT)

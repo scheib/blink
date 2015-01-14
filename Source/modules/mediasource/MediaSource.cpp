@@ -284,7 +284,8 @@ void MediaSource::trace(Visitor* visitor)
     visitor->trace(m_sourceBuffers);
     visitor->trace(m_activeSourceBuffers);
     visitor->registerWeakMembers<MediaSource, &MediaSource::clearWeakMembers>(this);
-    EventTargetWithInlineData::trace(visitor);
+    RefCountedGarbageCollectedEventTargetWithInlineData<MediaSource>::trace(visitor);
+    ActiveDOMObject::trace(visitor);
 }
 
 void MediaSource::setWebMediaSourceAndOpen(PassOwnPtr<WebMediaSource> webMediaSource)

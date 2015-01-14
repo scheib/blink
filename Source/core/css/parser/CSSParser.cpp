@@ -11,6 +11,8 @@
 #include "core/css/StyleSheetContents.h"
 #include "core/css/parser/CSSParserFastPaths.h"
 #include "core/css/parser/CSSParserImpl.h"
+#include "core/css/parser/CSSSelectorParser.h"
+#include "core/css/parser/CSSTokenizer.h"
 
 namespace blink {
 
@@ -29,16 +31,27 @@ bool CSSParser::parseDeclaration(MutableStylePropertySet* propertySet, const Str
 
 void CSSParser::parseSelector(const String& selector, CSSSelectorList& selectorList)
 {
+    if (RuntimeEnabledFeatures::newCSSParserEnabled()) {
+        Vector<CSSParserToken> tokens;
+        CSSTokenizer::tokenize(selector, tokens);
+        CSSSelectorParser::parseSelector(tokens, m_bisonParser.m_context, starAtom, nullptr, selectorList);
+        return;
+    }
     m_bisonParser.parseSelector(selector, selectorList);
 }
 
 PassRefPtrWillBeRawPtr<StyleRuleBase> CSSParser::parseRule(const CSSParserContext& context, StyleSheetContents* styleSheet, const String& rule)
 {
+    if (RuntimeEnabledFeatures::newCSSParserEnabled())
+        return CSSParserImpl::parseRule(rule, context, CSSParserImpl::RegularRules);
     return BisonCSSParser(context).parseRule(styleSheet, rule);
 }
 
 void CSSParser::parseSheet(const CSSParserContext& context, StyleSheetContents* styleSheet, const String& text, const TextPosition& startPosition, CSSParserObserver* observer, bool logErrors)
 {
+    // FIXME: Add inspector observer support in the new CSS parser
+    if (!observer && RuntimeEnabledFeatures::newCSSParserEnabled())
+        return CSSParserImpl::parseStyleSheet(text, context, styleSheet);
     BisonCSSParser(context).parseSheet(styleSheet, text, startPosition, observer, logErrors);
 }
 
@@ -90,11 +103,17 @@ PassRefPtrWillBeRawPtr<ImmutableStylePropertySet> CSSParser::parseInlineStyleDec
 
 PassOwnPtr<Vector<double> > CSSParser::parseKeyframeKeyList(const String& keyList)
 {
+    if (RuntimeEnabledFeatures::newCSSParserEnabled())
+        return CSSParserImpl::parseKeyframeKeyList(keyList);
     return BisonCSSParser(strictCSSParserContext()).parseKeyframeKeyList(keyList);
 }
 
-PassRefPtrWillBeRawPtr<StyleKeyframe> CSSParser::parseKeyframeRule(const CSSParserContext& context, StyleSheetContents* styleSheet, const String& rule)
+PassRefPtrWillBeRawPtr<StyleRuleKeyframe> CSSParser::parseKeyframeRule(const CSSParserContext& context, StyleSheetContents* styleSheet, const String& rule)
 {
+    if (RuntimeEnabledFeatures::newCSSParserEnabled()) {
+        RefPtrWillBeRawPtr<StyleRuleBase> keyframe = CSSParserImpl::parseRule(rule, context, CSSParserImpl::KeyframeRules);
+        return toStyleRuleKeyframe(keyframe.get());
+    }
     return BisonCSSParser(context).parseKeyframeRule(styleSheet, rule);
 }
 
@@ -105,7 +124,30 @@ bool CSSParser::parseSupportsCondition(const String& condition)
 
 bool CSSParser::parseColor(RGBA32& color, const String& string, bool strict)
 {
-    return BisonCSSParser::parseColor(color, string, strict);
+    if (string.isEmpty())
+        return false;
+
+    // First try creating a color specified by name, rgba(), rgb() or "#" syntax.
+    if (CSSPropertyParser::fastParseColor(color, string, strict))
+        return true;
+
+    // In case the fast-path parser didn't understand the color, try the full parser.
+    RefPtrWillBeRawPtr<MutableStylePropertySet> stylePropertySet = MutableStylePropertySet::create();
+    // FIXME: The old CSS parser is only working in strict mode ignoring the strict parameter.
+    // It needs to be investigated why.
+    if (!parseValue(stylePropertySet.get(), CSSPropertyColor, string, false, strictCSSParserContext()))
+        return false;
+
+    RefPtrWillBeRawPtr<CSSValue> value = stylePropertySet->getPropertyCSSValue(CSSPropertyColor);
+    if (!value || !value->isPrimitiveValue())
+        return false;
+
+    CSSPrimitiveValue* primitiveValue = toCSSPrimitiveValue(value.get());
+    if (!primitiveValue->isRGBColor())
+        return false;
+
+    color = primitiveValue->getRGBA32Value();
+    return true;
 }
 
 StyleColor CSSParser::colorFromRGBColorString(const String& string)

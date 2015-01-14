@@ -31,6 +31,7 @@
 #include "platform/PlatformExport.h"
 #include "platform/fonts/Font.h"
 #include "platform/geometry/FloatRect.h"
+#include "platform/geometry/FloatRoundedRect.h"
 #include "platform/graphics/DashArray.h"
 #include "platform/graphics/DrawLooperBuilder.h"
 #include "platform/graphics/ImageBufferSurface.h"
@@ -46,16 +47,18 @@
 #include "wtf/PassOwnPtr.h"
 
 class SkBitmap;
+class SkImage;
 class SkPaint;
 class SkPath;
+class SkPicture;
 class SkRRect;
 class SkTextBlob;
 struct SkRect;
 
 namespace blink {
 
+class ClipRecorderStack;
 class DisplayItemList;
-class Picture;
 class ImageBuffer;
 class KURL;
 
@@ -83,6 +86,9 @@ public:
     const SkCanvas* canvas() const { return m_canvas; }
 
     DisplayItemList* displayItemList() { return m_displayItemList; }
+
+    ClipRecorderStack* clipRecorderStack() const { return m_clipRecorderStack; }
+    void setClipRecorderStack(ClipRecorderStack* clipRecorderStack) { m_clipRecorderStack = clipRecorderStack; }
 
     void resetCanvas(SkCanvas*);
 
@@ -157,7 +163,7 @@ public:
 
     // Turn off LCD text for the paint if not supported on this context.
     void adjustTextRenderMode(SkPaint*) const;
-    bool couldUseLCDRenderedText() const { return m_isCertainlyOpaque && m_shouldSmoothFonts; }
+    bool couldUseLCDRenderedText() const;
 
     void setTextDrawingMode(TextDrawingModeFlags mode) { mutableState()->setTextDrawingMode(mode); }
     TextDrawingModeFlags textDrawingMode() const { return immutableState()->textDrawingMode(); }
@@ -246,21 +252,20 @@ public:
     void fillRect(const FloatRect&);
     void fillRect(const FloatRect&, const Color&);
     void fillRect(const FloatRect&, const Color&, CompositeOperator);
-    void fillRoundedRect(const IntRect&, const IntSize& topLeft, const IntSize& topRight, const IntSize& bottomLeft, const IntSize& bottomRight, const Color&);
-    void fillRoundedRect(const RoundedRect&, const Color&);
+    void fillRoundedRect(const FloatRect&, const FloatSize& topLeft, const FloatSize& topRight, const FloatSize& bottomLeft, const FloatSize& bottomRight, const Color&);
+    void fillRoundedRect(const FloatRoundedRect&, const Color&);
 
     void clearRect(const FloatRect&);
 
     void strokeRect(const FloatRect&);
     void strokeRect(const FloatRect&, float lineWidth);
 
-    void fillBetweenRoundedRects(const IntRect&, const IntSize& outerTopLeft, const IntSize& outerTopRight, const IntSize& outerBottomLeft, const IntSize& outerBottomRight,
-        const IntRect&, const IntSize& innerTopLeft, const IntSize& innerTopRight, const IntSize& innerBottomLeft, const IntSize& innerBottomRight, const Color&);
-    void fillBetweenRoundedRects(const RoundedRect&, const RoundedRect&, const Color&);
+    void fillBetweenRoundedRects(const FloatRect&, const FloatSize& outerTopLeft, const FloatSize& outerTopRight, const FloatSize& outerBottomLeft, const FloatSize& outerBottomRight,
+        const FloatRect&, const FloatSize& innerTopLeft, const FloatSize& innerTopRight, const FloatSize& innerBottomLeft, const FloatSize& innerBottomRight, const Color&);
+    void fillBetweenRoundedRects(const FloatRoundedRect&, const FloatRoundedRect&, const Color&);
 
-    void drawPicture(Picture*);
-    void drawPicture(SkPicture*, const FloatPoint& location);
-    void drawPicture(SkPicture*, const FloatRect& dest, const FloatRect& src, CompositeOperator, WebBlendMode);
+    void drawPicture(const SkPicture*);
+    void compositePicture(SkPicture*, const FloatRect& dest, const FloatRect& src, CompositeOperator, WebBlendMode);
 
     void drawImage(Image*, const IntPoint&, CompositeOperator = CompositeSourceOver, RespectImageOrientationEnum = DoNotRespectImageOrientation);
     void drawImage(Image*, const IntRect&, CompositeOperator = CompositeSourceOver, RespectImageOrientationEnum = DoNotRespectImageOrientation);
@@ -281,6 +286,8 @@ public:
     void writePixels(const SkImageInfo&, const void* pixels, size_t rowBytes, int x, int y);
     void drawBitmap(const SkBitmap&, SkScalar, SkScalar, const SkPaint* = 0);
     void drawBitmapRect(const SkBitmap&, const SkRect*, const SkRect&, const SkPaint* = 0);
+    void drawImage(const SkImage*, SkScalar, SkScalar, const SkPaint* = 0);
+    void drawImageRect(const SkImage*, const SkRect*, const SkRect&, const SkPaint* = 0);
     void drawOval(const SkRect&, const SkPaint&);
     void drawPath(const SkPath&, const SkPaint&);
     void drawRect(const SkRect&, const SkPaint&);
@@ -290,10 +297,11 @@ public:
 
     void clip(const IntRect& rect) { clipRect(rect); }
     void clip(const FloatRect& rect) { clipRect(rect); }
-    void clipRoundedRect(const RoundedRect&, SkRegion::Op = SkRegion::kIntersect_Op);
+    void clipRoundedRect(const FloatRoundedRect&, SkRegion::Op = SkRegion::kIntersect_Op);
     void clipOut(const IntRect& rect) { clipRect(rect, NotAntiAliased, SkRegion::kDifference_Op); }
+    void clipOut(const FloatRect& rect) { clipRect(rect, NotAntiAliased, SkRegion::kDifference_Op); }
     void clipOut(const Path&);
-    void clipOutRoundedRect(const RoundedRect&);
+    void clipOutRoundedRect(const FloatRoundedRect&);
     void clipPath(const Path&, WindRule = RULE_EVENODD, AntiAliasingMode = AntiAliased);
     void clipPath(const SkPath&, AntiAliasingMode = NotAntiAliased, SkRegion::Op = SkRegion::kIntersect_Op);
     void clipPolygon(size_t numPoints, const FloatPoint*, bool antialias);
@@ -322,7 +330,7 @@ public:
     // are stored in a display list that can be replayed at a later time. Pass in the bounding
     // rectangle for the content in the list.
     void beginRecording(const FloatRect&, uint32_t = 0);
-    PassRefPtr<Picture> endRecording();
+    PassRefPtr<const SkPicture> endRecording();
 
     bool hasShadow() const;
     void setShadow(const FloatSize& offset, float blur, const Color&,
@@ -347,7 +355,7 @@ public:
         LeftEdge = 1 << 4
     };
     typedef unsigned Edges;
-    void drawInnerShadow(const RoundedRect&, const Color& shadowColor, const IntSize shadowOffset, int shadowBlur, int shadowSpread, Edges clippedEdges = NoEdge);
+    void drawInnerShadow(const FloatRoundedRect&, const Color& shadowColor, const IntSize shadowOffset, int shadowBlur, int shadowSpread, Edges clippedEdges = NoEdge);
 
     // ---------- Transformation methods -----------------
     // Note that the getCTM method returns only the current transform from Blink's perspective,
@@ -377,7 +385,20 @@ public:
     void beginAnnotation(const AnnotationList&);
     void endAnnotation();
 
-    void preparePaintForDrawRectToRect(
+    class AutoCanvasRestorer {
+    public:
+        AutoCanvasRestorer(SkCanvas* canvas, int restoreCount)
+            : m_canvas(canvas)
+            , m_restoreCount(restoreCount)
+        { }
+
+        ~AutoCanvasRestorer();
+    private:
+        SkCanvas* m_canvas;
+        int m_restoreCount;
+    };
+
+    WARN_UNUSED_RETURN PassOwnPtr<AutoCanvasRestorer> preparePaintForDrawRectToRect(
         SkPaint*,
         const SkRect& srcRect,
         const SkRect& destRect,
@@ -392,6 +413,13 @@ public:
         return focusRingOutset(offset) + (focusRingWidth(width) + 1) / 2;
     }
 
+    // public decl needed for OwnPtr wrapper.
+    class RecordingState;
+
+#if ENABLE(ASSERT)
+    void setInDrawingRecorder(bool);
+#endif
+
 private:
     const GraphicsContextState* immutableState() const { return m_paintState; }
 
@@ -402,7 +430,7 @@ private:
     }
 
     static void setPathFromPoints(SkPath*, size_t, const FloatPoint*);
-    static void setRadii(SkVector*, IntSize, IntSize, IntSize, IntSize);
+    static void setRadii(SkVector*, FloatSize, FloatSize, FloatSize, FloatSize);
 
     static PassRefPtr<SkColorFilter> WebCoreColorFilterToSkiaColorFilter(ColorFilter);
 
@@ -458,7 +486,7 @@ private:
 
     void didDrawTextInRect(const SkRect& textRect);
 
-    void fillRectWithRoundedHole(const IntRect&, const RoundedRect& roundedHoleRect, const Color&);
+    void fillRectWithRoundedHole(const FloatRect&, const FloatRoundedRect& roundedHoleRect, const Color&);
 
     bool isRecording() const;
 
@@ -467,6 +495,8 @@ private:
 
     // This being null indicates not to paint into a DisplayItemList, and instead directly into the canvas.
     DisplayItemList* m_displayItemList;
+
+    ClipRecorderStack* m_clipRecorderStack;
 
     // Paint states stack. Enables local drawing state change with save()/restore() calls.
     // This state controls the appearance of drawn content.
@@ -479,13 +509,13 @@ private:
 
     AnnotationModeFlags m_annotationMode;
 
-    struct RecordingState;
-    Vector<RecordingState> m_recordingStateStack;
+    Vector<OwnPtr<RecordingState> > m_recordingStateStack;
 
 #if ENABLE(ASSERT)
     unsigned m_annotationCount;
     unsigned m_layerCount;
     bool m_disableDestructionChecks;
+    bool m_inDrawingRecorder;
 #endif
     // Tracks the region painted opaque via the GraphicsContext.
     RegionTracker m_trackedRegion;

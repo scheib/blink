@@ -132,9 +132,7 @@ HTMLInputElement::HTMLInputElement(Document& document, HTMLFormElement* form, bo
     , m_inputType(createdByParser ? nullptr : InputType::createText(*this))
     , m_inputTypeView(m_inputType)
 {
-#if ENABLE(INPUT_MULTIPLE_FIELDS_UI)
     setHasCustomStyleCallbacks();
-#endif
 }
 
 PassRefPtrWillBeRawPtr<HTMLInputElement> HTMLInputElement::create(Document& document, HTMLFormElement* form, bool createdByParser)
@@ -351,7 +349,7 @@ void HTMLInputElement::updateFocusAppearance(bool restorePreviousSelection)
 {
     if (isTextField()) {
         if (!restorePreviousSelection)
-            select();
+            select(NotDispatchSelectEvent);
         else
             restoreCachedSelection();
         if (document().frame())
@@ -726,8 +724,10 @@ void HTMLInputElement::parseAttribute(const QualifiedName& name, const AtomicStr
         parseMinLengthAttribute(value);
     } else if (name == sizeAttr) {
         int oldSize = m_size;
-        int valueAsInteger = value.toInt();
-        m_size = valueAsInteger > 0 ? valueAsInteger : defaultSize;
+        m_size = defaultSize;
+        int valueAsInteger;
+        if (!value.isEmpty() && parseHTMLInteger(value, valueAsInteger) && valueAsInteger > 0)
+            m_size = valueAsInteger;
         if (m_size != oldSize && renderer())
             renderer()->setNeedsLayoutAndPrefWidthsRecalcAndFullPaintInvalidation();
     } else if (name == altAttr)
@@ -1031,7 +1031,7 @@ void HTMLInputElement::setEditingValue(const String& value)
 
     unsigned max = value.length();
     if (focused())
-        setSelectionRange(max, max);
+        setSelectionRange(max, max, SelectionHasNoDirection, NotDispatchSelectEvent);
     else
         cacheSelectionInResponseToSetValue(max);
 
@@ -1633,6 +1633,11 @@ bool HTMLInputElement::isTextButton() const
     return m_inputType->isTextButton();
 }
 
+bool HTMLInputElement::isImage() const
+{
+    return m_inputType->isImage();
+}
+
 bool HTMLInputElement::isEnumeratable() const
 {
     return m_inputType->isEnumeratable();
@@ -1876,12 +1881,10 @@ bool HTMLInputElement::supportsAutofocus() const
     return m_inputType->isInteractiveContent();
 }
 
-#if ENABLE(INPUT_MULTIPLE_FIELDS_UI)
 PassRefPtr<RenderStyle> HTMLInputElement::customStyleForRenderer()
 {
     return m_inputTypeView->customStyleForRenderer(originalStyleForRenderer());
 }
-#endif
 
 bool HTMLInputElement::shouldDispatchFormControlChangeEvent(String& oldValue, String& newValue)
 {
@@ -1898,4 +1901,18 @@ AXObject* HTMLInputElement::popupRootAXObject()
     return m_inputTypeView->popupRootAXObject();
 }
 
+void HTMLInputElement::ensureFallbackContent()
+{
+    m_inputTypeView->ensureFallbackContent();
+}
+
+void HTMLInputElement::ensurePrimaryContent()
+{
+    m_inputTypeView->ensurePrimaryContent();
+}
+
+bool HTMLInputElement::hasFallbackContent() const
+{
+    return m_inputTypeView->hasFallbackContent();
+}
 } // namespace

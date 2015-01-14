@@ -71,7 +71,8 @@ enum WebAXEvent {
 // These values must match blink::AccessibilityRole values.
 // Enforced in AssertMatchingEnums.cpp.
 enum WebAXRole {
-    WebAXRoleAlertDialog = 1,
+    WebAXRoleUnknown = 0,
+    WebAXRoleAlertDialog,
     WebAXRoleAlert,
     WebAXRoleAnnotation,
     WebAXRoleApplication,
@@ -81,6 +82,7 @@ enum WebAXRole {
     WebAXRoleBusyIndicator,
     WebAXRoleButton,
     WebAXRoleCanvas,
+    WebAXRoleCaption,
     WebAXRoleCell,
     WebAXRoleCheckBox,
     WebAXRoleColorWell,
@@ -127,7 +129,6 @@ enum WebAXRole {
     WebAXRoleLog,
     WebAXRoleMain,
     WebAXRoleMarquee,
-    WebAXRoleMathElement,
     WebAXRoleMath,
     WebAXRoleMenuBar,
     WebAXRoleMenuButton,
@@ -182,9 +183,9 @@ enum WebAXRole {
     WebAXRoleTreeGrid,
     WebAXRoleTreeItem,
     WebAXRoleTree,
-    WebAXRoleUnknown,
     WebAXRoleUserInterfaceTooltip,
     WebAXRoleWebArea,
+    WebAXRoleLineBreak,
     WebAXRoleWindow,
 };
 
@@ -245,6 +246,17 @@ enum WebAXOrientation {
     WebAXOrientationUndefined = 0,
     WebAXOrientationVertical,
     WebAXOrientationHorizontal,
+};
+
+// Only used by HTML form controls and any other element that has
+// an aria-invalid attribute specified.
+enum WebAXInvalidState {
+    WebAXInvalidStateUndefined = 0,
+    WebAXInvalidStateFalse,
+    WebAXInvalidStateTrue,
+    WebAXInvalidStateSpelling,
+    WebAXInvalidStateGrammar,
+    WebAXInvalidStateOther
 };
 
 } // namespace blink

@@ -374,7 +374,7 @@ public:
     CSSCallbackWebFrameClient() : m_updateCount(0) { }
     virtual void didMatchCSS(WebLocalFrame*, const WebVector<WebString>& newlyMatchingSelectors, const WebVector<WebString>& stoppedMatchingSelectors) override;
 
-    std::map<WebLocalFrame*, std::set<std::string> > m_matchedSelectors;
+    std::map<WebLocalFrame*, std::set<std::string>> m_matchedSelectors;
     int m_updateCount;
 };
 
@@ -398,7 +398,6 @@ class WebFrameCSSCallbackTest : public testing::Test {
 protected:
     WebFrameCSSCallbackTest()
     {
-
         m_frame = m_helper.initializeAndLoad("about:blank", true, &m_client)->mainFrame()->toWebLocalFrame();
     }
 
@@ -4278,7 +4277,6 @@ public:
     CompositedSelectionBoundsTestLayerTreeView() : m_selectionCleared(false) { }
     virtual ~CompositedSelectionBoundsTestLayerTreeView() { }
 
-    virtual void setSurfaceReady()  override { }
     virtual void setRootLayer(const WebLayer&)  override { }
     virtual void clearRootLayer()  override { }
     virtual void setViewportSize(const WebSize& deviceViewportSize)  override { }
@@ -5915,10 +5913,10 @@ public:
     TestHistoryWebFrameClient()
     {
         m_replacesCurrentHistoryItem = false;
-        m_frame = 0;
+        m_frame = nullptr;
     }
 
-    void didStartProvisionalLoad(WebLocalFrame* frame, bool isTransitionNavigation)
+    void didStartProvisionalLoad(WebLocalFrame* frame, bool isTransitionNavigation, double)
     {
         WebDataSource* ds = frame->provisionalDataSource();
         m_replacesCurrentHistoryItem = ds->replacesCurrentHistoryItem();
@@ -6334,6 +6332,7 @@ TEST_F(WebFrameTest, FullscreenMediaStreamVideo)
     RenderLayer* renderLayer =  videoFullscreen->renderer()->enclosingLayer();
     GraphicsLayer* graphicsLayer = renderLayer->graphicsLayerBacking();
     EXPECT_TRUE(graphicsLayer->contentsAreVisible());
+    context->notifyContextDestroyed();
 }
 
 TEST_F(WebFrameTest, RenderBlockPercentHeightDescendants)
@@ -6820,6 +6819,47 @@ TEST_F(WebFrameSwapTest, SwapParentShouldDetachChildren)
     remoteFrame->close();
 }
 
+class RemoteToLocalSwapWebFrameClient : public FrameTestHelpers::TestWebFrameClient {
+public:
+    explicit RemoteToLocalSwapWebFrameClient(WebRemoteFrame* remoteFrame)
+        : m_historyCommitType(WebHistoryInertCommit)
+        , m_remoteFrame(remoteFrame)
+    {
+    }
+
+    void didCommitProvisionalLoad(WebLocalFrame* frame, const WebHistoryItem&, WebHistoryCommitType historyCommitType) override
+    {
+        m_historyCommitType = historyCommitType;
+        m_remoteFrame->swap(frame);
+    }
+
+    WebHistoryCommitType historyCommitType() const { return m_historyCommitType; }
+
+    WebHistoryCommitType m_historyCommitType;
+    WebRemoteFrame* m_remoteFrame;
+};
+
+TEST_F(WebFrameSwapTest, HistoryCommitTypeAfterRemoteToLocalSwap)
+{
+    WebRemoteFrame* remoteFrame = WebRemoteFrame::create(nullptr);
+    WebFrame* targetFrame = mainFrame()->firstChild();
+    ASSERT_TRUE(targetFrame);
+    targetFrame->swap(remoteFrame);
+    ASSERT_TRUE(mainFrame()->firstChild());
+    ASSERT_EQ(mainFrame()->firstChild(), remoteFrame);
+
+    RemoteToLocalSwapWebFrameClient client(remoteFrame);
+    WebLocalFrame* localFrame = WebLocalFrame::create(&client);
+    localFrame->initializeToReplaceRemoteFrame(remoteFrame);
+    FrameTestHelpers::loadFrame(localFrame, m_baseURL + "subframe-hello.html");
+    EXPECT_EQ(WebStandardCommit, client.historyCommitType());
+
+    // Manually reset to break WebViewHelper's dependency on the stack allocated
+    // TestWebFrameClient.
+    reset();
+    remoteFrame->close();
+}
+
 class MockDocumentThreadableLoaderClient : public DocumentThreadableLoaderClient {
 public:
     MockDocumentThreadableLoaderClient() : m_failed(false) { }
@@ -6877,7 +6917,7 @@ public:
         m_navigationalDataReceivedCount++;
     }
 
-    virtual void didStartProvisionalLoad(WebLocalFrame* localFrame, bool isTransitionNavigation) override
+    virtual void didStartProvisionalLoad(WebLocalFrame* localFrame, bool isTransitionNavigation, double) override
     {
         m_provisionalLoadCount++;
         m_wasLastProvisionalLoadATransition = isTransitionNavigation;

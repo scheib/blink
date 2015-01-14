@@ -93,7 +93,7 @@ public:
     BarProp* statusbar() const override;
     BarProp* toolbar() const override;
     Navigator* navigator() const override;
-    Location& location() const override;
+    Location* location() const override;
     bool offscreenBuffering() const override;
     int outerHeight() const override;
     int outerWidth() const override;
@@ -103,20 +103,12 @@ public:
     int screenY() const override;
     double scrollX() const override;
     double scrollY() const override;
-    bool closed() const override;
-    unsigned length() const override;
     const AtomicString& name() const override;
     void setName(const AtomicString&) override;
     String status() const override;
     void setStatus(const String&) override;
     String defaultStatus() const override;
     void setDefaultStatus(const String&) override;
-    DOMWindow* self() const override;
-    DOMWindow* window() const { return self(); }
-    DOMWindow* frames() const { return self(); }
-    DOMWindow* opener() const override;
-    DOMWindow* parent() const override;
-    DOMWindow* top() const override;
     Document* document() const override;
     StyleMedia* styleMedia() const override;
     double devicePixelRatio() const override;
@@ -128,9 +120,9 @@ public:
     Performance* performance() const override;
     DOMWindowCSS* css() const override;
     DOMSelection* getSelection() override;
-    void focus(ExecutionContext* = 0) override;
+    void focus(ExecutionContext*) override;
     void blur() override;
-    void close(ExecutionContext* = 0) override;
+    void close(ExecutionContext*) override;
     void print() override;
     void stop() override;
     void alert(const String& message = String()) override;
@@ -155,7 +147,6 @@ public:
     int requestAnimationFrame(RequestAnimationFrameCallback*) override;
     int webkitRequestAnimationFrame(RequestAnimationFrameCallback*) override;
     void cancelAnimationFrame(int id) override;
-    DOMWindow* anonymousIndexedGetter(uint32_t) override;
     void postMessage(PassRefPtr<SerializedScriptValue> message, const MessagePortArray*, const String& targetOrigin, LocalDOMWindow* source, ExceptionState&) override;
     String crossDomainAccessErrorMessage(LocalDOMWindow* callingWindow) override;
     String sanitizedCrossDomainAccessErrorMessage(LocalDOMWindow* callingWindow) override;
@@ -225,7 +216,7 @@ public:
 
     bool isInsecureScriptAccess(LocalDOMWindow& callingWindow, const String& urlString);
 
-    PassOwnPtr<LifecycleNotifier<LocalDOMWindow> > createLifecycleNotifier();
+    PassOwnPtr<LifecycleNotifier<LocalDOMWindow>> createLifecycleNotifier();
 
     EventQueue* eventQueue() const;
     void enqueueWindowEvent(PassRefPtrWillBeRawPtr<Event>);
@@ -301,7 +292,7 @@ private:
     bool m_hasBeenReset;
 #endif
 
-    WillBeHeapHashSet<RawPtrWillBeWeakMember<DOMWindowProperty> > m_properties;
+    WillBeHeapHashSet<RawPtrWillBeWeakMember<DOMWindowProperty>> m_properties;
 
     mutable RefPtrWillBeMember<Screen> m_screen;
     mutable RefPtrWillBeMember<History> m_history;
@@ -330,7 +321,7 @@ private:
     RefPtrWillBeMember<DOMWindowEventQueue> m_eventQueue;
     RefPtr<SerializedScriptValue> m_pendingStateObject;
 
-    WillBeHeapHashSet<OwnPtrWillBeMember<PostMessageTimer> > m_postMessageTimers;
+    WillBeHeapHashSet<OwnPtrWillBeMember<PostMessageTimer>> m_postMessageTimers;
 };
 
 DEFINE_TYPE_CASTS(LocalDOMWindow, DOMWindow, x, x->isLocalDOMWindow(), x.isLocalDOMWindow());

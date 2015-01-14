@@ -75,6 +75,7 @@ typedef StaticNodeTypeList<Node> StaticNodeList;
 
 class Internals final : public GarbageCollectedFinalized<Internals>, public ScriptWrappable, public ContextLifecycleObserver {
     DEFINE_WRAPPERTYPEINFO();
+    WILL_BE_USING_GARBAGE_COLLECTED_MIXIN(Internals);
 public:
     static Internals* create(Document*);
     virtual ~Internals();
@@ -118,12 +119,11 @@ public:
     bool hasSelectorForPseudoClassInShadow(Element* host, const String& pseudoClass, ExceptionState&);
     unsigned short compareTreeScopePosition(const Node*, const Node*, ExceptionState&) const;
 
-    // FIXME: Rename these functions if walker is preferred.
-    Node* nextSiblingByWalker(Node*);
-    Node* firstChildByWalker(Node*);
-    Node* lastChildByWalker(Node*);
-    Node* nextNodeByWalker(Node*);
-    Node* previousNodeByWalker(Node*);
+    Node* nextSiblingInComposedTree(Node*, ExceptionState&);
+    Node* firstChildInComposedTree(Node*, ExceptionState&);
+    Node* lastChildInComposedTree(Node*, ExceptionState&);
+    Node* nextInComposedTree(Node*, ExceptionState&);
+    Node* previousInComposedTree(Node*, ExceptionState&);
 
     unsigned updateStyleAndReturnAffectedElementCount(ExceptionState&) const;
     unsigned needsLayoutCount(ExceptionState&) const;

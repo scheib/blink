@@ -28,7 +28,6 @@
 
 #include "platform/graphics/BitmapImage.h"
 #include "platform/graphics/ImageBuffer.h"
-#include "platform/graphics/Picture.h"
 #include "platform/graphics/skia/NativeImageSkia.h"
 #include "third_party/skia/include/core/SkBitmap.h"
 #include "third_party/skia/include/core/SkCanvas.h"
@@ -234,7 +233,7 @@ TEST(GraphicsContextTest, trackDisplayListRecording)
     FloatRect bounds(0, 0, 100, 100);
     context.beginRecording(bounds);
     context.fillRect(FloatRect(0, 0, 100, 100), opaque, CompositeSourceOver);
-    RefPtr<Picture> picture = context.endRecording();
+    RefPtr<const SkPicture> picture = context.endRecording();
 
     // Make sure the opaque region was unaffected by the rect drawn during Picture recording.
     EXPECT_EQ_RECT(IntRect(0, 0, 50, 50), context.opaqueRegion().asRect());
@@ -686,7 +685,7 @@ TEST(GraphicsContextTest, trackOpaqueRoundedRectTest)
     EXPECT_EQ_RECT(IntRect(0, 0, 0, 0), context.opaqueRegion().asRect());
     EXPECT_PIXELS_MATCH(bitmap, context.opaqueRegion().asRect());
 
-    context.fillRoundedRect(IntRect(10, 10, 90, 90), radii, radii, radii, radii, opaque);
+    context.fillRoundedRect(FloatRect(10, 10, 90, 90), radii, radii, radii, radii, opaque);
     EXPECT_EQ_RECT(IntRect(0, 0, 0, 0), context.opaqueRegion().asRect());
     EXPECT_PIXELS_MATCH(bitmap, context.opaqueRegion().asRect());
 
@@ -697,19 +696,19 @@ TEST(GraphicsContextTest, trackOpaqueRoundedRectTest)
     context.setCompositeOperation(CompositeSourceIn);
     context.setShouldAntialias(false);
 
-    context.fillRoundedRect(IntRect(10, 10, 50, 30), radii, radii, radii, radii, opaque);
+    context.fillRoundedRect(FloatRect(10, 10, 50, 30), radii, radii, radii, radii, opaque);
     EXPECT_EQ_RECT(IntRect(10, 10, 90, 90), context.opaqueRegion().asRect());
     EXPECT_PIXELS_MATCH(bitmap, context.opaqueRegion().asRect());
 
-    context.fillRoundedRect(IntRect(10, 10, 30, 50), radii, radii, radii, radii, alpha);
+    context.fillRoundedRect(FloatRect(10, 10, 30, 50), radii, radii, radii, radii, alpha);
     EXPECT_EQ_RECT(IntRect(40, 10, 60, 90), context.opaqueRegion().asRect());
     EXPECT_PIXELS_MATCH(bitmap, context.opaqueRegion().asRect());
 
-    context.fillRoundedRect(IntRect(10, 0, 50, 30), radii, radii, radii, radii, alpha);
+    context.fillRoundedRect(FloatRect(10, 0, 50, 30), radii, radii, radii, radii, alpha);
     EXPECT_EQ_RECT(IntRect(40, 30, 60, 70), context.opaqueRegion().asRect());
     EXPECT_PIXELS_MATCH(bitmap, context.opaqueRegion().asRect());
 
-    context.fillRoundedRect(IntRect(30, 0, 70, 50), radii, radii, radii, radii, opaque);
+    context.fillRoundedRect(FloatRect(30, 0, 70, 50), radii, radii, radii, radii, opaque);
     EXPECT_EQ_RECT(IntRect(40, 30, 60, 70), context.opaqueRegion().asRect());
     EXPECT_PIXELS_MATCH(bitmap, context.opaqueRegion().asRect());
 }
@@ -1212,10 +1211,9 @@ TEST(GraphicsContextTest, RecordingCanvas)
     EXPECT_TRUE(canvas1->unique());
 
     // endRecording finally makes the picture accessible
-    RefPtr<Picture> picture = context.endRecording();
-    SkPicture* pic = picture->skPicture().get();
-    EXPECT_TRUE(pic);
-    EXPECT_TRUE(pic->unique());
+    RefPtr<const SkPicture> picture = context.endRecording();
+    EXPECT_TRUE(picture);
+    EXPECT_TRUE(picture->unique());
 
     context.endRecording();
 }

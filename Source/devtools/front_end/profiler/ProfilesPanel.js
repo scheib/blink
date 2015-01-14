@@ -662,7 +662,7 @@ WebInspector.ProfilesPanel.prototype = {
     {
         this._launcherView.addProfileType(profileType);
         var profileTypeSection = new WebInspector.ProfileTypeSidebarSection(this, profileType);
-        this._typeIdToSidebarSection[profileType.id] = profileTypeSection
+        this._typeIdToSidebarSection[profileType.id] = profileTypeSection;
         this.sidebarTree.appendChild(profileTypeSection);
         profileTypeSection.childrenListElement.addEventListener("contextmenu", this._handleContextMenuEvent.bind(this), true);
 
@@ -899,7 +899,7 @@ WebInspector.ProfilesPanel.prototype = {
                 this.showObject(result, viewName);
         }
 
-        contextMenu.appendItem(WebInspector.UIString(WebInspector.useLowerCaseMenuTitles() ? "Reveal in Summary view" : "Reveal in Summary View"), revealInView.bind(this, "Summary"));
+        contextMenu.appendItem(WebInspector.UIString.capitalize("Reveal in Summary ^view"), revealInView.bind(this, "Summary"));
     },
 
     __proto__: WebInspector.PanelWithSidebarTree.prototype

@@ -40,6 +40,7 @@
 namespace blink {
 
 class AXObject;
+class AXObjectCache;
 class AXObjectCacheImpl;
 class Element;
 class FrameView;
@@ -52,7 +53,8 @@ class Widget;
 typedef unsigned AXID;
 
 enum AccessibilityRole {
-    AlertDialogRole = 1,
+    UnknownRole = 0,
+    AlertDialogRole,
     AlertRole,
     AnnotationRole,
     ApplicationRole,
@@ -62,6 +64,7 @@ enum AccessibilityRole {
     BusyIndicatorRole,
     ButtonRole,
     CanvasRole,
+    CaptionRole,
     CellRole,
     CheckBoxRole,
     ColorWellRole,
@@ -108,7 +111,6 @@ enum AccessibilityRole {
     LogRole,
     MainRole,
     MarqueeRole,
-    MathElementRole,
     MathRole,
     MenuBarRole,
     MenuButtonRole,
@@ -163,10 +165,11 @@ enum AccessibilityRole {
     TreeGridRole,
     TreeItemRole,
     TreeRole,
-    UnknownRole,
     UserInterfaceTooltipRole,
     WebAreaRole,
+    LineBreakRole,
     WindowRole,
+    NumRoles
 };
 
 enum AccessibilityTextSource {
@@ -258,6 +261,15 @@ enum AccessibilityOptionalBool {
     OptionalBoolFalse
 };
 
+enum InvalidState {
+    InvalidStateUndefined = 0,
+    InvalidStateFalse,
+    InvalidStateTrue,
+    InvalidStateSpelling,
+    InvalidStateGrammar,
+    InvalidStateOther
+};
+
 class AXObject : public RefCounted<AXObject> {
 public:
     typedef Vector<RefPtr<AXObject> > AccessibilityChildrenVector;
@@ -281,7 +293,7 @@ public:
     };
 
 protected:
-    AXObject();
+    AXObject(AXObjectCacheImpl*);
 
 public:
     virtual ~AXObject();
@@ -301,7 +313,8 @@ public:
     virtual void setParent(AXObject* parent) { m_parent = parent; }
 
     // The AXObjectCacheImpl that owns this object, and its unique ID within this cache.
-    AXObjectCacheImpl* axObjectCache() const;
+    AXObjectCacheImpl* axObjectCache() const { return m_axObjectCache; }
+
     AXID axObjectID() const { return m_id; }
 
     // Determine subclass type.
@@ -343,6 +356,7 @@ public:
     virtual bool isMenuListOption() const { return false; }
     virtual bool isMenuListPopup() const { return false; }
     bool isMenuRelated() const;
+    virtual bool isMeter() const { return false; }
     virtual bool isMockObject() const { return false; }
     virtual bool isNativeSpinButton() const { return false; }
     virtual bool isNativeTextControl() const { return false; } // input or textarea
@@ -427,15 +441,20 @@ public:
     virtual String actionVerb() const;
     virtual AccessibilityButtonState checkboxOrRadioValue() const;
     virtual void colorValue(int& r, int& g, int& b) const { r = 0; g = 0; b = 0; }
+    virtual InvalidState invalidState() const { return InvalidStateUndefined; }
+    // Only used when invalidState() returns InvalidStateOther.
+    virtual String ariaInvalidValue() const { return String(); }
     virtual String valueDescription() const { return String(); }
     virtual float valueForRange() const { return 0.0f; }
     virtual float maxValueForRange() const { return 0.0f; }
     virtual float minValueForRange() const { return 0.0f; }
+    virtual String placeholder() const { return String(); }
     virtual String stringValue() const { return String(); }
     virtual const AtomicString& textInputType() const { return nullAtom; }
 
     // ARIA attributes.
     virtual AXObject* activeDescendant() const { return 0; }
+    virtual String ariaAutoComplete() const { return String(); }
     virtual String ariaDescribedByAttribute() const { return String(); }
     virtual void ariaFlowToElements(AccessibilityChildrenVector&) const { }
     virtual void ariaControlsElements(AccessibilityChildrenVector&) const { }
@@ -477,11 +496,12 @@ public:
 
     // Accessibility Text.
     virtual String textUnderElement() const { return String(); }
-
-    // Accessibility Text - (To be deprecated).
     virtual String accessibilityDescription() const { return String(); }
     virtual String title() const { return String(); }
     virtual String helpText() const { return String(); }
+    // Returns result of Accessible Name Calculation algorithm
+    // TODO(aboxhall): ensure above and replace title() with this logic
+    virtual String computedName() const { return String(); }
 
     // Location and click point in frame-relative coordinates.
     virtual LayoutRect elementRect() const { return m_explicitElementRect; }
@@ -507,7 +527,7 @@ public:
     // Low-level accessibility tree exploration, only for use within the accessibility module.
     virtual AXObject* firstChild() const { return 0; }
     virtual AXObject* nextSibling() const { return 0; }
-    static AXObject* firstAccessibleObjectFromNode(const Node*);
+    AXObject* firstAccessibleObjectFromNode(const Node*);
     virtual void addChildren() { }
     virtual bool canHaveChildren() const { return true; }
     bool hasChildren() const { return m_haveChildren; }
@@ -576,6 +596,7 @@ public:
     static bool isARIAInput(AccessibilityRole);
     static AccessibilityRole ariaRoleToWebCoreRole(const String&);
     static IntRect boundingBoxForQuads(RenderObject*, const Vector<FloatQuad>&);
+    static const AtomicString& roleName(AccessibilityRole);
 
 protected:
     AXID m_id;
@@ -605,6 +626,8 @@ protected:
     mutable int m_lastModificationCount;
     mutable bool m_cachedIsIgnored;
     mutable const AXObject* m_cachedLiveRegionRoot;
+
+    AXObjectCacheImpl* m_axObjectCache;
 
     // Updates the cached attribute values. This may be recursive, so to prevent deadlocks,
     // functions called here may only search up the tree (ancestors), not down.

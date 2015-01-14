@@ -16,8 +16,7 @@ namespace blink {
 class ExecutionContext;
 
 class PermissionStatus final
-    : public RefCountedGarbageCollectedWillBeGarbageCollectedFinalized<PermissionStatus>
-    , public EventTargetWithInlineData
+    : public RefCountedGarbageCollectedEventTargetWithInlineData<PermissionStatus>
     , public ContextLifecycleObserver {
     DEFINE_EVENT_TARGET_REFCOUNTING_WILL_BE_REMOVED(RefCountedGarbageCollected<PermissionStatus>);
     WILL_BE_USING_GARBAGE_COLLECTED_MIXIN(PermissionStatus);

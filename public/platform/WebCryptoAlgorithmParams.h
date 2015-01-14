@@ -122,12 +122,31 @@ private:
 
 class WebCryptoHmacImportParams : public WebCryptoAlgorithmParamsWithHash {
 public:
+    // FIXME: Remove this constructor once it is no longer used by Chromium. http://crbug.com/431085
     explicit WebCryptoHmacImportParams(const WebCryptoAlgorithm& hash)
         : WebCryptoAlgorithmParamsWithHash(hash)
+        , m_hasLengthBits(false)
+        , m_optionalLengthBits(0)
     {
     }
 
+    WebCryptoHmacImportParams(const WebCryptoAlgorithm& hash, bool hasLengthBits, unsigned lengthBits)
+        : WebCryptoAlgorithmParamsWithHash(hash)
+        , m_hasLengthBits(hasLengthBits)
+        , m_optionalLengthBits(lengthBits)
+    {
+        BLINK_ASSERT(hasLengthBits || !lengthBits);
+    }
+
     virtual WebCryptoAlgorithmParamsType type() const { return WebCryptoAlgorithmParamsTypeHmacImportParams; }
+
+    bool hasLengthBits() const { return m_hasLengthBits; }
+
+    unsigned optionalLengthBits() const { return m_optionalLengthBits; }
+
+private:
+    const bool m_hasLengthBits;
+    const unsigned m_optionalLengthBits;
 };
 
 class WebCryptoHmacKeyGenParams : public WebCryptoAlgorithmParamsWithHash {
@@ -301,6 +320,21 @@ public:
 
 private:
     const WebCryptoKey m_publicKey;
+};
+
+class WebCryptoAesDerivedKeyParams : public WebCryptoAlgorithmParams {
+public:
+    explicit WebCryptoAesDerivedKeyParams(unsigned short lengthBits)
+        : m_lengthBits(lengthBits)
+    {
+    }
+
+    virtual WebCryptoAlgorithmParamsType type() const override { return WebCryptoAlgorithmParamsTypeAesDerivedKeyParams; }
+
+    unsigned short lengthBits() const { return m_lengthBits; }
+
+private:
+    const unsigned short m_lengthBits;
 };
 
 } // namespace blink

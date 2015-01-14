@@ -79,7 +79,7 @@ using namespace HTMLNames;
     // lists in BisonCSSParser.h.
     WillBeHeapVector<RefPtrWillBeMember<StyleRuleBase> >* ruleList;
     WillBeHeapVector<OwnPtrWillBeMember<MediaQueryExp> >* mediaQueryExpList;
-    WillBeHeapVector<RefPtrWillBeMember<StyleKeyframe> >* keyframeRuleList;
+    WillBeHeapVector<RefPtrWillBeMember<StyleRuleKeyframe> >* keyframeRuleList;
     CSSParserSelector* selector;
     Vector<OwnPtr<CSSParserSelector> >* selectorList;
     CSSSelector::MarginBoxType marginBox;
@@ -91,7 +91,7 @@ using namespace HTMLNames;
     MediaQueryExp* mediaQueryExp;
     CSSParserValue value;
     CSSParserValueList* valueList;
-    StyleKeyframe* keyframe;
+    StyleRuleKeyframe* keyframe;
     float val;
     CSSPropertyID id;
     CSSParserLocation location;
@@ -349,6 +349,7 @@ inline static CSSParserValue makeIdentValue(CSSParserString string)
 %type <integer> unary_operator
 %type <integer> maybe_unary_operator
 %type <character> operator
+%type <character> slash_operator
 
 %type <valueList> expr
 %type <value> term
@@ -728,7 +729,7 @@ at_rule_header_end_maybe_space:
     ;
 
 media_rule_start:
-    before_media_rule MEDIA_SYM maybe_space;
+    MEDIA_SYM maybe_space before_media_rule;
 
 media:
     media_rule_start maybe_media_list '{' at_rule_header_end at_rule_body_start maybe_space block_rule_body closing_brace {
@@ -1596,6 +1597,12 @@ expr:
         $$ = $1;
         $$->addValue(parser->sinkFloatingValue($2));
     }
+     | expr slash_operator slash_operator term {
+         $$ = $1;
+         $$->addValue(makeOperatorValue($2));
+         $$->addValue(makeOperatorValue($3));
+         $$->addValue(parser->sinkFloatingValue($4));
+     }
   ;
 
 expr_recovery:
@@ -1604,10 +1611,14 @@ expr_recovery:
     }
   ;
 
+slash_operator:
+      '/' maybe_space {
+          $$ = '/';
+      }
+   ;
+ 
 operator:
-    '/' maybe_space {
-        $$ = '/';
-    }
+    slash_operator
   | ',' maybe_space {
         $$ = ',';
     }

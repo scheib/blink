@@ -9,6 +9,7 @@
 #include "bindings/core/v8/ScriptWrappable.h"
 #include "bindings/core/v8/SerializedScriptValue.h"
 #include "platform/heap/Handle.h"
+#include "public/platform/WebServiceWorkerClientsInfo.h"
 #include "wtf/Forward.h"
 
 namespace blink {
@@ -16,21 +17,27 @@ namespace blink {
 class ExecutionContext;
 class ScriptState;
 
-class ServiceWorkerClient final : public GarbageCollected<ServiceWorkerClient>, public ScriptWrappable {
+class ServiceWorkerClient : public GarbageCollectedFinalized<ServiceWorkerClient>, public ScriptWrappable {
     DEFINE_WRAPPERTYPEINFO();
 public:
-    static ServiceWorkerClient* create(unsigned id);
+    static ServiceWorkerClient* create(const WebServiceWorkerClientInfo&);
 
-    // ServiceWorkerClient.idl
+    virtual ~ServiceWorkerClient();
+
+    // Client.idl
+    String url() const { return m_url; }
     void postMessage(ExecutionContext*, PassRefPtr<SerializedScriptValue> message, const MessagePortArray*, ExceptionState&);
-    ScriptPromise focus(ScriptState*);
 
-    void trace(Visitor*) { }
+    virtual void trace(Visitor*) { }
+
+protected:
+    explicit ServiceWorkerClient(const WebServiceWorkerClientInfo&);
+
+    unsigned id() const { return m_id; }
 
 private:
-    explicit ServiceWorkerClient(unsigned id);
-
     unsigned m_id;
+    String m_url;
 };
 
 } // namespace blink

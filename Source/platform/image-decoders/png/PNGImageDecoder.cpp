@@ -63,38 +63,24 @@ inline blink::PNGImageDecoder* imageDecoder(png_structp png)
     return static_cast<blink::PNGImageDecoder*>(png_get_progressive_ptr(png));
 }
 
-// Called when decoding fails.
-void PNGAPI decodingFailed(png_structp png, png_const_charp)
-{
-    longjmp(JMPBUF(png), 1);
-}
-
-// Callbacks given to the read struct.  The first is for warnings (we want to
-// treat a particular warning as an error, which is why we have to register this
-// callback).
-void PNGAPI decodingWarning(png_structp png, png_const_charp warning)
-{
-    // Turn PLTE tRNS warnings into errors: http://bugzil.la/251381 for details.
-    if (!strncmp(warning, "Missing PLTE before tRNS", 24))
-        png_error(png, warning);
-}
-
-// Called when image header information is available (including the size).
-void PNGAPI headerAvailable(png_structp png, png_infop)
+void PNGAPI pngHeaderAvailable(png_structp png, png_infop)
 {
     imageDecoder(png)->headerAvailable();
 }
 
-// Called when a decoded row is ready.
-void PNGAPI rowAvailable(png_structp png, png_bytep rowBuffer, png_uint_32 rowIndex, int interlacePass)
+void PNGAPI pngRowAvailable(png_structp png, png_bytep row, png_uint_32 rowIndex, int state)
 {
-    imageDecoder(png)->rowAvailable(rowBuffer, rowIndex, interlacePass);
+    imageDecoder(png)->rowAvailable(row, rowIndex, state);
 }
 
-// Called when decoding completes.
 void PNGAPI pngComplete(png_structp png, png_infop)
 {
-    imageDecoder(png)->pngComplete();
+    imageDecoder(png)->complete();
+}
+
+void PNGAPI pngFailed(png_structp png, png_const_charp)
+{
+    longjmp(JMPBUF(png), 1);
 }
 
 } // anonymous
@@ -115,9 +101,9 @@ public:
         , m_rowBuffer()
 #endif
     {
-        m_png = png_create_read_struct(PNG_LIBPNG_VER_STRING, 0, decodingFailed, decodingWarning);
+        m_png = png_create_read_struct(PNG_LIBPNG_VER_STRING, 0, pngFailed, 0);
         m_info = png_create_info_struct(m_png);
-        png_set_progressive_read_fn(m_png, m_decoder, headerAvailable, rowAvailable, pngComplete);
+        png_set_progressive_read_fn(m_png, m_decoder, pngHeaderAvailable, pngRowAvailable, pngComplete);
     }
 
     ~PNGImageReader()
@@ -182,16 +168,20 @@ public:
         m_transform = 0;
     }
 
-    void createColorTransform(const ColorProfile& colorProfile, bool hasAlpha)
+    void createColorTransform(const ColorProfile& colorProfile, bool hasAlpha, bool sRGB)
     {
         clearColorTransform();
 
-        if (colorProfile.isEmpty())
+        if (colorProfile.isEmpty() && !sRGB)
             return;
         qcms_profile* deviceProfile = ImageDecoder::qcmsOutputDeviceProfile();
         if (!deviceProfile)
             return;
-        qcms_profile* inputProfile = qcms_profile_from_memory(colorProfile.data(), colorProfile.size());
+        qcms_profile* inputProfile = 0;
+        if (!colorProfile.isEmpty())
+            inputProfile = qcms_profile_from_memory(colorProfile.data(), colorProfile.size());
+        else
+            inputProfile = qcms_profile_sRGB();
         if (!inputProfile)
             return;
         // We currently only support color profiles for RGB and RGBA images.
@@ -218,11 +208,8 @@ private:
 #endif
 };
 
-PNGImageDecoder::PNGImageDecoder(ImageSource::AlphaOption alphaOption,
-    ImageSource::GammaAndColorProfileOption gammaAndColorProfileOption,
-    size_t maxDecodedBytes)
-    : ImageDecoder(alphaOption, gammaAndColorProfileOption, maxDecodedBytes)
-    , m_doNothingOnFailure(false)
+PNGImageDecoder::PNGImageDecoder(ImageSource::AlphaOption alphaOption, ImageSource::GammaAndColorProfileOption colorOptions, size_t maxDecodedBytes)
+    : ImageDecoder(alphaOption, colorOptions, maxDecodedBytes)
     , m_hasColorProfile(false)
 {
 }
@@ -260,18 +247,16 @@ ImageFrame* PNGImageDecoder::frameBufferAtIndex(size_t index)
     return &frame;
 }
 
-bool PNGImageDecoder::setFailed()
-{
-    if (m_doNothingOnFailure)
-        return false;
-    m_reader.clear();
-    return ImageDecoder::setFailed();
-}
-
 #if USE(QCMSLIB)
-static void readColorProfile(png_structp png, png_infop info, ColorProfile& colorProfile)
+static void getColorProfile(png_structp png, png_infop info, ColorProfile& colorProfile, bool& sRGB)
 {
 #ifdef PNG_iCCP_SUPPORTED
+    ASSERT(colorProfile.isEmpty());
+    if (png_get_valid(png, info, PNG_INFO_sRGB)) {
+        sRGB = true;
+        return;
+    }
+
     char* profileName;
     int compressionType;
 #if (PNG_LIBPNG_VER < 10500)
@@ -293,7 +278,6 @@ static void readColorProfile(png_structp png, png_infop info, ColorProfile& colo
     else if (!ImageDecoder::inputDeviceColorProfile(profileData, profileLength))
         ignoreProfile = true;
 
-    ASSERT(colorProfile.isEmpty());
     if (!ignoreProfile)
         colorProfile.append(profileData, profileLength);
 #endif
@@ -308,21 +292,14 @@ void PNGImageDecoder::headerAvailable()
     png_uint_32 height = png_get_image_height(png, info);
 
     // Protect against large PNGs. See http://bugzil.la/251381 for more details.
-    const unsigned long cMaxPNGSize = 1000000UL;
-    if (width > cMaxPNGSize || height > cMaxPNGSize) {
+    const unsigned long maxPNGSize = 1000000UL;
+    if (width > maxPNGSize || height > maxPNGSize) {
         longjmp(JMPBUF(png), 1);
         return;
     }
 
-    // We can fill in the size now that the header is available.  Avoid memory
-    // corruption issues by neutering setFailed() during this call; if we don't
-    // do this, failures will cause |m_reader| to be deleted, and our jmpbuf
-    // will cease to exist.  Note that we'll still properly set the failure flag
-    // in this case as soon as we longjmp().
-    m_doNothingOnFailure = true;
-    bool result = setSize(width, height);
-    m_doNothingOnFailure = false;
-    if (!result) {
+    // Set the image size now that the image header is available.
+    if (!setSize(width, height)) {
         longjmp(JMPBUF(png), 1);
         return;
     }
@@ -357,28 +334,29 @@ void PNGImageDecoder::headerAvailable()
         // do not similarly transform the color profile. We'd either need to transform
         // the color profile or we'd need to decode into a gray-scale image buffer and
         // hand that to CoreGraphics.
+        bool sRGB = false;
         ColorProfile colorProfile;
-        readColorProfile(png, info, colorProfile);
-        bool decodedImageHasAlpha = (colorType & PNG_COLOR_MASK_ALPHA) || trnsCount;
-        m_reader->createColorTransform(colorProfile, decodedImageHasAlpha);
+        getColorProfile(png, info, colorProfile, sRGB);
+        bool imageHasAlpha = (colorType & PNG_COLOR_MASK_ALPHA) || trnsCount;
+        m_reader->createColorTransform(colorProfile, imageHasAlpha, sRGB);
         m_hasColorProfile = !!m_reader->colorTransform();
     }
 #endif
 
     if (!m_hasColorProfile) {
         // Deal with gamma and keep it under our control.
-        const double cInverseGamma = 0.45455;
-        const double cDefaultGamma = 2.2;
+        const double inverseGamma = 0.45455;
+        const double defaultGamma = 2.2;
         double gamma;
         if (!m_ignoreGammaAndColorProfile && png_get_gAMA(png, info, &gamma)) {
-            const double cMaxGamma = 21474.83;
-            if ((gamma <= 0.0) || (gamma > cMaxGamma)) {
-                gamma = cInverseGamma;
+            const double maxGamma = 21474.83;
+            if ((gamma <= 0.0) || (gamma > maxGamma)) {
+                gamma = inverseGamma;
                 png_set_gAMA(png, info, gamma);
             }
-            png_set_gamma(png, cDefaultGamma, gamma);
+            png_set_gamma(png, defaultGamma, gamma);
         } else {
-            png_set_gamma(png, cDefaultGamma, cInverseGamma);
+            png_set_gamma(png, defaultGamma, inverseGamma);
         }
     }
 
@@ -446,7 +424,7 @@ void PNGImageDecoder::rowAvailable(unsigned char* rowBuffer, unsigned rowIndex, 
 
     /* libpng comments (here to explain what follows).
      *
-     * this function is called for every row in the image.  If the
+     * this function is called for every row in the image. If the
      * image is interlacing, and you turned on the interlace handler,
      * this function will be called for every row in every pass.
      * Some of these rows will not be changed from the previous pass.
@@ -471,24 +449,24 @@ void PNGImageDecoder::rowAvailable(unsigned char* rowBuffer, unsigned rowIndex, 
      * png_progressive_combine_row() passing in the row and the
      * old row.  You can call this function for NULL rows (it will
      * just return) and for non-interlaced images (it just does the
-     * memcpy for you) if it will make the code easier.  Thus, you
+     * memcpy for you) if it will make the code easier. Thus, you
      * can just do this for all cases:
      *
      *    png_progressive_combine_row(png_ptr, old_row, new_row);
      *
-     * where old_row is what was displayed for previous rows.  Note
+     * where old_row is what was displayed for previous rows. Note
      * that the first pass (pass == 0 really) will completely cover
-     * the old row, so the rows do not have to be initialized.  After
+     * the old row, so the rows do not have to be initialized. After
      * the first pass (and only for interlaced images), you will have
      * to pass the current row, and the function will combine the
      * old row and the new row.
      */
 
     bool hasAlpha = m_reader->hasAlpha();
-    unsigned colorChannels = hasAlpha ? 4 : 3;
     png_bytep row = rowBuffer;
 
     if (png_bytep interlaceBuffer = m_reader->interlaceBuffer()) {
+        unsigned colorChannels = hasAlpha ? 4 : 3;
         row = interlaceBuffer + (rowIndex * colorChannels * size().width());
         png_progressive_combine_row(m_reader->pngPtr(), row, rowBuffer);
     }
@@ -531,10 +509,20 @@ void PNGImageDecoder::rowAvailable(unsigned char* rowBuffer, unsigned rowIndex, 
     buffer.setPixelsChanged(true);
 }
 
-void PNGImageDecoder::pngComplete()
+void PNGImageDecoder::complete()
 {
-    if (!m_frameBufferCache.isEmpty())
-        m_frameBufferCache.first().setStatus(ImageFrame::FrameComplete);
+    if (m_frameBufferCache.isEmpty())
+        return;
+
+    m_frameBufferCache[0].setStatus(ImageFrame::FrameComplete);
+}
+
+bool PNGImageDecoder::isComplete() const
+{
+    if (m_frameBufferCache.isEmpty())
+        return false;
+
+    return m_frameBufferCache[0].status() == ImageFrame::FrameComplete;
 }
 
 void PNGImageDecoder::decode(bool onlySize)
@@ -545,13 +533,13 @@ void PNGImageDecoder::decode(bool onlySize)
     if (!m_reader)
         m_reader = adoptPtr(new PNGImageReader(this));
 
-    // If we couldn't decode the image but we've received all the data, decoding
+    // If we couldn't decode the image but have received all the data, decoding
     // has failed.
     if (!m_reader->decode(*m_data, onlySize) && isAllDataReceived())
         setFailed();
-    // If we're done decoding the image, we don't need the PNGImageReader
-    // anymore.  (If we failed, |m_reader| has already been cleared.)
-    else if (isComplete())
+
+    // If decoding is done or failed, we don't need the PNGImageReader anymore.
+    if (isComplete() || failed())
         m_reader.clear();
 }
 

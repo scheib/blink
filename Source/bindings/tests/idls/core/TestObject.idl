@@ -159,6 +159,7 @@ interface TestObject {
     attribute (double or DOMString) doubleOrStringAttribute;
     attribute (double or DOMString)? doubleOrStringOrNullAttribute;
     attribute (double? or DOMString) doubleOrNullStringAttribute;
+    attribute (DOMString or sequence<DOMString>) stringOrStringSequenceAttribute;
 
     // Extended attributes
     [LogActivity, LogAllWorlds] attribute long activityLoggingAccessForAllWorldsLongAttribute;
@@ -375,6 +376,8 @@ interface TestObject {
     // Exceptional types
     Dictionary dictionaryMethod();
     TestDictionary testDictionaryMethod();
+    TestDictionary? nullableTestDictionaryMethod();
+    void passPermissiveDictionaryMethod([PermissiveDictionaryConversion] optional TestDictionary arg);
     NodeFilter nodeFilterMethod();
     Promise<void> promiseMethod(long arg1, Dictionary arg2, DOMString arg3, DOMString... variadic);
     Promise promiseMethodWithoutExceptionState(Dictionary arg1);
@@ -575,4 +578,6 @@ interface TestObject {
     [ImplementedInPrivateScript, OnlyExposedToPrivateScript] short methodForPrivateScriptOnly(short value1, short value2);
     [ImplementedInPrivateScript, OnlyExposedToPrivateScript] attribute DOMString attributeForPrivateScriptOnly;
     [ImplementedInPrivateScript] attribute TestEnum enumForPrivateScript;
+
+    maplike<long, DOMString>;
 };

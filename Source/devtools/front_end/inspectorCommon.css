@@ -108,6 +108,12 @@ body /deep/ .flex-auto {
     flex: auto;
 }
 
+body /deep/ .flex-centered {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
 body /deep/ iframe.view {
     position: absolute;
     width: 100%;
@@ -144,11 +150,4 @@ body /deep/ select {
 body /deep/ input[type="search"]:focus,
 body /deep/ input[type="text"]:focus {
     outline: auto 5px -webkit-focus-ring-color;
-}
-
-body /deep/ input[type="checkbox"] {
-    height: 12px;
-    width: 12px;
-    margin: auto 3px;
-    flex-shrink: 0;
 }

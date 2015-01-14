@@ -33,11 +33,13 @@
 
 #include "bindings/core/v8/ScriptController.h"
 #include "core/workers/WorkerGlobalScope.h"
+#include "core/workers/WorkerReportingProxy.h"
+#include "core/workers/WorkerThread.h"
 
 namespace blink {
 
-WorkerConsoleAgent::WorkerConsoleAgent(InspectorTimelineAgent* timelineAgent, InjectedScriptManager* injectedScriptManager, WorkerGlobalScope* workerGlobalScope)
-    : InspectorConsoleAgent(timelineAgent, injectedScriptManager)
+WorkerConsoleAgent::WorkerConsoleAgent(InjectedScriptManager* injectedScriptManager, WorkerGlobalScope* workerGlobalScope)
+    : InspectorConsoleAgent(injectedScriptManager)
     , m_workerGlobalScope(workerGlobalScope)
 {
 }
@@ -50,6 +52,12 @@ void WorkerConsoleAgent::trace(Visitor* visitor)
 {
     visitor->trace(m_workerGlobalScope);
     InspectorConsoleAgent::trace(visitor);
+}
+
+void WorkerConsoleAgent::enable(ErrorString* error)
+{
+    InspectorConsoleAgent::enable(error);
+    m_workerGlobalScope->thread()->workerReportingProxy().postWorkerConsoleAgentEnabled();
 }
 
 ConsoleMessageStorage* WorkerConsoleAgent::messageStorage()

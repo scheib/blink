@@ -13,29 +13,43 @@
 
 namespace blink {
 
+class GraphicsContext;
+
 typedef Vector<OwnPtr<DisplayItem> > PaintList;
 
 class PLATFORM_EXPORT DisplayItemList {
     WTF_MAKE_NONCOPYABLE(DisplayItemList);
 public:
-    DisplayItemList() { };
+    static PassOwnPtr<DisplayItemList> create() { return adoptPtr(new DisplayItemList); }
 
     const PaintList& paintList();
     void add(WTF::PassOwnPtr<DisplayItem>);
+
     void invalidate(DisplayItemClient);
+    void invalidateAll();
+    bool clientCacheIsValid(DisplayItemClient client) const { return m_cachedClients.contains(client); }
+
+    // Plays back the current PaintList() into the given context.
+    void replay(GraphicsContext*);
 
 #ifndef NDEBUG
     void showDebugData() const;
 #endif
 
+protected:
+    DisplayItemList() { };
+
 private:
-    PaintList::iterator findDisplayItem(PaintList::iterator, const DisplayItem&);
+    PaintList::iterator findNextMatchingCachedItem(PaintList::iterator, const DisplayItem&);
     bool wasInvalidated(const DisplayItem&) const;
     void updatePaintList();
 
+#ifndef NDEBUG
+    WTF::String paintListAsDebugString(const PaintList&) const;
+#endif
+
     PaintList m_paintList;
-    HashSet<DisplayItemClient> m_paintListRenderers;
-    HashSet<DisplayItemClient> m_invalidated;
+    HashSet<DisplayItemClient> m_cachedClients;
     PaintList m_newPaints;
 };
 

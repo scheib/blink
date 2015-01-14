@@ -491,25 +491,25 @@ CodeMirror.StringStream = function(line)
     this.start = 0;
 }
 CodeMirror.StringStream.prototype = {
-    backUp: function (n) { },
-    column: function () { },
-    current: function () { },
-    eat: function (match) { },
-    eatSpace: function () { },
-    eatWhile: function (match) { },
-    eol: function () { },
-    indentation: function () { },
+    backUp: function(n) { },
+    column: function() { },
+    current: function() { },
+    eat: function(match) { },
+    eatSpace: function() { },
+    eatWhile: function(match) { },
+    eol: function() { },
+    indentation: function() { },
     /**
      * @param {!RegExp|string} pattern
      * @param {boolean=} consume
      * @param {boolean=} caseInsensitive
      */
-    match: function (pattern, consume, caseInsensitive) { },
-    next: function () { },
-    peek: function () { },
-    skipTo: function (ch) { },
-    skipToEnd: function () { },
-    sol: function () { }
+    match: function(pattern, consume, caseInsensitive) { },
+    next: function() { },
+    peek: function() { },
+    skipTo: function(ch) { },
+    skipToEnd: function() { },
+    sol: function() { }
 }
 
 /** @type {Object.<string, !Object.<string, string>>} */
@@ -651,3 +651,66 @@ Set.prototype = {
     // FIXME: This should be removed once transpilation is not required for closure compiler ES6
     $$iterator: function() { }
 }
+
+/**
+ * @constructor
+ * @template K, V
+ */
+var WeakMap = function() { }
+
+WeakMap.prototype = {
+    /**
+     * @param {K} key
+     * @param {V} value
+     */
+    set: function(key, value) { },
+
+    /**
+     * @param {K} key
+     * @return {boolean}
+     */
+    delete: function(key) { },
+
+    /**
+     * @param {K} key
+     * @return {V}
+     */
+    get: function(key) { },
+
+    /**
+     * @param {K} key
+     * @return {boolean}
+     */
+    has: function(key) { },
+}
+
+/**
+ * @constructor
+ * @template V
+ */
+var WeakSet = function() { }
+
+WeakSet.prototype = {
+    /**
+     * @param {V} value
+     */
+    add: function(value) { },
+
+    /**
+     * @param {V} value
+     * @return {boolean}
+     */
+    delete: function(value) { },
+
+    /**
+     * @param {V} value
+     * @return {boolean}
+     */
+    has: function(value) { },
+}
+
+/**
+ * @param {*} obj
+ * @return {boolean}
+ */
+ArrayBuffer.isView = function(obj) { }

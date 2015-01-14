@@ -39,6 +39,7 @@
 #include "core/html/HTMLLabelElement.h"
 #include "core/html/HTMLLegendElement.h"
 #include "core/html/HTMLMediaElement.h"
+#include "core/html/HTMLMeterElement.h"
 #include "core/html/HTMLPlugInElement.h"
 #include "core/html/HTMLSelectElement.h"
 #include "core/html/HTMLTextAreaElement.h"
@@ -53,8 +54,8 @@ namespace blink {
 
 using namespace HTMLNames;
 
-AXNodeObject::AXNodeObject(Node* node)
-    : AXObject()
+AXNodeObject::AXNodeObject(Node* node, AXObjectCacheImpl* axObjectCache)
+    : AXObject(axObjectCache)
     , m_ariaRole(UnknownRole)
     , m_childrenDirty(false)
 #if ENABLE(ASSERT)
@@ -64,9 +65,9 @@ AXNodeObject::AXNodeObject(Node* node)
 {
 }
 
-PassRefPtr<AXNodeObject> AXNodeObject::create(Node* node)
+PassRefPtr<AXNodeObject> AXNodeObject::create(Node* node, AXObjectCacheImpl* axObjectCache)
 {
-    return adoptRef(new AXNodeObject(node));
+    return adoptRef(new AXNodeObject(node, axObjectCache));
 }
 
 AXNodeObject::~AXNodeObject()
@@ -258,6 +259,8 @@ AccessibilityRole AXNodeObject::determineAccessibilityRoleUtil()
         return DescriptionListRole;
     if (node()->isElementNode() && node()->hasTagName(blockquoteTag))
         return BlockquoteRole;
+    if (node()->isElementNode() && node()->hasTagName(captionTag))
+        return CaptionRole;
     if (node()->isElementNode() && node()->hasTagName(figcaptionTag))
         return FigcaptionRole;
     if (node()->isElementNode() && node()->hasTagName(figureTag))
@@ -594,6 +597,11 @@ bool AXNodeObject::isMenuButton() const
     return roleValue() == MenuButtonRole;
 }
 
+bool AXNodeObject::isMeter() const
+{
+    return roleValue() == MeterRole;
+}
+
 bool AXNodeObject::isMultiSelectable() const
 {
     const AtomicString& ariaMultiSelectable = getAttribute(aria_multiselectableAttr);
@@ -768,9 +776,10 @@ bool AXNodeObject::isPressed() const
     if (!node)
         return false;
 
-    // If this is an ARIA button, check the aria-pressed attribute rather than node()->active()
-    if (ariaRoleAttribute() == ButtonRole) {
-        if (equalIgnoringCase(getAttribute(aria_pressedAttr), "true"))
+    // ARIA button with aria-pressed not undefined, then check for aria-pressed attribute rather than node()->active()
+    if (ariaRoleAttribute() == ToggleButtonRole) {
+        if (equalIgnoringCase(getAttribute(aria_pressedAttr), "true")
+            || equalIgnoringCase(getAttribute(aria_pressedAttr), "mixed"))
             return true;
         return false;
     }
@@ -798,12 +807,12 @@ bool AXNodeObject::isReadOnly() const
 
 bool AXNodeObject::isRequired() const
 {
-    if (equalIgnoringCase(getAttribute(aria_requiredAttr), "true"))
-        return true;
-
     Node* n = this->node();
     if (n && (n->isElementNode() && toElement(n)->isFormControlElement()))
         return toHTMLFormControlElement(n)->isRequired();
+
+    if (equalIgnoringCase(getAttribute(aria_requiredAttr), "true"))
+        return true;
 
     return false;
 }
@@ -950,6 +959,35 @@ unsigned AXNodeObject::hierarchicalLevel() const
     return level;
 }
 
+String AXNodeObject::ariaAutoComplete() const
+{
+    if (roleValue() != ComboBoxRole && roleValue() != TextAreaRole)
+        return String();
+
+    const AtomicString& ariaAutoComplete = getAttribute(aria_autocompleteAttr).lower();
+
+    if (ariaAutoComplete == "inline" || ariaAutoComplete == "list"
+        || ariaAutoComplete == "both")
+        return ariaAutoComplete;
+
+    return String();
+}
+
+String AXNodeObject::placeholder() const
+{
+    String placeholder;
+    if (node()) {
+        if (isHTMLInputElement(*node())) {
+            HTMLInputElement* inputElement = toHTMLInputElement(node());
+            placeholder = inputElement->strippedPlaceholder();
+        } else if (isHTMLTextAreaElement(*node())) {
+            HTMLTextAreaElement* textAreaElement = toHTMLTextAreaElement(node());
+            placeholder = textAreaElement->strippedPlaceholder();
+        }
+    }
+    return placeholder;
+}
+
 String AXNodeObject::text() const
 {
     // If this is a user defined static text, use the accessible name computation.
@@ -1021,6 +1059,44 @@ void AXNodeObject::colorValue(int& r, int& g, int& b) const
     b = color.blue();
 }
 
+InvalidState AXNodeObject::invalidState() const
+{
+    if (hasAttribute(aria_invalidAttr)) {
+        const AtomicString& attributeValue = getAttribute(aria_invalidAttr);
+        if (equalIgnoringCase(attributeValue, "false"))
+            return InvalidStateFalse;
+        if (equalIgnoringCase(attributeValue, "true"))
+            return InvalidStateTrue;
+        if (equalIgnoringCase(attributeValue, "spelling"))
+            return InvalidStateSpelling;
+        if (equalIgnoringCase(attributeValue, "grammar"))
+            return InvalidStateGrammar;
+        // A yet unknown value.
+        if (!attributeValue.isEmpty())
+            return InvalidStateOther;
+    }
+
+    if (node() && node()->isElementNode()
+        && toElement(node())->isFormControlElement()) {
+        HTMLFormControlElement* element = toHTMLFormControlElement(node());
+        WillBeHeapVector<RefPtrWillBeMember<HTMLFormControlElement>>
+            invalidControls;
+        bool isInvalid = !element->checkValidity(
+            &invalidControls, CheckValidityDispatchNoEvent);
+        return isInvalid ? InvalidStateTrue : InvalidStateFalse;
+    }
+
+    return InvalidStateUndefined;
+}
+
+String AXNodeObject::ariaInvalidValue() const
+{
+    if (invalidState() == InvalidStateOther)
+        return getAttribute(aria_invalidAttr);
+
+    return String();
+}
+
 String AXNodeObject::valueDescription() const
 {
     if (!supportsRangeValue())
@@ -1040,6 +1116,9 @@ float AXNodeObject::valueForRange() const
             return input.valueAsNumber();
     }
 
+    if (isHTMLMeterElement(node()))
+        return toHTMLMeterElement(*node()).value();
+
     return 0.0;
 }
 
@@ -1054,6 +1133,9 @@ float AXNodeObject::maxValueForRange() const
             return input.maximum();
     }
 
+    if (isHTMLMeterElement(node()))
+        return toHTMLMeterElement(*node()).max();
+
     return 0.0;
 }
 
@@ -1067,6 +1149,9 @@ float AXNodeObject::minValueForRange() const
         if (input.type() == InputTypeNames::range)
             return input.minimum();
     }
+
+    if (isHTMLMeterElement(node()))
+        return toHTMLMeterElement(*node()).min();
 
     return 0.0;
 }
@@ -1370,6 +1455,40 @@ String AXNodeObject::helpText() const
     return String();
 }
 
+String AXNodeObject::computedName() const
+{
+    String title = this->title();
+
+    String titleUIText;
+    if (title.isEmpty()) {
+        AXObject* titleUIElement = this->titleUIElement();
+        if (titleUIElement) {
+            titleUIText = titleUIElement->textUnderElement();
+            if (!titleUIText.isEmpty())
+                return titleUIText;
+        }
+    }
+
+    String description = accessibilityDescription();
+    if (!description.isEmpty())
+        return description;
+
+    if (!title.isEmpty())
+        return title;
+
+    String placeholder;
+    if (isHTMLInputElement(node())) {
+        HTMLInputElement* element = toHTMLInputElement(node());
+        placeholder = element->strippedPlaceholder();
+        if (!placeholder.isEmpty())
+            return placeholder;
+    }
+
+    return String();
+}
+
+
+
 LayoutRect AXNodeObject::elementRect() const
 {
     // First check if it has a custom rect, for example if this element is tied to a canvas path.
@@ -1638,6 +1757,10 @@ HTMLLabelElement* AXNodeObject::labelElementContainer() const
 
     // the control element should not be considered part of the label
     if (isControl())
+        return 0;
+
+    // the link element should not be considered part of the label
+    if (isLink())
         return 0;
 
     // find if this has a ancestor that is a label

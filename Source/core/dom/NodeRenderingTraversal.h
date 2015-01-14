@@ -37,9 +37,10 @@ class RenderObject;
 namespace NodeRenderingTraversal {
 
 class ParentDetails {
+    STACK_ALLOCATED();
 public:
     ParentDetails()
-        : m_insertionPoint(0)
+        : m_insertionPoint(nullptr)
     { }
 
     const InsertionPoint* insertionPoint() const { return m_insertionPoint; }
@@ -52,7 +53,7 @@ public:
     }
 
 private:
-    const InsertionPoint* m_insertionPoint;
+    RawPtrWillBeMember<const InsertionPoint> m_insertionPoint;
 };
 
 ContainerNode* parent(const Node&, ParentDetails* = 0);
@@ -62,6 +63,7 @@ Node* nextSibling(const Node&);
 Node* previousSibling(const Node&);
 Node* previous(const Node&, const Node* stayWithin);
 Node* next(const Node&, const Node* stayWithin);
+Node* nextSkippingChildren(const Node&, const Node* stayWithin);
 RenderObject* nextSiblingRenderer(const Node&);
 RenderObject* previousSiblingRenderer(const Node&);
 RenderObject* nextInTopLayer(const Element&);

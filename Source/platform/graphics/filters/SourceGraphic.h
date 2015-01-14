@@ -22,14 +22,16 @@
 #ifndef SourceGraphic_h
 #define SourceGraphic_h
 
-#include "platform/graphics/Picture.h"
 #include "platform/graphics/filters/FilterEffect.h"
+
+class SkPicture;
 
 namespace blink {
 
 class PLATFORM_EXPORT SourceGraphic : public FilterEffect {
 public:
     static PassRefPtrWillBeRawPtr<SourceGraphic> create(Filter*);
+    virtual ~SourceGraphic();
 
     static const AtomicString& effectName();
 
@@ -40,16 +42,12 @@ public:
     virtual TextStream& externalRepresentation(TextStream&, int indention) const override;
     PassRefPtr<SkImageFilter> createImageFilter(SkiaImageFilterBuilder*) override;
 
-    void setPicture(PassRefPtr<Picture>);
+    void setPicture(PassRefPtr<const SkPicture>);
 
 private:
-    SourceGraphic(Filter* filter)
-        : FilterEffect(filter)
-    {
-        setOperatingColorSpace(ColorSpaceDeviceRGB);
-    }
+    SourceGraphic(Filter*);
 
-    RefPtr<Picture> m_picture;
+    RefPtr<const SkPicture> m_picture;
 };
 
 } //namespace blink

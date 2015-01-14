@@ -73,7 +73,7 @@ WebInspector.Linkifier.handleLink = function(url, lineNumber)
 {
     if (!WebInspector.Linkifier._linkHandler)
         return false;
-    return WebInspector.Linkifier._linkHandler.handleLink(url, lineNumber)
+    return WebInspector.Linkifier._linkHandler.handleLink(url, lineNumber);
 }
 
 /**
@@ -241,13 +241,15 @@ WebInspector.Linkifier.prototype = {
          */
         function clickHandler(event)
         {
-            if (!anchor.__uiLocation)
+            var uiLocation = anchor.__uiLocation;
+            if (!uiLocation)
                 return;
 
             event.consume(true);
-            if (WebInspector.Linkifier.handleLink(anchor.__uiLocation.uiSourceCode.url, anchor.__uiLocation.lineNumber))
+            var networkURL = WebInspector.networkMapping.networkURL(uiLocation.uiSourceCode);
+            if (WebInspector.Linkifier.handleLink(networkURL, uiLocation.lineNumber))
                 return;
-            WebInspector.Revealer.reveal(anchor.__uiLocation);
+            WebInspector.Revealer.reveal(uiLocation);
         }
         anchor.addEventListener("click", clickHandler, false);
         return anchor;

@@ -44,7 +44,7 @@ WebInspector.SettingsScreen = function(onHide)
     this._contentElement = this.element.createChild("div", "help-window-main");
     var settingsLabelElement = createElementWithClass("div", "help-window-label");
     settingsLabelElement.createTextChild(WebInspector.UIString("Settings"));
-    this._contentElement.appendChild(this._createCloseButton());
+    this._contentElement.appendChild(this.createCloseButton());
 
     this._tabbedPane = new WebInspector.TabbedPane();
     this._tabbedPane.insertBeforeTabStrip(settingsLabelElement);
@@ -215,9 +215,7 @@ WebInspector.GenericSettingsTab = function()
 
     this._populateSectionsFromExtensions();
 
-    var restoreDefaults = this._appendSection().createChild("button", "", "text-button");
-    restoreDefaults.textContent = WebInspector.UIString("Restore defaults and reload");
-    restoreDefaults.addEventListener("click", restoreAndReload, false);
+    this._appendSection().appendChild(createTextButton(WebInspector.UIString("Restore defaults and reload"), restoreAndReload));
 
     function restoreAndReload()
     {
@@ -231,7 +229,7 @@ WebInspector.GenericSettingsTab.prototype = {
     _populateSectionsFromExtensions: function()
     {
         /** @const */
-        var explicitSectionOrder = ["", "Appearance", "Elements", "Sources", "Profiler", "Console", "Extensions"];
+        var explicitSectionOrder = ["", "Appearance", "Elements", "Sources", "Network", "Profiler", "Console", "Extensions"];
 
         var allExtensions = self.runtime.extensions("ui-setting");
 
@@ -340,12 +338,12 @@ WebInspector.GenericSettingsTab.prototype = {
             case "checkbox":
                 return WebInspector.SettingsUI.createSettingCheckbox(uiTitle, setting);
             case "select":
-                var descriptorOptions = descriptor["options"]
+                var descriptorOptions = descriptor["options"];
                 var options = new Array(descriptorOptions.length);
                 for (var i = 0; i < options.length; ++i) {
                     // The third array item flags that the option name is "raw" (non-i18n-izable).
                     var optionName = descriptorOptions[i][2] ? descriptorOptions[i][0] : WebInspector.UIString(descriptorOptions[i][0]);
-                    options[i] = [WebInspector.UIString(descriptorOptions[i][0]), descriptorOptions[i][1]];
+                    options[i] = [optionName, descriptorOptions[i][1]];
                 }
                 return this._createSelectSetting(uiTitle, options, setting);
             default:
@@ -373,11 +371,7 @@ WebInspector.SettingsScreen.SkipStackFramePatternSettingDelegate.prototype = {
      */
     settingElement: function()
     {
-        var button = createElement("button", "text-button");
-        button.textContent = WebInspector.manageBlackboxingButtonLabel();
-        button.title = WebInspector.UIString("Skip stepping through sources with particular names");
-        button.addEventListener("click", this._onManageButtonClick.bind(this), false);
-        return button;
+        return createTextButton(WebInspector.manageBlackboxingButtonLabel(), this._onManageButtonClick.bind(this), "", WebInspector.UIString("Skip stepping through sources with particular names"));
     },
 
     _onManageButtonClick: function()
@@ -406,13 +400,10 @@ WebInspector.WorkspaceSettingsTab = function()
     this._fileSystemsListContainer = this._fileSystemsSection.createChild("p", "settings-list-container");
 
     this._addFileSystemRowElement = this._fileSystemsSection.createChild("div");
-    var addFileSystemButton = this._addFileSystemRowElement.createChild("button", "", "text-button");
-    addFileSystemButton.textContent = WebInspector.UIString("Add folder\u2026");
-    addFileSystemButton.addEventListener("click", this._addFileSystemClicked.bind(this), false);
+    this._addFileSystemRowElement.appendChild(createTextButton(WebInspector.UIString("Add folder\u2026"), this._addFileSystemClicked.bind(this)));
 
-    this._editFileSystemButton = this._addFileSystemRowElement.createChild("button", "", "text-button");
-    this._editFileSystemButton.textContent = WebInspector.UIString("Folder options\u2026");
-    this._editFileSystemButton.addEventListener("click", this._editFileSystemClicked.bind(this), false);
+    this._editFileSystemButton = createTextButton(WebInspector.UIString("Folder options\u2026"), this._editFileSystemClicked.bind(this));
+    this._addFileSystemRowElement.appendChild(this._editFileSystemButton);
     this._updateEditFileSystemButtonState();
 
     this._reset();
@@ -546,7 +537,6 @@ WebInspector.WorkspaceSettingsTab.prototype = {
     _fileSystemRemoved: function(event)
     {
         var fileSystem = /** @type {!WebInspector.IsolatedFileSystem} */ (event.data);
-        var selectedFileSystemPath = this._selectedFileSystemPath();
         if (this._fileSystemsList.itemForId(fileSystem.path()))
             this._fileSystemsList.removeItem(fileSystem.path());
         if (!this._fileSystemsList.itemIds().length)
@@ -597,10 +587,9 @@ WebInspector.ExperimentsSettingsTab.prototype = {
 
     _createExperimentCheckbox: function(experiment)
     {
-        var input = createElement("input");
-        input.type = "checkbox";
+        var label = createCheckboxLabel(WebInspector.UIString(experiment.title), experiment.isEnabled());
+        var input = label.checkboxElement;
         input.name = experiment.name;
-        input.checked = experiment.isEnabled();
         function listener()
         {
             experiment.setEnabled(input.checked);
@@ -609,9 +598,6 @@ WebInspector.ExperimentsSettingsTab.prototype = {
 
         var p = createElement("p");
         p.className = experiment.hidden && !experiment.isEnabled() ? "settings-experiment-hidden" : "";
-        var label = p.createChild("label");
-        label.appendChild(input);
-        label.createTextChild(WebInspector.UIString(experiment.title));
         p.appendChild(label);
         return p;
     },

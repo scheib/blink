@@ -26,9 +26,10 @@
 
 #include "core/rendering/svg/RenderSVGModelObject.h"
 
+class SkPicture;
+
 namespace blink {
 
-class Picture;
 class RenderImageResource;
 class SVGImageElement;
 
@@ -45,7 +46,7 @@ public:
     RenderImageResource* imageResource() { return m_imageResource.get(); }
 
     virtual const AffineTransform& localToParentTransform() const override { return m_localTransform; }
-    RefPtr<Picture>& bufferedForeground() { return m_bufferedForeground; }
+    RefPtr<const SkPicture>& bufferedForeground() { return m_bufferedForeground; }
 
     virtual FloatRect objectBoundingBox() const override { return m_objectBoundingBox; }
     virtual bool isOfType(RenderObjectType type) const override { return type == RenderObjectSVGImage || RenderSVGModelObject::isOfType(type); }
@@ -74,7 +75,7 @@ private:
     FloatRect m_objectBoundingBox;
     OwnPtr<RenderImageResource> m_imageResource;
 
-    RefPtr<Picture> m_bufferedForeground;
+    RefPtr<const SkPicture> m_bufferedForeground;
 };
 
 DEFINE_RENDER_OBJECT_TYPE_CASTS(RenderSVGImage, isSVGImage());

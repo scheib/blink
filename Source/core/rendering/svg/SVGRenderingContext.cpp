@@ -39,10 +39,6 @@ namespace blink {
 
 SVGRenderingContext::~SVGRenderingContext()
 {
-    // Fast path if we don't need to restore anything.
-    if (!(m_renderingFlags & ActionsNeeded))
-        return;
-
     ASSERT(m_object && m_paintInfo);
 
     if (m_renderingFlags & PostApplyResources) {
@@ -52,7 +48,6 @@ SVGRenderingContext::~SVGRenderingContext()
         if (m_filter) {
             ASSERT(SVGResourcesCache::cachedResourcesForRenderObject(m_object)->filter() == m_filter);
             m_filter->finishEffect(m_object, m_paintInfo->context);
-            m_paintInfo->context = m_savedContext;
             m_paintInfo->rect = m_savedPaintRect;
         }
 
@@ -66,12 +61,6 @@ SVGRenderingContext::~SVGRenderingContext()
             m_masker->finishEffect(m_object, m_paintInfo->context);
         }
     }
-
-    if (m_renderingFlags & EndOpacityLayer)
-        m_paintInfo->context->endLayer();
-
-    if (m_renderingFlags & RestoreGraphicsContext)
-        m_paintInfo->context->restore();
 }
 
 void SVGRenderingContext::prepareToRenderSVGContent(RenderObject* object, PaintInfo& paintInfo)
@@ -100,23 +89,10 @@ void SVGRenderingContext::prepareToRenderSVGContent(RenderObject* object, PaintI
 
     // RenderLayer takes care of root opacity and blend mode.
     if (!isRenderingMask && !object->isSVGRoot() && (opacity < 1 || hasBlendMode)) {
-        FloatRect paintInvalidationRect = m_object->paintInvalidationRectInLocalCoordinates();
-        m_paintInfo->context->clip(paintInvalidationRect);
-
-        if (hasBlendMode) {
-            if (!(m_renderingFlags & RestoreGraphicsContext)) {
-                m_paintInfo->context->save();
-                m_renderingFlags |= RestoreGraphicsContext;
-            }
-            m_paintInfo->context->setCompositeOperation(CompositeSourceOver, style->blendMode());
-        }
-
-        m_paintInfo->context->beginTransparencyLayer(opacity);
-
-        if (hasBlendMode)
-            m_paintInfo->context->setCompositeOperation(CompositeSourceOver, WebBlendModeNormal);
-
-        m_renderingFlags |= EndOpacityLayer;
+        m_clipRecorder = adoptPtr(new FloatClipRecorder(*m_paintInfo->context, m_object->displayItemClient(), m_paintInfo->phase, m_object->paintInvalidationRectInLocalCoordinates()));
+        WebBlendMode blendMode = hasBlendMode ? style->blendMode() : WebBlendModeNormal;
+        CompositeOperator compositeOp = hasBlendMode ? CompositeSourceOver : m_paintInfo->context->compositeOperation();
+        m_transparencyRecorder = adoptPtr(new TransparencyRecorder(m_paintInfo->context, object->displayItemClient(), compositeOp, blendMode, opacity, compositeOp));
     }
 
     SVGResources* resources = SVGResourcesCache::cachedResourcesForRenderObject(m_object);
@@ -133,7 +109,7 @@ void SVGRenderingContext::prepareToRenderSVGContent(RenderObject* object, PaintI
         ClipPathOperation* clipPathOperation = style->clipPath();
         if (clipPathOperation && clipPathOperation->type() == ClipPathOperation::SHAPE) {
             ShapeClipPathOperation* clipPath = toShapeClipPathOperation(clipPathOperation);
-            m_paintInfo->context->clipPath(clipPath->path(object->objectBoundingBox()), clipPath->windRule());
+            m_clipPathRecorder = adoptPtr(new ClipPathRecorder(*m_paintInfo->context, object->displayItemClient(), clipPath->path(object->objectBoundingBox()), clipPath->windRule()));
         }
     }
 
@@ -152,7 +128,6 @@ void SVGRenderingContext::prepareToRenderSVGContent(RenderObject* object, PaintI
 
         m_filter = resources->filter();
         if (m_filter) {
-            m_savedContext = m_paintInfo->context;
             m_savedPaintRect = m_paintInfo->rect;
             // Return with false here may mean that we don't need to draw the content
             // (because it was either drawn before or empty) but we still need to apply the filter.
@@ -164,7 +139,7 @@ void SVGRenderingContext::prepareToRenderSVGContent(RenderObject* object, PaintI
             // changes, we need to paint the whole filter region. Otherwise, elements not visible
             // at the time of the initial paint (due to scrolling, window size, etc.) will never
             // be drawn.
-            m_paintInfo->rect = IntRect(m_filter->drawingRegion(m_object));
+            m_paintInfo->rect = LayoutRect::infiniteIntRect();
         }
     } else {
         // Broken filter disables rendering.
@@ -172,17 +147,15 @@ void SVGRenderingContext::prepareToRenderSVGContent(RenderObject* object, PaintI
             return;
     }
 
-    if (!isIsolationInstalled() && SVGRenderSupport::isIsolationRequired(object)) {
-        m_paintInfo->context->beginTransparencyLayer(1);
-        m_renderingFlags |= EndOpacityLayer;
-    }
+    if (!isIsolationInstalled() && SVGRenderSupport::isIsolationRequired(object))
+        m_transparencyRecorder = adoptPtr(new TransparencyRecorder(m_paintInfo->context, object->displayItemClient(), m_paintInfo->context->compositeOperation(), WebBlendModeNormal, 1, m_paintInfo->context->compositeOperation()));
 
     m_renderingFlags |= RenderingPrepared;
 }
 
 bool SVGRenderingContext::isIsolationInstalled() const
 {
-    if (m_renderingFlags & EndOpacityLayer)
+    if (m_transparencyRecorder)
         return true;
     if (m_masker || m_filter)
         return true;
@@ -257,7 +230,7 @@ void SVGRenderingContext::renderSubtree(GraphicsContext* context, RenderObject* 
     ASSERT(item);
     ASSERT(!item->needsLayout());
 
-    PaintInfo info(context, PaintInfo::infiniteRect(), PaintPhaseForeground, PaintBehaviorNormal);
+    PaintInfo info(context, LayoutRect::infiniteIntRect(), PaintPhaseForeground, PaintBehaviorNormal);
     item->paint(info, IntPoint());
 }
 

@@ -41,12 +41,14 @@ class WorkerGlobalScope;
 class WorkerConsoleAgent final : public InspectorConsoleAgent {
     WTF_MAKE_NONCOPYABLE(WorkerConsoleAgent);
 public:
-    static PassOwnPtrWillBeRawPtr<WorkerConsoleAgent> create(InspectorTimelineAgent* timelineAgent, InjectedScriptManager* injectedScriptManager, WorkerGlobalScope* workerGlobalScope)
+    static PassOwnPtrWillBeRawPtr<WorkerConsoleAgent> create(InjectedScriptManager* injectedScriptManager, WorkerGlobalScope* workerGlobalScope)
     {
-        return adoptPtrWillBeNoop(new WorkerConsoleAgent(timelineAgent, injectedScriptManager, workerGlobalScope));
+        return adoptPtrWillBeNoop(new WorkerConsoleAgent(injectedScriptManager, workerGlobalScope));
     }
     virtual ~WorkerConsoleAgent();
     virtual void trace(Visitor*) override;
+
+    virtual void enable(ErrorString*) override;
 
     virtual bool isWorkerAgent() override { return true; }
 
@@ -57,7 +59,7 @@ protected:
     virtual void disableStackCapturingIfNeeded() override;
 
 private:
-    WorkerConsoleAgent(InspectorTimelineAgent*, InjectedScriptManager*, WorkerGlobalScope*);
+    WorkerConsoleAgent(InjectedScriptManager*, WorkerGlobalScope*);
     virtual void addInspectedNode(ErrorString*, int nodeId) override;
 
     RawPtrWillBeMember<WorkerGlobalScope> m_workerGlobalScope;

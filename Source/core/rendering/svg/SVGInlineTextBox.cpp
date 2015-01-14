@@ -45,7 +45,7 @@ struct ExpectedSVGInlineTextBoxSize : public InlineTextBox {
     Vector<SVGTextFragment> vector;
 };
 
-COMPILE_ASSERT(sizeof(SVGInlineTextBox) == sizeof(ExpectedSVGInlineTextBoxSize), SVGInlineTextBox_is_not_of_expected_size);
+static_assert(sizeof(SVGInlineTextBox) == sizeof(ExpectedSVGInlineTextBoxSize), "SVGInlineTextBox has an unexpected size");
 
 SVGInlineTextBox::SVGInlineTextBox(RenderObject& object, int start, unsigned short length)
     : InlineTextBox(object, start, length)
@@ -110,8 +110,6 @@ FloatRectWillBeLayoutRect SVGInlineTextBox::selectionRectForTextFragment(const S
     ASSERT(startPosition < endPosition);
     ASSERT(style);
 
-    FontCachePurgePreventer fontCachePurgePreventer;
-
     RenderSVGInlineText& textRenderer = toRenderSVGInlineText(this->renderer());
 
     FloatWillBeLayoutUnit scalingFactor = textRenderer.scalingFactor();
@@ -165,12 +163,13 @@ LayoutRect SVGInlineTextBox::localSelectionRect(int startPosition, int endPositi
         selectionRect.unite(fragmentRect);
     }
 
-    return enclosingIntRect(selectionRect);
+    // FIXME: the call to rawValue() below is temporary and should be removed once the transition
+    // to LayoutUnit-based types is complete (crbug.com/321237)
+    return enclosingIntRect(selectionRect.rawValue());
 }
 
 void SVGInlineTextBox::paint(const PaintInfo& paintInfo, const LayoutPoint& paintOffset, LayoutUnit, LayoutUnit)
 {
-
     SVGInlineTextBoxPainter(*this).paint(paintInfo, paintOffset);
 }
 
@@ -284,9 +283,11 @@ bool SVGInlineTextBox::nodeAtPoint(const HitTestRequest& request, HitTestResult&
             FloatPointWillBeLayoutPoint boxOrigin(x(), y());
             boxOrigin.moveBy(accumulatedOffset);
             FloatRectWillBeLayoutRect rect(boxOrigin, size());
-            if (locationInContainer.intersects(rect)) {
+            // FIXME: both calls to rawValue() below is temporary and should be removed once the transition
+            // to LayoutUnit-based types is complete (crbug.com/321237)
+            if (locationInContainer.intersects(rect.rawValue())) {
                 renderer().updateHitTestResult(result, locationInContainer.point() - toLayoutSize(accumulatedOffset));
-                if (!result.addNodeToRectBasedTestResult(renderer().node(), request, locationInContainer, rect))
+                if (!result.addNodeToRectBasedTestResult(renderer().node(), request, locationInContainer, rect.rawValue()))
                     return true;
              }
         }

@@ -338,7 +338,7 @@ void SerializedScriptValueWriter::writeDenseArray(uint32_t numProperties, uint32
 
 String SerializedScriptValueWriter::takeWireString()
 {
-    COMPILE_ASSERT(sizeof(BufferValueType) == 2, BufferValueTypeIsTwoBytes);
+    static_assert(sizeof(BufferValueType) == 2, "BufferValueType should be 2 bytes");
     fillHole();
     String data = String(m_buffer.data(), m_buffer.size());
     data.impl()->truncateAssumingIsolated((m_position + 1) / sizeof(BufferValueType));
@@ -459,13 +459,13 @@ void SerializedScriptValueWriter::append(const uint8_t* data, int length)
 
 void SerializedScriptValueWriter::ensureSpace(unsigned extra)
 {
-    COMPILE_ASSERT(sizeof(BufferValueType) == 2, BufferValueTypeIsTwoBytes);
+    static_assert(sizeof(BufferValueType) == 2, "BufferValueType should be 2 bytes");
     m_buffer.resize((m_position + extra + 1) / sizeof(BufferValueType)); // "+ 1" to round up.
 }
 
 void SerializedScriptValueWriter::fillHole()
 {
-    COMPILE_ASSERT(sizeof(BufferValueType) == 2, BufferValueTypeIsTwoBytes);
+    static_assert(sizeof(BufferValueType) == 2, "BufferValueType should be 2 bytes");
     // If the writer is at odd position in the buffer, then one of
     // the bytes in the last UChar is not initialized.
     if (m_position % 2)
@@ -871,7 +871,7 @@ void ScriptValueSerializer::writeImageData(v8::Handle<v8::Value> value)
     ImageData* imageData = V8ImageData::toImpl(value.As<v8::Object>());
     if (!imageData)
         return;
-    DOMUint8ClampedArray* pixelArray = imageData->data();
+    Uint8ClampedArray* pixelArray = imageData->data();
     m_writer.writeImageData(imageData->width(), imageData->height(), pixelArray->data(), pixelArray->length());
 }
 
@@ -1371,7 +1371,7 @@ bool SerializedScriptValueReader::readImageData(v8::Handle<v8::Value>* value)
     if (m_position + pixelDataLength > m_length)
         return false;
     RefPtrWillBeRawPtr<ImageData> imageData = ImageData::create(IntSize(width, height));
-    DOMUint8ClampedArray* pixelArray = imageData->data();
+    Uint8ClampedArray* pixelArray = imageData->data();
     ASSERT(pixelArray);
     ASSERT(pixelArray->length() >= pixelDataLength);
     memcpy(pixelArray->data(), m_buffer + m_position, pixelDataLength);

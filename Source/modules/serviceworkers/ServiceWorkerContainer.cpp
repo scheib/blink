@@ -49,6 +49,7 @@
 #include "modules/serviceworkers/ServiceWorkerError.h"
 #include "modules/serviceworkers/ServiceWorkerRegistration.h"
 #include "platform/RuntimeEnabledFeatures.h"
+#include "public/platform/WebPageVisibilityState.h"
 #include "public/platform/WebServiceWorker.h"
 #include "public/platform/WebServiceWorkerClientsInfo.h"
 #include "public/platform/WebServiceWorkerProvider.h"
@@ -62,7 +63,7 @@ namespace blink {
 // when nullptr is given to onSuccess.
 class GetRegistrationCallback : public WebServiceWorkerProvider::WebServiceWorkerGetRegistrationCallbacks {
 public:
-    explicit GetRegistrationCallback(PassRefPtr<ScriptPromiseResolver> resolver)
+    explicit GetRegistrationCallback(PassRefPtrWillBeRawPtr<ScriptPromiseResolver> resolver)
         : m_resolver(resolver)
         , m_adapter(m_resolver) { }
     virtual ~GetRegistrationCallback() { }
@@ -75,7 +76,7 @@ public:
     }
     virtual void onError(WebServiceWorkerError* error) override { m_adapter.onError(error); }
 private:
-    RefPtr<ScriptPromiseResolver> m_resolver;
+    RefPtrWillBePersistent<ScriptPromiseResolver> m_resolver;
     CallbackPromiseAdapter<ServiceWorkerRegistration, ServiceWorkerError> m_adapter;
     WTF_MAKE_NONCOPYABLE(GetRegistrationCallback);
 };
@@ -103,13 +104,14 @@ void ServiceWorkerContainer::trace(Visitor* visitor)
     visitor->trace(m_controller);
     visitor->trace(m_readyRegistration);
     visitor->trace(m_ready);
-    EventTargetWithInlineData::trace(visitor);
+    RefCountedGarbageCollectedEventTargetWithInlineData<ServiceWorkerContainer>::trace(visitor);
+    ContextLifecycleObserver::trace(visitor);
 }
 
 ScriptPromise ServiceWorkerContainer::registerServiceWorker(ScriptState* scriptState, const String& url, const RegistrationOptions& options)
 {
     ASSERT(RuntimeEnabledFeatures::serviceWorkerEnabled());
-    RefPtr<ScriptPromiseResolver> resolver = ScriptPromiseResolver::create(scriptState);
+    RefPtrWillBeRawPtr<ScriptPromiseResolver> resolver = ScriptPromiseResolver::create(scriptState);
     ScriptPromise promise = resolver->promise();
 
     if (!m_provider) {
@@ -133,13 +135,6 @@ ScriptPromise ServiceWorkerContainer::registerServiceWorker(ScriptState* scriptS
         return promise;
     }
 
-    KURL patternURL = executionContext->completeURL(options.scope());
-    patternURL.removeFragmentIdentifier();
-    if (!documentOrigin->canRequest(patternURL)) {
-        resolver->reject(DOMException::create(SecurityError, "The scope must match the current origin."));
-        return promise;
-    }
-
     KURL scriptURL = executionContext->completeURL(url);
     scriptURL.removeFragmentIdentifier();
     if (!documentOrigin->canRequest(scriptURL)) {
@@ -147,8 +142,15 @@ ScriptPromise ServiceWorkerContainer::registerServiceWorker(ScriptState* scriptS
         return promise;
     }
 
-    if (!patternURL.string().startsWith(scriptURL.baseAsString())) {
-        resolver->reject(DOMException::create(SecurityError, "The scope must be under the directory of the script URL."));
+    KURL patternURL;
+    if (options.scope().isNull())
+        patternURL = KURL(scriptURL, "./");
+    else
+        patternURL = executionContext->completeURL(options.scope());
+    patternURL.removeFragmentIdentifier();
+
+    if (!documentOrigin->canRequest(patternURL)) {
+        resolver->reject(DOMException::create(SecurityError, "The scope must match the current origin."));
         return promise;
     }
 
@@ -173,7 +175,7 @@ private:
 ScriptPromise ServiceWorkerContainer::getRegistration(ScriptState* scriptState, const String& documentURL)
 {
     ASSERT(RuntimeEnabledFeatures::serviceWorkerEnabled());
-    RefPtr<ScriptPromiseResolver> resolver = ScriptPromiseResolver::create(scriptState);
+    RefPtrWillBeRawPtr<ScriptPromiseResolver> resolver = ScriptPromiseResolver::create(scriptState);
     ScriptPromise promise = resolver->promise();
 
     if (!m_provider) {
@@ -289,7 +291,7 @@ bool ServiceWorkerContainer::getClientInfo(WebServiceWorkerClientInfo* info)
     if (!context || !context->isDocument())
         return false;
     Document* document = toDocument(context);
-    info->visibilityState = document->visibilityState();
+    info->pageVisibilityState = static_cast<WebPageVisibilityState>(document->pageVisibilityState());
     info->isFocused = document->hasFocus();
     info->url = document->url();
     if (!document->frame())

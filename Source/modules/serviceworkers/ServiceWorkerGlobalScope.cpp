@@ -37,13 +37,14 @@
 #include "core/fetch/MemoryCache.h"
 #include "core/fetch/ResourceLoaderOptions.h"
 #include "core/inspector/ScriptCallStack.h"
+#include "core/inspector/WorkerInspectorController.h"
 #include "core/loader/ThreadableLoader.h"
 #include "core/workers/WorkerClients.h"
 #include "core/workers/WorkerThreadStartupData.h"
 #include "modules/EventTargetModules.h"
+#include "modules/fetch/GlobalFetch.h"
 #include "modules/serviceworkers/CacheStorage.h"
-#include "modules/serviceworkers/FetchManager.h"
-#include "modules/serviceworkers/Request.h"
+#include "modules/serviceworkers/InspectorServiceWorkerCacheAgent.h"
 #include "modules/serviceworkers/ServiceWorkerClients.h"
 #include "modules/serviceworkers/ServiceWorkerGlobalScopeClient.h"
 #include "modules/serviceworkers/ServiceWorkerThread.h"
@@ -59,7 +60,7 @@ namespace blink {
 class ServiceWorkerGlobalScope::SkipWaitingCallback final : public WebServiceWorkerSkipWaitingCallbacks {
     WTF_MAKE_NONCOPYABLE(SkipWaitingCallback);
 public:
-    explicit SkipWaitingCallback(PassRefPtr<ScriptPromiseResolver> resolver)
+    explicit SkipWaitingCallback(PassRefPtrWillBeRawPtr<ScriptPromiseResolver> resolver)
         : m_resolver(resolver) { }
     ~SkipWaitingCallback() { }
 
@@ -69,7 +70,7 @@ public:
     }
 
 private:
-    RefPtr<ScriptPromiseResolver> m_resolver;
+    RefPtrWillBePersistent<ScriptPromiseResolver> m_resolver;
 };
 
 PassRefPtrWillBeRawPtr<ServiceWorkerGlobalScope> ServiceWorkerGlobalScope::create(ServiceWorkerThread* thread, PassOwnPtrWillBeRawPtr<WorkerThreadStartupData> startupData)
@@ -83,11 +84,11 @@ PassRefPtrWillBeRawPtr<ServiceWorkerGlobalScope> ServiceWorkerGlobalScope::creat
 
 ServiceWorkerGlobalScope::ServiceWorkerGlobalScope(const KURL& url, const String& userAgent, ServiceWorkerThread* thread, double timeOrigin, const SecurityOrigin* starterOrigin, PassOwnPtrWillBeRawPtr<WorkerClients> workerClients)
     : WorkerGlobalScope(url, userAgent, thread, timeOrigin, starterOrigin, workerClients)
-    , m_fetchManager(adoptPtr(new FetchManager(this)))
     , m_didEvaluateScript(false)
     , m_hadErrorInTopLevelEventHandler(false)
     , m_eventNestingLevel(0)
 {
+    workerInspectorController()->registerModuleAgent(InspectorServiceWorkerCacheAgent::create(this));
 }
 
 ServiceWorkerGlobalScope::~ServiceWorkerGlobalScope()
@@ -99,16 +100,6 @@ void ServiceWorkerGlobalScope::didEvaluateWorkerScript()
     m_didEvaluateScript = true;
 }
 
-void ServiceWorkerGlobalScope::stopFetch()
-{
-    m_fetchManager.clear();
-}
-
-String ServiceWorkerGlobalScope::scope(ExecutionContext* context)
-{
-    return ServiceWorkerGlobalScopeClient::from(context)->scope().string();
-}
-
 CacheStorage* ServiceWorkerGlobalScope::caches(ExecutionContext* context)
 {
     if (!m_caches)
@@ -118,18 +109,7 @@ CacheStorage* ServiceWorkerGlobalScope::caches(ExecutionContext* context)
 
 ScriptPromise ServiceWorkerGlobalScope::fetch(ScriptState* scriptState, const RequestInfo& input, const Dictionary& init, ExceptionState& exceptionState)
 {
-    if (!m_fetchManager) {
-        exceptionState.throwTypeError("ServiceWorkerGlobalScope is shutting down.");
-        return ScriptPromise();
-    }
-
-    // "Let |r| be the associated request of the result of invoking the initial
-    // value of Request as constructor with |input| and |init| as arguments. If
-    // this throws an exception, reject |p| with it."
-    Request* r = Request::create(this, input, init, exceptionState);
-    if (exceptionState.hadException())
-        return ScriptPromise();
-    return m_fetchManager->fetch(scriptState, r->request());
+    return GlobalFetch::fetch(scriptState, *this, input, init, exceptionState);
 }
 
 ServiceWorkerClients* ServiceWorkerGlobalScope::clients()
@@ -146,10 +126,14 @@ void ServiceWorkerGlobalScope::close(ExceptionState& exceptionState)
 
 ScriptPromise ServiceWorkerGlobalScope::skipWaiting(ScriptState* scriptState)
 {
-    RefPtr<ScriptPromiseResolver> resolver = ScriptPromiseResolver::create(scriptState);
+    ExecutionContext* executionContext = scriptState->executionContext();
+    // FIXME: short-term fix, see details at: https://codereview.chromium.org/535193002/.
+    if (!executionContext)
+        return ScriptPromise();
+
+    RefPtrWillBeRawPtr<ScriptPromiseResolver> resolver = ScriptPromiseResolver::create(scriptState);
     ScriptPromise promise = resolver->promise();
 
-    ExecutionContext* executionContext = scriptState->executionContext();
     ServiceWorkerGlobalScopeClient::from(executionContext)->skipWaiting(new SkipWaitingCallback(resolver));
     return promise;
 }

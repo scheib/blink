@@ -20,10 +20,17 @@
         {
             "type": "ui-setting",
             "section": "Network",
-            "title": "Show request timing directly in timeline",
-            "settingName": "networkShowRequestTimingInTimeline",
+            "title": "Show primary load waterfall",
+            "settingName": "networkShowPrimaryLoadWaterfall",
             "settingType": "checkbox",
-            "experiment": "showRequestTimingInNetworkTimeline"
+            "experiment": "showPrimaryLoadWaterfallInNetworkTimeline"
+        },
+        {
+            "type": "ui-setting",
+            "section": "Network",
+            "title": "Color-code resource types",
+            "settingName": "networkColorCodeResourceTypes",
+            "settingType": "checkbox"
         }
     ],
     "dependencies": ["source_frame"],

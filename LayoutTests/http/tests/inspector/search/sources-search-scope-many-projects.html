@@ -29,7 +29,7 @@ function test()
     function addNetworkUISourceCode(url, content)
     {
         var contentProvider = new WebInspector.StaticContentProvider(WebInspector.resourceTypes.Script, content);
-        var uiSourceCode = InspectorTest.testNetworkWorkspaceBinding.addFileForURL(url, contentProvider, false);
+        var uiSourceCode = InspectorTest.testNetworkProject.addFileForURL(url, contentProvider, false);
         return uiSourceCode;
     }
 
@@ -48,7 +48,7 @@ function test()
     WebInspector.inspectorView.showViewInDrawer("search");
 
     InspectorTest.createWorkspace();
-    manager = InspectorTest.createIsolatedFileSystemManager(InspectorTest.testWorkspace, InspectorTest.testFileSystemMapping);
+    manager = InspectorTest.createIsolatedFileSystemManager(InspectorTest.testWorkspace);
     manager.addMockFileSystem(fileSystemPath);
     InspectorTest.waitForWorkspaceUISourceCodeAddedEvent(function(){}, 3);
     manager.addFiles(fileSystemPath, files);

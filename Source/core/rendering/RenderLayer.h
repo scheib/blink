@@ -130,8 +130,11 @@ public:
         return curr;
     }
 
-    LayoutPoint location() const;
-    IntSize size() const;
+    const LayoutPoint& location() const { ASSERT(!m_needsPositionUpdate); return m_location; }
+    // FIXME: size() should ASSERT(!m_needsPositionUpdate) as well, but that fails in some tests,
+    // for example, fast/repaint/clipped-relative.html.
+    const IntSize& size() const { return m_size; }
+    void setSizeHackForRenderTreeAsText(const IntSize& size) { m_size = size; }
 
     LayoutRect rect() const { return LayoutRect(location(), LayoutSize(size())); }
 
@@ -144,6 +147,7 @@ public:
     void contentChanged(ContentChangeType);
 
     void updateLayerPositionsAfterLayout();
+    void updateLayerPositionsAfterOverflowScroll();
 
     bool isPaginated() const { return m_isPaginated; }
     RenderLayer* enclosingPaginationLayer() const { return m_enclosingPaginationLayer; }
@@ -151,8 +155,7 @@ public:
     void updateTransformationMatrix();
     RenderLayer* renderingContextRoot();
 
-    // Our current relative position offset.
-    const LayoutSize offsetForInFlowPosition() const;
+    const LayoutSize& offsetForInFlowPosition() const { return m_offsetForInFlowPosition; }
 
     void blockSelectionGapsBoundsChanged();
     void addBlockSelectionGapsBounds(const LayoutRect&);
@@ -211,6 +214,13 @@ public:
 
     void convertToLayerCoords(const RenderLayer* ancestorLayer, LayoutPoint&) const;
     void convertToLayerCoords(const RenderLayer* ancestorLayer, LayoutRect&) const;
+
+    // Does the same as convertToLayerCoords() when not in multicol. For multicol, however,
+    // convertToLayerCoords() calculates the offset in flow-thread coordinates (what the layout
+    // engine uses internally), while this method calculates the visual coordinates; i.e. it figures
+    // out which column the layer starts in and adds in the offset. See
+    // http://www.chromium.org/developers/design-documents/multi-column-layout for more info.
+    LayoutPoint visualOffsetFromAncestor(const RenderLayer* ancestorLayer) const;
 
     // The hitTest() method looks for mouse events by walking layers that intersect the point from front to back.
     bool hitTest(const HitTestRequest&, HitTestResult&);
@@ -521,7 +531,11 @@ private:
 
     void dirtyAncestorChainHasSelfPaintingLayerDescendantStatus();
 
+    // Returns true if the position changed.
+    bool updateLayerPosition();
+
     void updateLayerPositionRecursive();
+    void updateLayerPositionsAfterScrollRecursive();
 
     void setNextSibling(RenderLayer* next) { m_next = next; }
     void setPreviousSibling(RenderLayer* prev) { m_previous = prev; }
@@ -613,6 +627,10 @@ private:
 
     unsigned m_isPaginated : 1; // If we think this layer is split by a multi-column ancestor, then this bit will be set.
 
+#if ENABLE(ASSERT)
+    unsigned m_needsPositionUpdate : 1;
+#endif
+
     unsigned m_3DTransformedDescendantStatusDirty : 1;
     // Set on a stacking context layer that has 3D descendants anywhere
     // in a preserves3D hierarchy. Hint to do 3D-aware hit testing.
@@ -647,6 +665,15 @@ private:
     RenderLayer* m_first;
     RenderLayer* m_last;
 
+    // Our current relative position offset.
+    LayoutSize m_offsetForInFlowPosition;
+
+    // Our (x,y) coordinates are in our parent layer's coordinate space.
+    LayoutPoint m_location;
+
+    // The layer's width/height
+    IntSize m_size;
+
     // Cached normal flow values for absolute positioned elements with static left/top values.
     LayoutUnit m_staticInlinePosition;
     LayoutUnit m_staticBlockPosition;
@@ -654,6 +681,13 @@ private:
     OwnPtr<TransformationMatrix> m_transform;
 
     // Pointer to the enclosing RenderLayer that caused us to be paginated. It is 0 if we are not paginated.
+    //
+    // See RenderMultiColumnFlowThread and
+    // https://sites.google.com/a/chromium.org/dev/developers/design-documents/multi-column-layout
+    // for more information about the multicol implementation. It's important to understand the
+    // difference between flow thread coordinates and visual coordinates when working with multicol
+    // in RenderLayer, since RenderLayer is one of the few places where we have to worry about the
+    // visual ones. Internally we try to use flow-thread coordinates whenever possible.
     RenderLayer* m_enclosingPaginationLayer;
 
     // These compositing reasons are updated whenever style changes, not while updating compositing layers.

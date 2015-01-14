@@ -8,9 +8,9 @@
 #include "bindings/core/v8/CallbackPromiseAdapter.h"
 #include "bindings/core/v8/ScriptPromiseResolver.h"
 #include "core/dom/ExceptionCode.h"
-#include "modules/serviceworkers/ServiceWorkerClient.h"
 #include "modules/serviceworkers/ServiceWorkerError.h"
 #include "modules/serviceworkers/ServiceWorkerGlobalScopeClient.h"
+#include "modules/serviceworkers/ServiceWorkerWindowClient.h"
 #include "public/platform/WebServiceWorkerClientsInfo.h"
 #include "wtf/RefPtr.h"
 #include "wtf/Vector.h"
@@ -27,10 +27,7 @@ namespace {
             OwnPtr<WebType> webClients = adoptPtr(webClientsRaw);
             HeapVector<Member<ServiceWorkerClient> > clients;
             for (size_t i = 0; i < webClients->clients.size(); ++i) {
-                clients.append(ServiceWorkerClient::create(webClients->clients[i].clientID));
-            }
-            for (size_t i = 0; i < webClients->clientIDs.size(); ++i) {
-                clients.append(ServiceWorkerClient::create(webClients->clientIDs[i]));
+                clients.append(ServiceWorkerWindowClient::create(webClients->clients[i]));
             }
             return clients;
         }
@@ -55,14 +52,20 @@ ServiceWorkerClients::ServiceWorkerClients()
 {
 }
 
-ScriptPromise ServiceWorkerClients::getAll(ScriptState* scriptState, const ServiceWorkerClientQueryOptions& options)
+ScriptPromise ServiceWorkerClients::getAll(ScriptState* scriptState, const ClientQueryOptions& options)
 {
-    RefPtr<ScriptPromiseResolver> resolver = ScriptPromiseResolver::create(scriptState);
+    RefPtrWillBeRawPtr<ScriptPromiseResolver> resolver = ScriptPromiseResolver::create(scriptState);
     ScriptPromise promise = resolver->promise();
 
     if (options.includeUncontrolled()) {
         // FIXME: Currently we don't support includeUncontrolled=true.
         resolver->reject(DOMException::create(NotSupportedError, "includeUncontrolled parameter of getAll is not supported."));
+        return promise;
+    }
+
+    if (options.type() != "window") {
+        // FIXME: Currently we only support WindowClients.
+        resolver->reject(DOMException::create(NotSupportedError, "type parameter of getAll is not supported."));
         return promise;
     }
 

@@ -36,7 +36,7 @@ public:
     {
         m_impl->didReceiveTextMessage(payload);
     }
-    virtual void didReceiveBinaryMessage(PassOwnPtr<Vector<char> > payload) override
+    virtual void didReceiveBinaryMessage(PassOwnPtr<Vector<char>> payload) override
     {
         m_impl->didReceiveBinaryMessage(payload);
     }
@@ -57,6 +57,11 @@ public:
         WebSocketImpl* impl = m_impl;
         m_impl = nullptr;
         impl->didClose(status, code, reason);
+    }
+
+    virtual void trace(Visitor* visitor) override
+    {
+        WebSocketChannelClient::trace(visitor);
     }
 
 private:

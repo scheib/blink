@@ -51,6 +51,7 @@
 #include "core/css/CSSHelper.h"
 #include "core/css/CSSImageSetValue.h"
 #include "core/css/CSSLineBoxContainValue.h"
+#include "core/css/CSSPathValue.h"
 #include "core/css/CSSPrimitiveValueMappings.h"
 #include "core/css/CSSPropertyMetadata.h"
 #include "core/css/Counter.h"
@@ -65,6 +66,7 @@
 #include "core/frame/LocalFrame.h"
 #include "core/frame/Settings.h"
 #include "core/rendering/style/CounterContent.h"
+#include "core/rendering/style/PathStyleMotionPath.h"
 #include "core/rendering/style/QuotesData.h"
 #include "core/rendering/style/RenderStyle.h"
 #include "core/rendering/style/RenderStyleConstants.h"
@@ -119,8 +121,15 @@ void StyleBuilder::applyProperty(CSSPropertyID id, StyleResolverState& state, CS
         return;
     }
 
-    if (isInherit && !state.parentStyle()->hasExplicitlyInheritedProperties() && !CSSPropertyMetadata::isInheritedProperty(id))
+    if (isInherit && !state.parentStyle()->hasExplicitlyInheritedProperties() && !CSSPropertyMetadata::isInheritedProperty(id)) {
         state.parentStyle()->setHasExplicitlyInheritedProperties();
+    } else if (value->isUnsetValue()) {
+        ASSERT(!isInherit && !isInitial);
+        if (CSSPropertyMetadata::isInheritedProperty(id))
+            isInherit = true;
+        else
+            isInitial = true;
+    }
 
     StyleBuilder::applyProperty(id, state, value, isInitial, isInherit);
 }
@@ -548,6 +557,69 @@ void StyleBuilderFunctions::applyValueCSSPropertyTransform(StyleResolverState& s
     state.style()->setTransform(operations);
 }
 
+void StyleBuilderFunctions::applyInheritCSSPropertyMotionPath(StyleResolverState& state)
+{
+    if (state.parentStyle()->motionPath())
+        state.style()->setMotionPath(state.parentStyle()->motionPath());
+    else
+        state.style()->resetMotionPath();
+}
+
+void StyleBuilderFunctions::applyValueCSSPropertyMotionPath(StyleResolverState& state, CSSValue* value)
+{
+    if (value->isPathValue()) {
+        const String& pathString = toCSSPathValue(value)->pathString();
+        state.style()->setMotionPath(PathStyleMotionPath::create(pathString));
+        return;
+    }
+
+    ASSERT(value->isPrimitiveValue() && toCSSPrimitiveValue(value)->getValueID() == CSSValueNone);
+    state.style()->resetMotionPath();
+}
+
+void StyleBuilderFunctions::applyInitialCSSPropertyMotionPath(StyleResolverState& state)
+{
+    state.style()->resetMotionPath();
+}
+
+void StyleBuilderFunctions::applyInheritCSSPropertyMotionRotation(StyleResolverState& state)
+{
+    state.style()->setMotionRotation(state.parentStyle()->motionRotation());
+    state.style()->setMotionRotationType(state.parentStyle()->motionRotationType());
+}
+
+void StyleBuilderFunctions::applyInitialCSSPropertyMotionRotation(StyleResolverState& state)
+{
+    state.style()->setMotionRotation(RenderStyle::initialMotionRotation());
+    state.style()->setMotionRotationType(RenderStyle::initialMotionRotationType());
+}
+
+void StyleBuilderFunctions::applyValueCSSPropertyMotionRotation(StyleResolverState& state, CSSValue* value)
+{
+    float rotation = 0;
+    MotionRotationType rotationType = MotionRotationFixed;
+
+    ASSERT(value->isValueList());
+    CSSValueList* list = toCSSValueList(value);
+    int len = list->length();
+    for (int i = 0; i < len; i++) {
+        CSSValue* item = list->item(i);
+        ASSERT(item->isPrimitiveValue());
+        CSSPrimitiveValue* primitiveValue = toCSSPrimitiveValue(item);
+        if (primitiveValue->getValueID() == CSSValueAuto) {
+            rotationType = MotionRotationAuto;
+        } else if (primitiveValue->getValueID() == CSSValueReverse) {
+            rotationType = MotionRotationAuto;
+            rotation += 180;
+        } else {
+            rotation += primitiveValue->computeDegrees();
+        }
+    }
+
+    state.style()->setMotionRotation(rotation);
+    state.style()->setMotionRotationType(rotationType);
+}
+
 void StyleBuilderFunctions::applyInheritCSSPropertyVerticalAlign(StyleResolverState& state)
 {
     EVerticalAlign verticalAlign = state.parentStyle()->verticalAlign();
@@ -797,8 +869,6 @@ void StyleBuilderFunctions::applyValueCSSPropertyContent(StyleResolverState& sta
             const AtomicString& value = state.element()->getAttribute(attr);
             state.style()->setContent(value.isNull() ? emptyString() : value.string(), didSet);
             didSet = true;
-            // register the fact that the attribute value affects the style
-            state.contentAttrValues().append(attr.localName());
         } else if (contentValue->isCounter()) {
             Counter* counterValue = contentValue->getCounterValue();
             EListStyleType listStyleType = NoneListStyle;

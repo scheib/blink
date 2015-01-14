@@ -30,9 +30,10 @@
 #include "wtf/HashMap.h"
 #include "wtf/OwnPtr.h"
 
+class SkPicture;
+
 namespace blink {
 
-class Picture;
 class GraphicsContext;
 
 class RenderSVGResourceMasker final : public RenderSVGResourceContainer {
@@ -61,7 +62,7 @@ private:
     void drawMaskForRenderer(GraphicsContext*, const FloatRect& targetBoundingBox);
     void createPicture(GraphicsContext*);
 
-    RefPtr<Picture> m_maskContentPicture;
+    RefPtr<const SkPicture> m_maskContentPicture;
     FloatRect m_maskContentBoundaries;
 };
 

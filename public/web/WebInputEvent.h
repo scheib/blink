@@ -83,6 +83,9 @@ public:
     // TODO(hbono): Issue 18064: remove the KeyDown type since it isn't
     // used in Chrome any longer.
 
+    // A Java counterpart will be generated for this enum.
+    // GENERATED_JAVA_ENUM_PACKAGE: org.chromium.blink_public.web
+    // GENERATED_JAVA_CLASS_NAME_OVERRIDE: WebInputEventType
     enum Type {
         Undefined = -1,
         TypeFirst = Undefined,
@@ -140,6 +143,9 @@ public:
         TypeLast = TouchTypeLast
     };
 
+    // A Java counterpart will be generated for this enum.
+    // GENERATED_JAVA_ENUM_PACKAGE: org.chromium.blink_public.web
+    // GENERATED_JAVA_CLASS_NAME_OVERRIDE: WebInputEventModifier
     enum Modifiers {
         // modifiers for all events:
         ShiftKey         = 1 << 0,
@@ -374,6 +380,12 @@ public:
     bool scrollByPage;
     bool hasPreciseScrollingDeltas;
 
+    // When false, this wheel event should not trigger scrolling (or any other default
+    // action) if the event goes unhandled by JavaScript. This is used, for example,
+    // when the browser decides the default behavior for Ctrl+Wheel should be to zoom
+    // instead of scroll.
+    bool canScroll;
+
     WebMouseWheelEvent()
         : WebMouseEvent(sizeof(WebMouseWheelEvent))
         , deltaX(0.0f)
@@ -388,6 +400,7 @@ public:
         , canRubberbandRight(true)
         , scrollByPage(false)
         , hasPreciseScrollingDeltas(false)
+        , canScroll(true)
     {
     }
 };
@@ -456,6 +469,12 @@ public:
             float velocityX;
             float velocityY;
         } flingStart;
+
+        struct {
+            // If set to true, don't treat flingCancel
+            // as a part of fling boost events sequence.
+            bool preventBoosting;
+        } flingCancel;
 
         struct {
             float scale;

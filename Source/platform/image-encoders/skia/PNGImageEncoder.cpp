@@ -124,9 +124,9 @@ bool PNGImageEncoder::encode(const SkBitmap& bitmap, Vector<unsigned char>* outp
     return encodePixels(IntSize(bitmap.width(), bitmap.height()), static_cast<unsigned char*>(bitmap.getPixels()), true, output);
 }
 
-bool PNGImageEncoder::encode(const ImageEncoder::RawImageBytes& imageData, Vector<unsigned char>* output)
+bool PNGImageEncoder::encode(const ImageDataBuffer& imageData, Vector<unsigned char>* output)
 {
-    return encodePixels(imageData.size(), imageData.data(), false, output);
+    return encodePixels(IntSize(imageData.width(), imageData.height()), imageData.pixels(), false, output);
 }
 
 } // namespace blink

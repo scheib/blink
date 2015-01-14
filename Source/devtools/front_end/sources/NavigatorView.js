@@ -315,7 +315,7 @@ WebInspector.NavigatorView.prototype = {
             WebInspector.isolatedFileSystemManager.addFileSystem();
         }
 
-        var addFolderLabel = WebInspector.UIString(WebInspector.useLowerCaseMenuTitles() ? "Add folder to workspace" : "Add Folder to Workspace");
+        var addFolderLabel = WebInspector.UIString.capitalize("Add ^folder to ^workspace");
         contextMenu.appendItem(addFolderLabel, addFolder);
     },
 
@@ -383,9 +383,9 @@ WebInspector.NavigatorView.prototype = {
         var project = uiSourceCode.project();
         if (project.type() === WebInspector.projectTypes.FileSystem) {
             var path = uiSourceCode.parentPath();
-            contextMenu.appendItem(WebInspector.UIString("Rename\u2026"), this._handleContextMenuRename.bind(this, uiSourceCode));
-            contextMenu.appendItem(WebInspector.UIString(WebInspector.useLowerCaseMenuTitles() ? "Make a copy\u2026" : "Make a Copy\u2026"), this._handleContextMenuCreate.bind(this, project, path, uiSourceCode));
-            contextMenu.appendItem(WebInspector.UIString("Delete"), this._handleContextMenuDelete.bind(this, uiSourceCode));
+            contextMenu.appendItem(WebInspector.UIString.capitalize("Rename\u2026"), this._handleContextMenuRename.bind(this, uiSourceCode));
+            contextMenu.appendItem(WebInspector.UIString.capitalize("Make a ^copy\u2026"), this._handleContextMenuCreate.bind(this, project, path, uiSourceCode));
+            contextMenu.appendItem(WebInspector.UIString.capitalize("Delete"), this._handleContextMenuDelete.bind(this, uiSourceCode));
             contextMenu.appendSeparator();
         }
 
@@ -410,9 +410,9 @@ WebInspector.NavigatorView.prototype = {
         var project = projectNode._project;
 
         if (project.type() === WebInspector.projectTypes.FileSystem) {
-            contextMenu.appendItem(WebInspector.UIString("Refresh"), this._handleContextMenuRefresh.bind(this, project, path));
-            contextMenu.appendItem(WebInspector.UIString(WebInspector.useLowerCaseMenuTitles() ? "New file" : "New File"), this._handleContextMenuCreate.bind(this, project, path));
-            contextMenu.appendItem(WebInspector.UIString(WebInspector.useLowerCaseMenuTitles() ? "Exclude folder" : "Exclude Folder"), this._handleContextMenuExclude.bind(this, project, path));
+            contextMenu.appendItem(WebInspector.UIString.capitalize("Refresh"), this._handleContextMenuRefresh.bind(this, project, path));
+            contextMenu.appendItem(WebInspector.UIString.capitalize("New ^file"), this._handleContextMenuCreate.bind(this, project, path));
+            contextMenu.appendItem(WebInspector.UIString.capitalize("Exclude ^folder"), this._handleContextMenuExclude.bind(this, project, path));
         }
         contextMenu.appendSeparator();
         this._appendAddFolderItem(contextMenu);
@@ -425,7 +425,7 @@ WebInspector.NavigatorView.prototype = {
         }
 
         if (project.type() === WebInspector.projectTypes.FileSystem && node === projectNode) {
-            var removeFolderLabel = WebInspector.UIString(WebInspector.useLowerCaseMenuTitles() ? "Remove folder from workspace" : "Remove Folder from Workspace");
+            var removeFolderLabel = WebInspector.UIString.capitalize("Remove ^folder from ^workspace");
             contextMenu.appendItem(removeFolderLabel, removeFolder);
         }
 
@@ -456,7 +456,7 @@ WebInspector.NavigatorView.prototype = {
 
             this.dispatchEventToListeners(WebInspector.NavigatorView.Events.ItemRenamed, uiSourceCode);
             this._updateIcon(uiSourceCode);
-            this._sourceSelected(uiSourceCode, true)
+            this._sourceSelected(uiSourceCode, true);
         }
     },
 
@@ -504,7 +504,7 @@ WebInspector.NavigatorView.prototype = {
             filePath = path;
             uiSourceCode = project.uiSourceCode(filePath);
             if (!uiSourceCode) {
-                console.assert(uiSourceCode)
+                console.assert(uiSourceCode);
                 return;
             }
             this._sourceSelected(uiSourceCode, false);
@@ -549,7 +549,7 @@ WebInspector.SourcesNavigatorView.prototype = {
        for (var i = 0; i < nodes.length; ++i) {
            var uiSourceCode = nodes[i].uiSourceCode();
            var inspectedPageURL = WebInspector.targetManager.inspectedPageURL();
-           if (inspectedPageURL && uiSourceCode.url === inspectedPageURL)
+           if (inspectedPageURL && WebInspector.networkMapping.networkURL(uiSourceCode) === inspectedPageURL)
               this.revealUISourceCode(uiSourceCode, true);
        }
     },
@@ -562,7 +562,7 @@ WebInspector.SourcesNavigatorView.prototype = {
     {
         WebInspector.NavigatorView.prototype._addUISourceCode.call(this, uiSourceCode);
         var inspectedPageURL = WebInspector.targetManager.inspectedPageURL();
-        if (inspectedPageURL && uiSourceCode.url === inspectedPageURL)
+        if (inspectedPageURL && WebInspector.networkMapping.networkURL(uiSourceCode) === inspectedPageURL)
             this.revealUISourceCode(uiSourceCode, true);
      },
 
@@ -1307,7 +1307,7 @@ WebInspector.NavigatorUISourceCodeTreeNode.prototype = {
         var editingConfig = new WebInspector.InplaceEditor.Config(commitHandler.bind(this), cancelHandler.bind(this));
         this.updateTitle(true);
         WebInspector.InplaceEditor.startEditing(this._treeElement.titleElement, editingConfig);
-        treeOutlineElement.window().getSelection().setBaseAndExtent(this._treeElement.titleElement, 0, this._treeElement.titleElement, 1);
+        treeOutlineElement.getComponentSelection().setBaseAndExtent(this._treeElement.titleElement, 0, this._treeElement.titleElement, 1);
     },
 
     __proto__: WebInspector.NavigatorTreeNode.prototype

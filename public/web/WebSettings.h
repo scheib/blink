@@ -74,22 +74,25 @@ public:
         V8ScriptStreamingModeAllPlusBlockParsingBlocking,
     };
 
-    // Bit field values to tell Blink what kind of pointer/hover types are
-    // available on the system. These must match the enums in
-    // core/css/PointerProperties.h and their equality is compile-time asserted
-    // in WebSettingsImpl.cpp.
+    // Bit field values indicating available pointer types. Identical to
+    // blink::PointerType enums, enforced by compile-time assertions in
+    // AssertMatchingEnums.cpp.
+    // TODO(mustaq): Move this into public/platform, like WebBlendMode.
     enum PointerType {
-        PointerTypeNone = 1,
-        PointerTypeCoarse = 2,
-        PointerTypeFine = 4
+        PointerTypeNone = 1 << 0,
+        PointerTypeCoarse = 1 << 1,
+        PointerTypeFine = 1 << 2
     };
 
+    // Bit field values indicating available hover types. Identical to
+    // blink::HoverType enums, enforced by compile-time assertions in
+    // AssertMatchingEnums.cpp.
     enum HoverType {
-        HoverTypeNone = 1,
+        HoverTypeNone = 1 << 0,
         // Indicates that the primary pointing system can hover, but it requires
         // a significant action on the user’s part. e.g. hover on “long press”.
-        HoverTypeOnDemand = 2,
-        HoverTypeHover = 4
+        HoverTypeOnDemand = 1 << 1,
+        HoverTypeHover = 1 << 2
     };
 
     virtual bool mainFrameResizesAreOrientationChanges() const = 0;
@@ -167,7 +170,7 @@ public:
     virtual void setJavaScriptCanAccessClipboard(bool) = 0;
     virtual void setJavaScriptCanOpenWindowsAutomatically(bool) = 0;
     virtual void setJavaScriptEnabled(bool) = 0;
-    virtual void setLayerSquashingEnabled(bool) = 0;
+    void setLayerSquashingEnabled(bool) { }
     virtual void setLoadsImagesAutomatically(bool) = 0;
     virtual void setLoadWithOverviewMode(bool) = 0;
     virtual void setLocalStorageEnabled(bool) = 0;
@@ -219,6 +222,8 @@ public:
     // elements using SPACE or ENTER keys.
     virtual void setSpatialNavigationEnabled(bool) = 0;
     virtual void setStandardFontFamily(const WebString&, UScriptCode = USCRIPT_COMMON) = 0;
+    virtual void setStrictMixedContentChecking(bool) = 0;
+    virtual void setStrictPowerfulFeatureRestrictions(bool) = 0;
     virtual void setSupportDeprecatedTargetDensityDPI(bool) = 0;
     virtual void setSupportsMultipleWindows(bool) = 0;
     virtual void setSyncXHRInDocumentsEnabled(bool) = 0;

@@ -439,14 +439,23 @@ def impl_includes_for_type(idl_type, interfaces_info):
         includes_for_type.add('wtf/text/WTFString.h')
     if base_idl_type in interfaces_info:
         interface_info = interfaces_info[idl_type.base_type]
-        includes_for_type.add(interface_info['include_path'])
+        if interface_info['include_path']:
+            includes_for_type.add(interface_info['include_path'])
     if base_idl_type in INCLUDES_FOR_TYPE:
         includes_for_type.update(INCLUDES_FOR_TYPE[base_idl_type])
     if idl_type.is_typed_array:
         return set(['core/dom/DOMTypedArray.h'])
     return includes_for_type
 
+
+def impl_includes_for_type_union(idl_type, interfaces_info):
+    includes_for_type = set()
+    for member_type in idl_type.member_types:
+        includes_for_type.update(member_type.impl_includes_for_type(interfaces_info))
+    return includes_for_type
+
 IdlTypeBase.impl_includes_for_type = impl_includes_for_type
+IdlUnionType.impl_includes_for_type = impl_includes_for_type_union
 
 
 component_dir = {}
@@ -481,7 +490,7 @@ V8_VALUE_TO_CPP_VALUE = {
     'unsigned long long': 'toUInt64({arguments})',
     # Interface types
     'Dictionary': 'Dictionary({v8_value}, {isolate}, exceptionState)',
-    'EventTarget': 'V8DOMWrapper::isDOMWrapper({v8_value}) ? toWrapperTypeInfo(v8::Handle<v8::Object>::Cast({v8_value}))->toEventTarget(v8::Handle<v8::Object>::Cast({v8_value})) : 0',
+    'EventTarget': 'toEventTarget({isolate}, {v8_value})',
     'NodeFilter': 'toNodeFilter({v8_value}, info.Holder(), ScriptState::current({isolate}))',
     'Promise': 'ScriptPromise::cast(ScriptState::current({isolate}), {v8_value})',
     'SerializedScriptValue': 'SerializedScriptValueFactory::instance().create({v8_value}, 0, 0, exceptionState, {isolate})',
@@ -521,7 +530,7 @@ def v8_conversion_is_trivial(idl_type):
 IdlType.v8_conversion_is_trivial = property(v8_conversion_is_trivial)
 
 
-def v8_value_to_cpp_value(idl_type, extended_attributes, v8_value, variable_name, needs_type_check, index, isolate):
+def v8_value_to_cpp_value(idl_type, extended_attributes, v8_value, variable_name, index, isolate):
     if idl_type.name == 'void':
         return ''
 
@@ -549,17 +558,14 @@ def v8_value_to_cpp_value(idl_type, extended_attributes, v8_value, variable_name
     elif idl_type.is_array_buffer_or_view:
         cpp_expression_format = (
             '{v8_value}->Is{idl_type}() ? '
-            'V8{idl_type}::toImpl(v8::Handle<v8::{idl_type}>::Cast({v8_value})) : 0')
+            'V8{idl_type}::toImpl(v8::Local<v8::{idl_type}>::Cast({v8_value})) : 0')
     elif idl_type.use_output_parameter_for_result:
         if idl_type.includes_nullable_type:
             base_idl_type = idl_type.cpp_type + 'OrNull'
         cpp_expression_format = 'V8{idl_type}::toImpl({isolate}, {v8_value}, {variable_name}, exceptionState)'
-    elif needs_type_check:
-        cpp_expression_format = (
-            'V8{idl_type}::toImplWithTypeCheck({isolate}, {v8_value})')
     else:
         cpp_expression_format = (
-            'V8{idl_type}::toImpl(v8::Handle<v8::Object>::Cast({v8_value}))')
+            'V8{idl_type}::toImplWithTypeCheck({isolate}, {v8_value})')
 
     return cpp_expression_format.format(arguments=arguments, idl_type=base_idl_type, v8_value=v8_value, variable_name=variable_name, isolate=isolate)
 
@@ -586,7 +592,7 @@ def v8_value_to_cpp_value_array_or_sequence(native_array_element_type, v8_value,
 
 
 # FIXME: this function should be refactored, as this takes too many flags.
-def v8_value_to_local_cpp_value(idl_type, extended_attributes, v8_value, variable_name=None, needs_type_check=True, index=None, declare_variable=True, isolate='info.GetIsolate()', used_in_private_script=False, return_promise=False, needs_exception_state_for_string=False):
+def v8_value_to_local_cpp_value(idl_type, extended_attributes, v8_value, variable_name=None, index=None, declare_variable=True, isolate='info.GetIsolate()', used_in_private_script=False, return_promise=False, needs_exception_state_for_string=False):
     """Returns an expression that converts a V8 value to a C++ value and stores it as a local value."""
 
     this_cpp_type = idl_type.cpp_type_args(extended_attributes=extended_attributes, raw_type=True)
@@ -595,7 +601,7 @@ def v8_value_to_local_cpp_value(idl_type, extended_attributes, v8_value, variabl
     if idl_type.base_type in ('void', 'object', 'EventHandler', 'EventListener'):
         return '/* no V8 -> C++ conversion for IDL type: %s */' % idl_type.name
 
-    cpp_value = v8_value_to_cpp_value(idl_type, extended_attributes, v8_value, variable_name, needs_type_check, index, isolate)
+    cpp_value = v8_value_to_cpp_value(idl_type, extended_attributes, v8_value, variable_name, index, isolate)
 
     if idl_type.is_dictionary or idl_type.is_union_type:
         return 'TONATIVE_VOID_EXCEPTIONSTATE_ARGINTERNAL(%s, exceptionState)' % cpp_value
@@ -707,6 +713,11 @@ def v8_conversion_type(idl_type, extended_attributes):
     """
     extended_attributes = extended_attributes or {}
 
+    # Nullable dictionaries need to be handled differently than either
+    # non-nullable dictionaries or unions.
+    if idl_type.is_dictionary and idl_type.is_nullable:
+        return 'NullableDictionary'
+
     if idl_type.is_dictionary or idl_type.is_union_type:
         return 'DictionaryOrUnion'
 
@@ -781,6 +792,8 @@ V8_SET_RETURN_VALUE = {
     'DOMWrapperDefault': 'v8SetReturnValue(info, {cpp_value})',
     # Generic dictionary type
     'Dictionary': 'v8SetReturnValue(info, {cpp_value})',
+    # Nullable dictionaries
+    'NullableDictionary': 'v8SetReturnValue(info, result.get())',
     # Union types or dictionaries
     'DictionaryOrUnion': 'v8SetReturnValue(info, result)',
 }
@@ -835,16 +848,25 @@ CPP_VALUE_TO_V8_VALUE = {
     'unrestricted double': 'v8::Number::New({isolate}, {cpp_value})',
     'void': 'v8Undefined()',
     # [TreatReturnedNullStringAs]
-    'StringOrNull': '{cpp_value}.isNull() ? v8::Handle<v8::Value>(v8::Null({isolate})) : v8String({isolate}, {cpp_value})',
+    'StringOrNull': '{cpp_value}.isNull() ? v8::Local<v8::Value>(v8::Null({isolate})) : v8String({isolate}, {cpp_value})',
     'StringOrUndefined': '{cpp_value}.isNull() ? v8Undefined() : v8String({isolate}, {cpp_value})',
     # Special cases
     'Dictionary': '{cpp_value}.v8Value()',
-    'EventHandler': '{cpp_value} ? v8::Handle<v8::Value>(V8AbstractEventListener::cast({cpp_value})->getListenerObject(impl->executionContext())) : v8::Handle<v8::Value>(v8::Null({isolate}))',
+    'EventHandler': '{cpp_value} ? v8::Local<v8::Value>(V8AbstractEventListener::cast({cpp_value})->getListenerObject(impl->executionContext())) : v8::Local<v8::Value>(v8::Null({isolate}))',
     'ScriptValue': '{cpp_value}.v8Value()',
-    'SerializedScriptValue': '{cpp_value} ? {cpp_value}->deserialize() : v8::Handle<v8::Value>(v8::Null({isolate}))',
+    'SerializedScriptValue': '{cpp_value} ? {cpp_value}->deserialize() : v8::Local<v8::Value>(v8::Null({isolate}))',
     # General
     'array': 'toV8({cpp_value}, {creation_context}, {isolate})',
     'DOMWrapper': 'toV8({cpp_value}, {creation_context}, {isolate})',
+    # Passing nullable dictionaries isn't a pattern currently used
+    # anywhere in the web platform, and more work would be needed in
+    # the code generator to distinguish between passing null, and
+    # passing an object which happened to not contain any of the
+    # dictionary's defined attributes. For now, don't define
+    # NullableDictionary here, which will cause an exception to be
+    # thrown during code generation if an argument to a method is a
+    # nullable dictionary type.
+    #
     # Union types or dictionaries
     'DictionaryOrUnion': 'toV8({cpp_value}, {creation_context}, {isolate})',
 }

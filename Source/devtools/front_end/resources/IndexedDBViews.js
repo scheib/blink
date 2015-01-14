@@ -39,6 +39,7 @@ WebInspector.IDBDatabaseView = function(database)
     this.registerRequiredCSS("resources/indexedDBViews.css");
 
     this.element.classList.add("indexed-db-database-view");
+    this.element.classList.add("storage-view");
 
     this._headersListElement = this.element.createChild("ol", "outline-disclosure");
     this._headersTreeOutline = new TreeOutline(this._headersListElement);
@@ -172,7 +173,7 @@ WebInspector.IDBDataView.prototype = {
             return keyColumnHeaderFragment;
 
         keyColumnHeaderFragment.createTextChild(" (" + WebInspector.UIString("Key path: "));
-        if (keyPath instanceof Array) {
+        if (Array.isArray(keyPath)) {
             keyColumnHeaderFragment.createTextChild("[");
             for (var i = 0; i < keyPath.length; ++i) {
                 if (i != 0)
@@ -312,7 +313,6 @@ WebInspector.IDBDataView.prototype = {
                 data["primaryKey"] = entries[i].primaryKey;
                 data["value"] = entries[i].value;
 
-                var primaryKey = JSON.stringify(this._isIndex ? entries[i].primaryKey : entries[i].key);
                 var node = new WebInspector.IDBDataGridNode(data);
                 this._dataGrid.rootNode().appendChild(node);
             }
@@ -405,7 +405,7 @@ WebInspector.IDBDataGridNode.prototype = {
         switch (type) {
         case "object":
         case "array":
-            var section = new WebInspector.ObjectPropertiesSection(value, value.description)
+            var section = new WebInspector.ObjectPropertiesSection(value, value.description);
             section.editable = false;
             section.skipProto = true;
             contents.appendChild(section.element);

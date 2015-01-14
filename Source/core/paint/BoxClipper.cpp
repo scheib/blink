@@ -5,7 +5,6 @@
 #include "config.h"
 #include "core/paint/BoxClipper.h"
 
-#include "core/paint/ClipRecorder.h"
 #include "core/rendering/PaintInfo.h"
 #include "core/rendering/RenderBox.h"
 #include "core/rendering/RenderLayer.h"
@@ -32,7 +31,7 @@ BoxClipper::BoxClipper(RenderBox& box, const PaintInfo& paintInfo, const LayoutP
         return;
 
     LayoutRect clipRect = isControlClip ? m_box.controlClipRect(m_accumulatedOffset) : m_box.overflowClipRect(m_accumulatedOffset);
-    RoundedRect clipRoundedRect(0, 0, 0, 0);
+    FloatRoundedRect clipRoundedRect(0, 0, 0, 0);
     bool hasBorderRadius = m_box.style()->hasBorderRadius();
     if (hasBorderRadius)
         clipRoundedRect = m_box.style()->getRoundedInnerBorderFor(LayoutRect(m_accumulatedOffset, m_box.size()));
@@ -44,7 +43,7 @@ BoxClipper::BoxClipper(RenderBox& box, const PaintInfo& paintInfo, const LayoutP
 
         LayoutRect conservativeClipRect = clipRect;
         if (hasBorderRadius)
-            conservativeClipRect.intersect(clipRoundedRect.radiusCenterRect());
+            conservativeClipRect.intersect(LayoutRect(clipRoundedRect.radiusCenterRect()));
         conservativeClipRect.moveBy(-m_accumulatedOffset);
         if (m_box.hasLayer())
             conservativeClipRect.move(m_box.scrolledContentOffset());
@@ -54,9 +53,9 @@ BoxClipper::BoxClipper(RenderBox& box, const PaintInfo& paintInfo, const LayoutP
 
     DisplayItem::Type clipType = DisplayItem::ClipBoxForeground;
     if (RuntimeEnabledFeatures::slimmingPaintEnabled())
-        clipType = ClipRecorder::paintPhaseToClipType(m_paintInfo.phase);
+        clipType = m_paintInfo.displayItemTypeForClipping();
 
-    OwnPtr<ClipDisplayItem> clipDisplayItem = adoptPtr(new ClipDisplayItem(m_box.displayItemClient(), clipType, pixelSnappedIntRect(clipRect)));
+    OwnPtr<ClipDisplayItem> clipDisplayItem = ClipDisplayItem::create(m_box.displayItemClient(), clipType, pixelSnappedIntRect(clipRect));
     if (hasBorderRadius)
         clipDisplayItem->roundedRectClips().append(clipRoundedRect);
 
@@ -76,7 +75,7 @@ BoxClipper::~BoxClipper()
 
     ASSERT(m_box.hasControlClip() || (m_box.hasOverflowClip() && !m_box.layer()->isSelfPaintingLayer()));
 
-    OwnPtr<EndClipDisplayItem> endClipDisplayItem = adoptPtr(new EndClipDisplayItem(m_box.displayItemClient()));
+    OwnPtr<EndClipDisplayItem> endClipDisplayItem = EndClipDisplayItem::create(m_box.displayItemClient());
 
     if (RuntimeEnabledFeatures::slimmingPaintEnabled()) {
         ASSERT(m_paintInfo.context->displayItemList());

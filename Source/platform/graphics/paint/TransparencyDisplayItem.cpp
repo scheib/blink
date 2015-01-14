@@ -13,22 +13,21 @@ namespace blink {
 
 void BeginTransparencyDisplayItem::replay(GraphicsContext* context)
 {
-    context->setCompositeOperation(m_compositeOperator, m_blendMode);
+    context->setCompositeOperation(m_preTransparencyLayerCompositeOp, m_preTransparencyLayerBlendMode);
     context->beginTransparencyLayer(m_opacity);
-    context->setCompositeOperation(m_compositeOperator, WebBlendModeNormal);
+    context->setCompositeOperation(m_postTransparencyLayerCompositeOp, WebBlendModeNormal);
 }
 
 void BeginTransparencyDisplayItem::appendToWebDisplayItemList(WebDisplayItemList* list) const
 {
-    list->appendTransparencyItem(m_opacity, m_blendMode);
+    list->appendTransparencyItem(m_opacity, m_preTransparencyLayerBlendMode);
 }
 
 #ifndef NDEBUG
-WTF::String BeginTransparencyDisplayItem::asDebugString() const
+void BeginTransparencyDisplayItem::dumpPropertiesAsDebugString(WTF::StringBuilder& stringBuilder) const
 {
-    return String::format("{%s, type: \"%s\", hasBlendMode: %d, blendMode: %d, opacity: %f}",
-        clientDebugString().utf8().data(), typeAsDebugString(type()).utf8().data(),
-        hasBlendMode(), m_blendMode, m_opacity);
+    DisplayItem::dumpPropertiesAsDebugString(stringBuilder);
+    stringBuilder.append(WTF::String::format(", blendMode: %d, opacity: %f", m_preTransparencyLayerBlendMode, m_opacity));
 }
 #endif
 
@@ -41,13 +40,5 @@ void EndTransparencyDisplayItem::appendToWebDisplayItemList(WebDisplayItemList* 
 {
     list->appendEndTransparencyItem();
 }
-
-#ifndef NDEBUG
-WTF::String EndTransparencyDisplayItem::asDebugString() const
-{
-    return String::format("{%s, type: \"%s\"}",
-        clientDebugString().utf8().data(), typeAsDebugString(type()).utf8().data());
-}
-#endif
 
 } // namespace blink

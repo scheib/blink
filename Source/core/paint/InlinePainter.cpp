@@ -6,10 +6,10 @@
 #include "core/paint/InlinePainter.h"
 
 #include "core/paint/BoxPainter.h"
-#include "core/paint/DrawingRecorder.h"
+#include "core/paint/GraphicsContextAnnotator.h"
 #include "core/paint/LineBoxListPainter.h"
 #include "core/paint/ObjectPainter.h"
-#include "core/rendering/GraphicsContextAnnotator.h"
+#include "core/paint/RenderDrawingRecorder.h"
 #include "core/rendering/PaintInfo.h"
 #include "core/rendering/RenderBlock.h"
 #include "core/rendering/RenderInline.h"
@@ -38,7 +38,9 @@ void InlinePainter::paintOutline(const PaintInfo& paintInfo, const LayoutPoint& 
         bounds = cb->visualOverflowRect();
         bounds.moveBy(paintOffset);
     }
-    DrawingRecorder recorder(paintInfo.context, &m_renderInline, paintInfo.phase, bounds);
+    RenderDrawingRecorder recorder(paintInfo.context, m_renderInline, paintInfo.phase, bounds);
+    if (recorder.canUseCachedDrawing())
+        return;
 
     if (styleToUse->outlineStyleIsAuto()) {
         if (RenderTheme::theme().shouldDrawDefaultFocusRing(&m_renderInline)) {

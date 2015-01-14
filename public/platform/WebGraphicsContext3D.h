@@ -64,6 +64,7 @@ struct WebGLInfo {
     WebString vendorInfo;
     WebString rendererInfo;
     WebString driverVersion;
+    WebString contextInfoCollectionFailure;
 };
 
 // This interface abstracts the operations performed by the
@@ -431,6 +432,10 @@ public:
     virtual void insertEventMarkerEXT(const WGC3Dchar* marker) { }
     virtual void pushGroupMarkerEXT(const WGC3Dchar* marker) { }
     virtual void popGroupMarkerEXT(void) { }
+
+    // GL_CHROMIUM_trace_marker
+    virtual void traceBeginCHROMIUM(const WGC3Dchar* category, const WGC3Dchar* trace) { }
+    virtual void traceEndCHROMIUM() { }
 
     // GL_OES_vertex_array_object
     virtual WebGLId createVertexArrayOES() { return 0; }

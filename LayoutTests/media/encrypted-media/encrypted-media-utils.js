@@ -12,9 +12,41 @@ function consoleWrite(text)
     console.appendChild(span);
 }
 
+// FIXME: Detect EME support rather than just general container support.
+// http://crbug.com/441585
+// For now, assume that implementations that support a container type for clear
+// content and are running these tests also support that container with EME.
+// The element used for this will is not released to avoid interfering with the
+// ActiveDOMObject counts in the lifetime tests.
+var canPlayTypeElement = new Audio();
+var isWebMSupported = ('' != canPlayTypeElement.canPlayType('video/webm'));
+var isCencSupported = ('' != canPlayTypeElement.canPlayType('video/mp4'));
+
+function isInitDataTypeSupported(initDataType)
+{
+    var result = false;
+    switch (initDataType) {
+    case 'webm':
+        result = isWebMSupported;
+        break;
+    case 'cenc':
+        result = isCencSupported;
+        break;
+    default:
+        result = false;
+    }
+
+    return result;
+}
+
+
 function getInitDataType()
 {
-    return (MediaKeys.isTypeSupported('org.w3.clearkey', 'video/webm')) ? 'webm' : 'cenc';
+    if (isInitDataTypeSupported('webm'))
+        return 'webm';
+    if (isInitDataTypeSupported('cenc'))
+        return 'cenc';
+    throw 'No supported Initialization Data Types';
 }
 
 function getInitData(initDataType)
@@ -70,13 +102,6 @@ function stringToUint8Array(str)
     return result;
 }
 
-// For Clear Key, MediaKeySession.update() takes a JSON Web Key (JWK) Set,
-// which contains a set of cryptographic keys represented by JSON. These helper
-// functions help wrap raw keys into a JWK set.
-// See:
-// https://dvcs.w3.org/hg/html-media/raw-file/tip/encrypted-media/encrypted-media.html#simple-decryption-clear-key
-// http://tools.ietf.org/html/draft-ietf-jose-json-web-key
-
 // Encodes data into base64 string without trailing '='.
 function base64Encode(data)
 {
@@ -84,11 +109,18 @@ function base64Encode(data)
     return result.replace(/=+$/g, '');
 }
 
+// For Clear Key, the License Format is a JSON Web Key (JWK) Set, which contains
+// a set of cryptographic keys represented by JSON. These helper functions help
+// wrap raw keys into a JWK set.
+// See:
+// https://w3c.github.io/encrypted-media/#clear-key-license-format
+// http://tools.ietf.org/html/draft-ietf-jose-json-web-key
+//
 // Creates a JWK from raw key ID and key.
 // |keyId| and |key| are expected to be ArrayBufferViews, not base64-encoded.
 function createJWK(keyId, key)
 {
-    var jwk = '{"kty":"oct","kid":"';
+    var jwk = '{"kty":"oct","alg":"A128KW","kid":"';
     // FIXME: Should use base64URLEncoding.
     jwk += base64Encode(keyId);
     jwk += '","k":"';

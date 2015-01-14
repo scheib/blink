@@ -88,6 +88,16 @@ void WaitUntilObserver::waitUntil(ScriptState* scriptState, const ScriptValue& v
         return;
     }
 
+    if (!executionContext())
+        return;
+
+    // When handling a notificationclick event, we want to allow one window to
+    // be focused. Regardless of whether one window was focused,
+    // |consumeWindowFocus| will be called when all the pending activities will
+    // be resolved.
+    if (m_type == NotificationClick)
+        executionContext()->allowWindowFocus();
+
     incrementPendingActivity();
     ScriptPromise::cast(scriptState, value).then(
         ThenFunction::createFunction(scriptState, this, ThenFunction::Fulfilled),
@@ -134,12 +144,18 @@ void WaitUntilObserver::decrementPendingActivity()
         break;
     case NotificationClick:
         client->didHandleNotificationClickEvent(m_eventID, result);
+        executionContext()->consumeWindowFocus();
         break;
     case Push:
         client->didHandlePushEvent(m_eventID, result);
         break;
     }
     observeContext(0);
+}
+
+void WaitUntilObserver::trace(Visitor* visitor)
+{
+    ContextLifecycleObserver::trace(visitor);
 }
 
 } // namespace blink

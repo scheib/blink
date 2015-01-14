@@ -8,6 +8,7 @@
 #include "platform/geometry/LayoutRect.h"
 #include "platform/graphics/ImageFilter.h"
 #include "platform/graphics/paint/DisplayItem.h"
+#include "wtf/PassOwnPtr.h"
 #include "wtf/PassRefPtr.h"
 #ifndef NDEBUG
 #include "wtf/text/WTFString.h"
@@ -17,13 +18,19 @@ namespace blink {
 
 class PLATFORM_EXPORT BeginFilterDisplayItem : public DisplayItem {
 public:
-    BeginFilterDisplayItem(DisplayItemClient client, Type type, PassRefPtr<ImageFilter> imageFilter, const LayoutRect& bounds)
-        : DisplayItem(client, type), m_imageFilter(imageFilter), m_bounds(bounds) { }
+    static PassOwnPtr<BeginFilterDisplayItem> create(DisplayItemClient client, Type type, PassRefPtr<ImageFilter> imageFilter, const LayoutRect& bounds) { return adoptPtr(new BeginFilterDisplayItem(client, type, imageFilter, bounds)); }
+
     virtual void replay(GraphicsContext*) override;
     virtual void appendToWebDisplayItemList(WebDisplayItemList*) const override;
 
+protected:
+    BeginFilterDisplayItem(DisplayItemClient client, Type type, PassRefPtr<ImageFilter> imageFilter, const LayoutRect& bounds)
+        : DisplayItem(client, type), m_imageFilter(imageFilter), m_bounds(bounds) { }
+
+private:
 #ifndef NDEBUG
-    virtual WTF::String asDebugString() const override;
+    virtual const char* name() const override { return "BeginFilter"; }
+    virtual void dumpPropertiesAsDebugString(WTF::StringBuilder&) const override;
 #endif
 
     RefPtr<ImageFilter> m_imageFilter;
@@ -32,13 +39,18 @@ public:
 
 class PLATFORM_EXPORT EndFilterDisplayItem : public DisplayItem {
 public:
-    EndFilterDisplayItem(DisplayItemClient client)
-        : DisplayItem(client, EndFilter) { }
+    static PassOwnPtr<EndFilterDisplayItem> create(DisplayItemClient client) { return adoptPtr(new EndFilterDisplayItem(client)); }
+
     virtual void replay(GraphicsContext*) override;
     virtual void appendToWebDisplayItemList(WebDisplayItemList*) const override;
 
+protected:
+    EndFilterDisplayItem(DisplayItemClient client)
+        : DisplayItem(client, EndFilter) { }
+
+private:
 #ifndef NDEBUG
-    virtual WTF::String asDebugString() const override;
+    virtual const char* name() const override { return "EndFilter"; }
 #endif
 };
 

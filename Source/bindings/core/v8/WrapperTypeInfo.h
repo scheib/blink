@@ -48,14 +48,14 @@ static const int v8DefaultWrapperInternalFieldCount = static_cast<int>(gin::kNum
 static const int v8PrototypeTypeIndex = 0;
 static const int v8PrototypeInternalFieldcount = 1;
 
-typedef v8::Handle<v8::FunctionTemplate> (*DomTemplateFunction)(v8::Isolate*);
+typedef v8::Local<v8::FunctionTemplate> (*DomTemplateFunction)(v8::Isolate*);
 typedef void (*RefObjectFunction)(ScriptWrappable*);
 typedef void (*DerefObjectFunction)(ScriptWrappable*);
 typedef void (*TraceFunction)(Visitor*, ScriptWrappable*);
-typedef ActiveDOMObject* (*ToActiveDOMObjectFunction)(v8::Handle<v8::Object>);
+typedef ActiveDOMObject* (*ToActiveDOMObjectFunction)(v8::Local<v8::Object>);
 typedef void (*ResolveWrapperReachabilityFunction)(v8::Isolate*, ScriptWrappable*, const v8::Persistent<v8::Object>&);
-typedef void (*InstallConditionallyEnabledMethodsFunction)(v8::Handle<v8::Object>, v8::Isolate*);
-typedef void (*InstallConditionallyEnabledPropertiesFunction)(v8::Handle<v8::Object>, v8::Isolate*);
+typedef void (*InstallConditionallyEnabledMethodsFunction)(v8::Local<v8::Object>, v8::Isolate*);
+typedef void (*InstallConditionallyEnabledPropertiesFunction)(v8::Local<v8::Object>, v8::Isolate*);
 
 inline void setObjectGroup(v8::Isolate* isolate, ScriptWrappable* scriptWrappable, const v8::Persistent<v8::Object>& wrapper)
 {
@@ -119,7 +119,7 @@ struct WrapperTypeInfo {
             wrapper->MarkIndependent();
     }
 
-    v8::Handle<v8::FunctionTemplate> domTemplate(v8::Isolate* isolate) const
+    v8::Local<v8::FunctionTemplate> domTemplate(v8::Isolate* isolate) const
     {
         return domTemplateFunction(isolate);
     }
@@ -142,19 +142,19 @@ struct WrapperTypeInfo {
         return traceFunction(visitor, scriptWrappable);
     }
 
-    void installConditionallyEnabledMethods(v8::Handle<v8::Object> prototypeTemplate, v8::Isolate* isolate) const
+    void installConditionallyEnabledMethods(v8::Local<v8::Object> prototypeTemplate, v8::Isolate* isolate) const
     {
         if (installConditionallyEnabledMethodsFunction)
             installConditionallyEnabledMethodsFunction(prototypeTemplate, isolate);
     }
 
-    void installConditionallyEnabledProperties(v8::Handle<v8::Object> prototypeTemplate, v8::Isolate* isolate) const
+    void installConditionallyEnabledProperties(v8::Local<v8::Object> prototypeTemplate, v8::Isolate* isolate) const
     {
         if (installConditionallyEnabledPropertiesFunction)
             installConditionallyEnabledPropertiesFunction(prototypeTemplate, isolate);
     }
 
-    ActiveDOMObject* toActiveDOMObject(v8::Handle<v8::Object> object) const
+    ActiveDOMObject* toActiveDOMObject(v8::Local<v8::Object> object) const
     {
         if (!toActiveDOMObjectFunction)
             return 0;
@@ -171,7 +171,7 @@ struct WrapperTypeInfo {
             visitDOMWrapperFunction(isolate, scriptWrappable, wrapper);
     }
 
-    // This field must be the first member of the struct WrapperTypeInfo. This is also checked by a COMPILE_ASSERT() below.
+    // This field must be the first member of the struct WrapperTypeInfo. This is also checked by a static_assert() below.
     const gin::GinEmbedder ginEmbedder;
 
     DomTemplateFunction domTemplateFunction;
@@ -190,7 +190,7 @@ struct WrapperTypeInfo {
     const unsigned gcType : 2; // GCType
 };
 
-COMPILE_ASSERT(offsetof(struct WrapperTypeInfo, ginEmbedder) == offsetof(struct gin::WrapperInfo, embedder), wrapper_type_info_compatible_to_gin);
+static_assert(offsetof(struct WrapperTypeInfo, ginEmbedder) == offsetof(struct gin::WrapperInfo, embedder), "offset of WrapperTypeInfo.ginEmbedder must be the same as gin::WrapperInfo.embedder");
 
 template<typename T, int offset>
 inline T* getInternalField(const v8::Persistent<v8::Object>& persistent)

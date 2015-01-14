@@ -89,7 +89,7 @@ static bool checkShapeImageOrigin(Document& document, const StyleImage& styleIma
 
     ASSERT(styleImage.cachedImage());
     ImageResource& imageResource = *(styleImage.cachedImage());
-    if (imageResource.isAccessAllowed(document.securityOrigin()))
+    if (imageResource.isAccessAllowed(&document, document.securityOrigin()))
         return true;
 
     const KURL& url = imageResource.url();
@@ -166,7 +166,7 @@ const Shape& ShapeOutsideInfo::computedShape() const
         m_shape = createShapeForImage(shapeValue.image(), shapeImageThreshold, writingMode, margin);
         break;
     case ShapeValue::Box: {
-        const RoundedRect& shapeRect = style.getRoundedBorderFor(LayoutRect(LayoutPoint(), m_referenceBoxLogicalSize), m_renderer.view());
+        const FloatRoundedRect& shapeRect = style.getRoundedBorderFor(LayoutRect(LayoutPoint(), m_referenceBoxLogicalSize), m_renderer.view());
         m_shape = Shape::createLayoutBoxShape(shapeRect, writingMode, margin);
         break;
     }

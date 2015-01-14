@@ -57,7 +57,7 @@ class CryptoResultImpl final : public CryptoResult {
 public:
     ~CryptoResultImpl();
 
-    static PassRefPtr<CryptoResultImpl> create(ScriptState*);
+    static PassRefPtrWillBeRawPtr<CryptoResultImpl> create(ScriptState*);
 
     virtual void completeWithError(WebCryptoErrorType, const WebString&) override;
     virtual void completeWithBuffer(const void* bytes, unsigned bytesSize) override;
@@ -72,12 +72,15 @@ public:
     ScriptPromise promise();
 
 private:
-    class WeakResolver;
+    class Resolver;
     explicit CryptoResultImpl(ScriptState*);
 
+    void clearResolver();
     void cancel();
 
-    WeakPtr<ScriptPromiseResolver> m_resolver;
+    // FIXME: ScriptPromiseResolver should not be exported.
+    // Instead, use ScriptPromise.
+    ScriptPromiseResolver* m_resolver;
     volatile int m_cancelled;
 };
 

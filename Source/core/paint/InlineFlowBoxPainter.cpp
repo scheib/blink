@@ -6,7 +6,7 @@
 #include "core/paint/InlineFlowBoxPainter.h"
 
 #include "core/paint/BoxPainter.h"
-#include "core/paint/DrawingRecorder.h"
+#include "core/paint/RenderDrawingRecorder.h"
 #include "core/rendering/InlineFlowBox.h"
 #include "core/rendering/PaintInfo.h"
 #include "core/rendering/RenderBlock.h"
@@ -61,8 +61,9 @@ void InlineFlowBoxPainter::paint(const PaintInfo& paintInfo, const LayoutPoint& 
             }
         }
     } else if (paintInfo.phase == PaintPhaseMask) {
-        DrawingRecorder recorder(paintInfo.context, &m_inlineFlowBox.renderer(), paintInfo.phase, pixelSnappedIntRect(overflowRect));
-        paintMask(paintInfo, paintOffset);
+        RenderDrawingRecorder recorder(paintInfo.context, m_inlineFlowBox.renderer(), paintInfo.phase, pixelSnappedIntRect(overflowRect));
+        if (!recorder.canUseCachedDrawing())
+            paintMask(paintInfo, paintOffset);
         return;
     } else if (paintInfo.phase == PaintPhaseForeground) {
         // Paint our background, border and box-shadow.
@@ -108,7 +109,7 @@ void InlineFlowBoxPainter::paintFillLayer(const PaintInfo& paintInfo, const Colo
     } else {
         // We have a fill image that spans multiple lines.
         // FIXME: frameSize ought to be the same as rect.size().
-        LayoutSize frameSize(static_cast<LayoutUnit>(m_inlineFlowBox.width()), static_cast<LayoutUnit>(m_inlineFlowBox.height()));
+        LayoutSize frameSize(m_inlineFlowBox.width().toLayoutUnit(), m_inlineFlowBox.height().toLayoutUnit());
         LayoutRect imageStripPaintRect = paintRectForImageStrip(rect.location(), frameSize, m_inlineFlowBox.renderer().style()->direction());
         GraphicsContextStateSaver stateSaver(*paintInfo.context);
         paintInfo.context->clip(LayoutRect(rect.x(), rect.y(), m_inlineFlowBox.width(), m_inlineFlowBox.height()));
@@ -132,7 +133,7 @@ static LayoutRect clipRectForNinePieceImageStrip(InlineFlowBox* box, const NineP
 {
     LayoutRect clipRect(paintRect);
     RenderStyle* style = box->renderer().style();
-    LayoutBoxExtent outsets = style->imageOutsets(image);
+    LayoutRectOutsets outsets = style->imageOutsets(image);
     if (box->isHorizontal()) {
         clipRect.setY(paintRect.y() - outsets.top());
         clipRect.setHeight(paintRect.height() + outsets.top() + outsets.bottom());
@@ -212,7 +213,9 @@ void InlineFlowBoxPainter::paintBoxDecorationBackground(const PaintInfo& paintIn
 
     LayoutRect paintRect = LayoutRect(adjustedPaintOffset, frameRect.size());
 
-    DrawingRecorder recorder(paintInfo.context, &m_inlineFlowBox.renderer(), paintInfo.phase, pixelSnappedIntRect(paintRect));
+    RenderDrawingRecorder recorder(paintInfo.context, m_inlineFlowBox.renderer(), paintInfo.phase, pixelSnappedIntRect(paintRect));
+    if (recorder.canUseCachedDrawing())
+        return;
 
     // Shadow comes first and is behind the background and border.
     if (!m_inlineFlowBox.boxModelObject()->boxShadowShouldBeAppliedToBackground(BackgroundBleedNone, &m_inlineFlowBox))

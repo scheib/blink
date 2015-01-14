@@ -317,7 +317,6 @@ int HarfBuzzShaper::HarfBuzzRun::characterIndexForXPosition(float targetX)
 float HarfBuzzShaper::HarfBuzzRun::xPositionForOffset(unsigned offset)
 {
     ASSERT(offset < m_numCharacters);
-    ASSERT(hasGlyphToCharacterIndexes());
     unsigned glyphIndex = 0;
     float position = 0;
     if (rtl()) {
@@ -383,7 +382,6 @@ HarfBuzzShaper::HarfBuzzShaper(const Font* font, const TextRun& run, ForTextEmph
     , m_fromIndex(0)
     , m_toIndex(m_run.length())
     , m_forTextEmphasis(forTextEmphasis)
-    , m_glyphBoundingBox(std::numeric_limits<float>::max(), std::numeric_limits<float>::min(), std::numeric_limits<float>::min(), std::numeric_limits<float>::max())
     , m_fallbackFonts(fallbackFonts)
 {
     m_normalizedBuffer = adoptArrayPtr(new UChar[m_run.length() + 1]);
@@ -404,9 +402,9 @@ static inline bool isWordEnd(const UChar* normalizedBuffer, unsigned index)
     return index && isCodepointSpace(normalizedBuffer[index]);
 }
 
-int HarfBuzzShaper::determineWordBreakSpacing()
+float HarfBuzzShaper::determineWordBreakSpacing()
 {
-    int wordBreakSpacing = m_wordSpacingAdjustment;
+    float wordBreakSpacing = m_wordSpacingAdjustment;
 
     if (m_padding > 0) {
         int toPad = roundf(m_padPerWordBreak + m_padError);
@@ -560,8 +558,7 @@ bool HarfBuzzShaper::shape(GlyphBuffer* glyphBuffer)
     if (!shapeHarfBuzzRuns())
         return false;
 
-    if (m_harfBuzzRuns.last()->hasGlyphToCharacterIndexes()
-        && glyphBuffer && !fillGlyphBuffer(glyphBuffer))
+    if (glyphBuffer && !fillGlyphBuffer(glyphBuffer))
         return false;
 
     return true;
@@ -802,7 +799,7 @@ static const uint16_t* toUint16(const UChar* src)
     // FIXME: This relies on undefined behavior however it works on the
     // current versions of all compilers we care about and avoids making
     // a copy of the string.
-    COMPILE_ASSERT(sizeof(UChar) == sizeof(uint16_t), UChar_is_the_same_size_as_uint16_t);
+    static_assert(sizeof(UChar) == sizeof(uint16_t), "UChar should be the same size as uint16_t");
     return reinterpret_cast<const uint16_t*>(src);
 }
 
@@ -818,8 +815,8 @@ bool HarfBuzzShaper::shapeHarfBuzzRuns()
     for (unsigned i = 0; i < m_harfBuzzRuns.size(); ++i) {
         unsigned runIndex = m_run.rtl() ? m_harfBuzzRuns.size() - i - 1 : i;
         HarfBuzzRun* currentRun = m_harfBuzzRuns[runIndex].get();
-        const SimpleFontData* currentFontData = currentRun->fontData();
 
+        const SimpleFontData* currentFontData = currentRun->fontData();
         FontPlatformData* platformData = const_cast<FontPlatformData*>(&currentFontData->platformData());
         HarfBuzzFace* face = platformData->harfBuzzFace();
         if (!face)
@@ -881,14 +878,13 @@ bool HarfBuzzShaper::shapeHarfBuzzRuns()
 
 void HarfBuzzShaper::setGlyphPositionsForHarfBuzzRun(HarfBuzzRun* currentRun, hb_buffer_t* harfBuzzBuffer)
 {
+    // Skip runs that only contain control characters.
+    if (!currentRun->numGlyphs())
+        return;
+
     const SimpleFontData* currentFontData = currentRun->fontData();
     hb_glyph_info_t* glyphInfos = hb_buffer_get_glyph_infos(harfBuzzBuffer, 0);
     hb_glyph_position_t* glyphPositions = hb_buffer_get_glyph_positions(harfBuzzBuffer, 0);
-
-    if (!currentRun->hasGlyphToCharacterIndexes()) {
-        // FIXME: https://crbug.com/337886
-        return;
-    }
 
     unsigned numGlyphs = currentRun->numGlyphs();
     uint16_t* glyphToCharacterIndexes = currentRun->glyphToCharacterIndexes();
@@ -1056,10 +1052,9 @@ bool HarfBuzzShaper::fillGlyphBuffer(GlyphBuffer* glyphBuffer)
     float advanceSoFar = 0;
     for (unsigned runIndex = 0; runIndex < numRuns; ++runIndex) {
         HarfBuzzRun* currentRun = m_harfBuzzRuns[m_run.ltr() ? runIndex : numRuns - runIndex - 1].get();
-        if (!currentRun->hasGlyphToCharacterIndexes()) {
-            // FIXME: bug 337886, 359664
+        // Skip runs that only contain control characters.
+        if (!currentRun->numGlyphs())
             continue;
-        }
         advanceSoFar += (m_forTextEmphasis == ForTextEmphasis)
             ? fillGlyphBufferForTextEmphasis(glyphBuffer, currentRun, advanceSoFar)
             : fillGlyphBufferFromHarfBuzzRun(glyphBuffer, currentRun, advanceSoFar);

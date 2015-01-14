@@ -40,9 +40,10 @@ private:
 
     friend class AnimationInterpolableValueTest;
     friend class AnimationInterpolationEffectTest;
+    friend class AnimationDoubleStyleInterpolationTest;
+    friend class AnimationVisibilityStyleInterpolationTest;
+    friend class AnimationColorStyleInterpolationTest;
 };
-
-WILL_BE_EAGERLY_TRACED(Interpolation);
 
 } // namespace blink
 

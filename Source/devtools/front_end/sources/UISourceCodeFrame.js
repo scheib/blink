@@ -147,7 +147,7 @@ WebInspector.UISourceCodeFrame.prototype = {
         this._updateStyle();
         WebInspector.notifications.dispatchEventToListeners(WebInspector.UserMetrics.UserAction, {
             action: WebInspector.UserMetrics.UserActionNames.FileSaved,
-            url: this._uiSourceCode.url
+            url: WebInspector.networkMapping.networkURL(this._uiSourceCode)
         });
     },
 

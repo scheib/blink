@@ -47,9 +47,11 @@ WebInspector.SourcesSearchScope._filesComparator = function(uiSourceCode1, uiSou
         return -1;
     if (!uiSourceCode1.isDirty() && uiSourceCode2.isDirty())
         return 1;
-    if (uiSourceCode1.url && !uiSourceCode2.url)
+    var networkURL1 = WebInspector.networkMapping.networkURL(uiSourceCode1);
+    var networkURL2 = WebInspector.networkMapping.networkURL(uiSourceCode2);
+    if (networkURL1 && !networkURL2)
         return -1;
-    if (!uiSourceCode1.url && uiSourceCode2.url)
+    if (!networkURL1 && networkURL2)
         return 1;
     return String.naturalOrderComparator(uiSourceCode1.fullDisplayName(), uiSourceCode2.fullDisplayName());
 }
@@ -280,7 +282,7 @@ WebInspector.SourcesSearchScope.prototype = {
             var queries = this._searchConfig.queries();
             if (content !== null) {
                 for (var i = 0; i < queries.length; ++i) {
-                    var nextMatches = WebInspector.ContentProvider.performSearchInContent(content, queries[i], !this._searchConfig.ignoreCase(), this._searchConfig.isRegex())
+                    var nextMatches = WebInspector.ContentProvider.performSearchInContent(content, queries[i], !this._searchConfig.ignoreCase(), this._searchConfig.isRegex());
                     matches = matches.mergeOrdered(nextMatches, matchesComparator);
                 }
             }

@@ -967,7 +967,7 @@ TEST_F(WebViewTest, EnterFullscreenResetScrollAndScaleState)
     EXPECT_EQ(116, webViewImpl->mainFrame()->scrollOffset().width);
     EXPECT_EQ(84, webViewImpl->mainFrame()->scrollOffset().height);
 
-    RefPtrWillBeRawPtr<Element> element = static_cast<PassRefPtrWillBeRawPtr<Element> >(webViewImpl->mainFrame()->document().body());
+    RefPtrWillBeRawPtr<Element> element = static_cast<PassRefPtrWillBeRawPtr<Element>>(webViewImpl->mainFrame()->document().body());
     webViewImpl->enterFullScreenForElement(element.get());
     webViewImpl->didEnterFullScreen();
 
@@ -976,7 +976,7 @@ TEST_F(WebViewTest, EnterFullscreenResetScrollAndScaleState)
     EXPECT_EQ(1.0f, webViewImpl->pageScaleFactor());
 
     // Make sure fullscreen nesting doesn't disrupt scroll/scale saving.
-    RefPtrWillBeRawPtr<Element> otherElement = static_cast<PassRefPtrWillBeRawPtr<Element> >(webViewImpl->mainFrame()->document().head());
+    RefPtrWillBeRawPtr<Element> otherElement = static_cast<PassRefPtrWillBeRawPtr<Element>>(webViewImpl->mainFrame()->document().head());
     webViewImpl->enterFullScreenForElement(otherElement.get());
 
     // Confirm that exiting fullscreen restores the parameters.
@@ -1014,7 +1014,7 @@ TEST_F(WebViewTest, PrintWithXHRInFlight)
     URLTestHelpers::registerMockedURLFromBaseURL(WebString::fromUTF8(m_baseURL.c_str()), WebString::fromUTF8("print_with_xhr_inflight.html"));
     WebViewImpl* webViewImpl = m_webViewHelper.initializeAndLoad(m_baseURL + "print_with_xhr_inflight.html", true, 0, &client);
 
-    ASSERT_EQ(FrameStateComplete, toLocalFrame(webViewImpl->page()->mainFrame())->loader().state());
+    ASSERT_TRUE(toLocalFrame(webViewImpl->page()->mainFrame())->document()->loadEventFinished());
     EXPECT_TRUE(client.printCalled());
     m_webViewHelper.reset();
 }
@@ -1124,7 +1124,7 @@ private:
 static bool tapElementById(WebView* webView, WebInputEvent::Type type, const WebString& id)
 {
     ASSERT(webView);
-    RefPtrWillBeRawPtr<Element> element = static_cast<PassRefPtrWillBeRawPtr<Element> >(webView->mainFrame()->document().getElementById(id));
+    RefPtrWillBeRawPtr<Element> element = static_cast<PassRefPtrWillBeRawPtr<Element>>(webView->mainFrame()->document().getElementById(id));
     if (!element)
         return false;
 
@@ -1644,14 +1644,14 @@ TEST_F(WebViewTest, SmartClipData)
         "normal; font-variant: normal; font-weight: normal; letter-spacing: "
         "normal; line-height: normal; orphans: auto; text-align: start; "
         "text-indent: 0px; text-transform: none; white-space: normal; widows: "
-        "auto; word-spacing: 0px; -webkit-text-stroke-width: 0px;\">Air "
+        "1; word-spacing: 0px; -webkit-text-stroke-width: 0px;\">Air "
         "conditioner</div><div id=\"div5\" style=\"padding: 10px; margin: "
         "10px; border: 2px solid rgb(135, 206, 235); float: left; width: "
         "190px; height: 30px; color: rgb(0, 0, 0); font-family: myahem; "
         "font-size: 8px; font-style: normal; font-variant: normal; "
         "font-weight: normal; letter-spacing: normal; line-height: normal; "
         "orphans: auto; text-align: start; text-indent: 0px; text-transform: "
-        "none; white-space: normal; widows: auto; word-spacing: 0px; "
+        "none; white-space: normal; widows: 1; word-spacing: 0px; "
         "-webkit-text-stroke-width: 0px;\">Price 10,000,000won</div>";
     WebString clipText;
     WebString clipHtml;
@@ -2161,5 +2161,21 @@ TEST_F(WebViewTest, AutoResizeSubtreeLayout)
     // merely a dummy. The real test is that we don't trigger asserts in debug builds.
     EXPECT_FALSE(frameView->needsLayout());
 };
+
+TEST_F(WebViewTest, PreferredSize)
+{
+    std::string url = m_baseURL + "specify_size.html?100px:100px";
+    URLTestHelpers::registerMockedURLLoad(toKURL(url), "specify_size.html");
+    WebView* webView = m_webViewHelper.initializeAndLoad(url, true);
+
+    WebSize size = webView->contentsPreferredMinimumSize();
+    EXPECT_EQ(100, size.width);
+    EXPECT_EQ(100, size.height);
+
+    webView->setZoomLevel(WebView::zoomFactorToZoomLevel(2.0));
+    size = webView->contentsPreferredMinimumSize();
+    EXPECT_EQ(200, size.width);
+    EXPECT_EQ(200, size.height);
+}
 
 } // namespace

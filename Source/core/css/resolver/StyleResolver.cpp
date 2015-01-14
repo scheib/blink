@@ -61,6 +61,7 @@
 #include "core/css/resolver/AnimatedStyleBuilder.h"
 #include "core/css/resolver/MatchResult.h"
 #include "core/css/resolver/MediaQueryResult.h"
+#include "core/css/resolver/ScopedStyleResolver.h"
 #include "core/css/resolver/SharedStyleFinder.h"
 #include "core/css/resolver/StyleAdjuster.h"
 #include "core/css/resolver/StyleResolverParentScope.h"
@@ -126,6 +127,21 @@ static void addFontFaceRule(Document* document, CSSFontSelector* cssFontSelector
     RefPtrWillBeRawPtr<FontFace> fontFace = FontFace::create(document, fontFaceRule);
     if (fontFace)
         cssFontSelector->fontFaceCache()->add(cssFontSelector, fontFaceRule, fontFace);
+}
+
+static void collectScopedResolversForHostedShadowTrees(const Element* element, WillBeHeapVector<RawPtrWillBeMember<ScopedStyleResolver>, 8>& resolvers)
+{
+    ElementShadow* shadow = element->shadow();
+    if (!shadow)
+        return;
+
+    // Adding scoped resolver for active shadow roots for shadow host styling.
+    for (ShadowRoot* shadowRoot = shadow->youngestShadowRoot(); shadowRoot; shadowRoot = shadowRoot->olderShadowRoot()) {
+        if (shadowRoot->numberOfStyles() > 0) {
+            if (ScopedStyleResolver* resolver = shadowRoot->scopedStyleResolver())
+                resolvers.append(resolver);
+        }
+    }
 }
 
 StyleResolver::StyleResolver(Document& document)
@@ -254,13 +270,14 @@ void StyleResolver::processScopedRules(const RuleSet& authorRules, CSSStyleSheet
 
 void StyleResolver::resetAuthorStyle(TreeScope& treeScope)
 {
+    m_treeBoundaryCrossingRules.reset(&treeScope.rootNode());
+    resetRuleFeatures();
+
     ScopedStyleResolver* resolver = treeScope.scopedStyleResolver();
     if (!resolver)
         return;
 
-    m_treeBoundaryCrossingRules.reset(&treeScope.rootNode());
     resolver->resetAuthorStyle();
-    resetRuleFeatures();
     if (treeScope.rootNode().isDocumentNode())
         return;
 
@@ -378,7 +395,7 @@ void StyleResolver::matchAuthorRulesForShadowHost(Element* element, ElementRuleC
     CascadeOrder cascadeOrder = 0;
 
     for (int j = resolversInShadowTree.size() - 1; j >= 0; --j)
-        resolversInShadowTree.at(j)->collectMatchingAuthorRules(collector, includeEmptyRules, cascadeScope, cascadeOrder++);
+        resolversInShadowTree.at(j)->collectMatchingShadowHostRules(collector, includeEmptyRules, cascadeScope, cascadeOrder++);
 
     if (resolvers.isEmpty() || resolvers.first()->treeScope() != element->treeScope())
         ++cascadeScope;
@@ -505,22 +522,20 @@ PassRefPtr<RenderStyle> StyleResolver::styleForDocument(Document& document)
     const LocalFrame* frame = document.frame();
 
     RefPtr<RenderStyle> documentStyle = RenderStyle::create();
-    documentStyle->setDisplay(BLOCK);
     documentStyle->setRTLOrdering(document.visuallyOrdered() ? VisualOrder : LogicalOrder);
     documentStyle->setZoom(frame && !document.printing() ? frame->pageZoomFactor() : 1);
     documentStyle->setLocale(document.contentLanguage());
     documentStyle->setZIndex(0);
     documentStyle->setUserModify(document.inDesignMode() ? READ_WRITE : READ_ONLY);
+    // These are designed to match the user-agent stylesheet values for the document element
+    // so that the common case doesn't need to create a new RenderStyle in
+    // Document::inheritHtmlAndBodyElementStyles.
+    documentStyle->setDisplay(BLOCK);
+    documentStyle->setScrollBlocksOn(WebScrollBlocksOnStartTouch | WebScrollBlocksOnWheelEvent);
 
     document.setupFontBuilder(documentStyle.get());
 
     return documentStyle.release();
-}
-
-static void addContentAttrValuesToFeatures(const Vector<AtomicString>& contentAttrValues, RuleFeatureSet& features)
-{
-    for (size_t i = 0; i < contentAttrValues.size(); ++i)
-        features.addContentAttr(contentAttrValues[i]);
 }
 
 void StyleResolver::adjustRenderStyle(StyleResolverState& state, Element* element)
@@ -630,8 +645,6 @@ PassRefPtr<RenderStyle> StyleResolver::styleForElement(Element* element, RenderS
         applyMatchedProperties(state, collector.matchedResult());
         applyCallbackSelectors(state);
 
-        addContentAttrValuesToFeatures(state.contentAttrValues(), m_features);
-
         // Cache our original display.
         state.style()->setOriginalDisplay(state.style()->display());
 
@@ -659,7 +672,7 @@ PassRefPtr<RenderStyle> StyleResolver::styleForElement(Element* element, RenderS
     return state.takeStyle();
 }
 
-PassRefPtr<RenderStyle> StyleResolver::styleForKeyframe(Element& element, const RenderStyle& elementStyle, RenderStyle* parentStyle, const StyleKeyframe* keyframe, const AtomicString& animationName)
+PassRefPtr<RenderStyle> StyleResolver::styleForKeyframe(Element& element, const RenderStyle& elementStyle, RenderStyle* parentStyle, const StyleRuleKeyframe* keyframe, const AtomicString& animationName)
 {
     ASSERT(document().frame());
     ASSERT(document().settings());
@@ -813,8 +826,6 @@ bool StyleResolver::pseudoStyleForElementInternal(Element& element, const Pseudo
         applyMatchedProperties(state, collector.matchedResult());
         applyCallbackSelectors(state);
 
-        addContentAttrValuesToFeatures(state.contentAttrValues(), m_features);
-
         // Cache our original display.
         state.style()->setOriginalDisplay(state.style()->display());
 
@@ -887,8 +898,6 @@ PassRefPtr<RenderStyle> StyleResolver::styleForPage(int pageIndex)
     updateFont(state);
 
     applyMatchedProperties<LowPriorityProperties>(state, result, false, 0, result.matchedProperties.size() - 1, inheritedOnly);
-
-    addContentAttrValuesToFeatures(state.contentAttrValues(), m_features);
 
     loadPendingResources(state);
 
@@ -1033,33 +1042,18 @@ void StyleResolver::resolveScopedStyles(const Element* element, WillBeHeapVector
         resolvers.append(scopedResolver);
 }
 
-void StyleResolver::collectScopedResolversForHostedShadowTrees(const Element* element, WillBeHeapVector<RawPtrWillBeMember<ScopedStyleResolver>, 8>& resolvers)
+const StyleRuleKeyframes* StyleResolver::findKeyframesRule(const Element* element, const AtomicString& animationName)
 {
-    ElementShadow* shadow = element->shadow();
-    if (!shadow)
-        return;
-
-    // Adding scoped resolver for active shadow roots for shadow host styling.
-    for (ShadowRoot* shadowRoot = shadow->youngestShadowRoot(); shadowRoot; shadowRoot = shadowRoot->olderShadowRoot()) {
-        if (shadowRoot->numberOfStyles() > 0) {
-            if (ScopedStyleResolver* resolver = shadowRoot->scopedStyleResolver())
-                resolvers.append(resolver);
-        }
-    }
-}
-
-void StyleResolver::styleTreeResolveScopedKeyframesRules(const Element* element, WillBeHeapVector<RawPtrWillBeMember<ScopedStyleResolver>, 8>& resolvers)
-{
-    TreeScope& treeScope = element->treeScope();
-
-    // Add resolvers for shadow roots hosted by the given element.
+    WillBeHeapVector<RawPtrWillBeMember<ScopedStyleResolver>, 8> resolvers;
     collectScopedResolversForHostedShadowTrees(element, resolvers);
+    if (ScopedStyleResolver* scopedResolver = element->treeScope().scopedStyleResolver())
+        resolvers.append(scopedResolver);
 
-    // Add resolvers while walking up DOM tree from the given element.
-    for (ScopedStyleResolver* scopedResolver = scopedResolverFor(element); scopedResolver; scopedResolver = scopedResolver->parent()) {
-        if (scopedResolver->treeScope() == treeScope)
-            resolvers.append(scopedResolver);
+    for (size_t i = 0; i < resolvers.size(); ++i) {
+        if (const StyleRuleKeyframes* keyframesRule = resolvers[i]->keyframeStylesForAnimation(animationName.impl()))
+            return keyframesRule;
     }
+    return nullptr;
 }
 
 template <StyleResolver::StyleApplicationPass pass>
@@ -1257,15 +1251,15 @@ static inline bool isValidFirstLetterStyleProperty(CSSPropertyID id)
 // lastCSSPropertyId<HighPriorityProperties>.
 template<> CSSPropertyID StyleResolver::firstCSSPropertyId<StyleResolver::HighPriorityProperties>()
 {
-    COMPILE_ASSERT(CSSPropertyColor == firstCSSProperty, CSS_color_is_first_high_priority_property);
+    static_assert(CSSPropertyColor == firstCSSProperty, "CSSPropertyColor should be the first high priority property");
     return CSSPropertyColor;
 }
 
 // This method returns the last CSSPropertyId of high priority properties.
 template<> CSSPropertyID StyleResolver::lastCSSPropertyId<StyleResolver::HighPriorityProperties>()
 {
-    COMPILE_ASSERT(CSSPropertyZoom == CSSPropertyColor + 16, CSS_zoom_is_end_of_high_priority_property_range);
-    COMPILE_ASSERT(CSSPropertyTextRendering == CSSPropertyZoom - 1, CSS_text_rendering_is_before_zoom);
+    static_assert(CSSPropertyZoom == CSSPropertyColor + 16, "CSSPropertyZoom should be the end of the high priority property range");
+    static_assert(CSSPropertyTextRendering == CSSPropertyZoom - 1, "CSSPropertyTextRendering should be immediately before CSSPropertyZoom");
     return CSSPropertyZoom;
 }
 
@@ -1277,7 +1271,7 @@ template<> CSSPropertyID StyleResolver::lastCSSPropertyId<StyleResolver::HighPri
 // lastCSSPropertyId<LowPriorityProperties>.
 template<> CSSPropertyID StyleResolver::firstCSSPropertyId<StyleResolver::LowPriorityProperties>()
 {
-    COMPILE_ASSERT(CSSPropertyAlignContent == CSSPropertyZoom + 1, CSS_align_content_is_first_low_priority_property);
+    static_assert(CSSPropertyAlignContent == CSSPropertyZoom + 1, "CSSPropertyAlignContent should be the first low priority property");
     return CSSPropertyAlignContent;
 }
 
@@ -1366,14 +1360,6 @@ void StyleResolver::applyProperties(StyleResolverState& state, const StyleProper
 
         if (!isPropertyForPass<pass>(property))
             continue;
-
-        if (current.value()->isUnsetValue()) {
-            if (CSSPropertyMetadata::isInheritedProperty(property))
-                StyleBuilder::applyProperty(property, state, cssValuePool().createInheritedValue().get());
-            else
-                StyleBuilder::applyProperty(property, state, cssValuePool().createExplicitInitialValue().get());
-            continue;
-        }
 
         StyleBuilder::applyProperty(current.id(), state, current.value());
     }

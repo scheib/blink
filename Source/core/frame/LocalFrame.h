@@ -33,6 +33,8 @@
 #include "core/loader/NavigationScheduler.h"
 #include "core/page/FrameTree.h"
 #include "platform/Supplementable.h"
+#include "platform/graphics/ImageOrientation.h"
+#include "platform/graphics/paint/DisplayItem.h"
 #include "platform/heap/Handle.h"
 #include "platform/scroll/ScrollTypes.h"
 #include "wtf/HashSet.h"
@@ -82,9 +84,12 @@ namespace blink {
         virtual bool isLocalFrame() const override { return true; }
         virtual DOMWindow* domWindow() const override;
         virtual void navigate(Document& originDocument, const KURL&, bool lockBackForwardList) override;
+        virtual void reload(ReloadPolicy, ClientRedirectPolicy) override;
         virtual void detach() override;
         virtual void disconnectOwnerElement() override;
         virtual SecurityContext* securityContext() const override;
+        bool checkLoadComplete() override;
+        void printNavigationErrorMessage(const Frame&, const char* reason) override;
 
         void addDestructionObserver(FrameDestructionObserver*);
         void removeDestructionObserver(FrameDestructionObserver*);
@@ -171,9 +176,15 @@ namespace blink {
 
         String localLayerTreeAsText(unsigned flags) const;
 
+        DisplayItemClient displayItemClient() const { return static_cast<DisplayItemClientInternalVoid*>((void*)this); }
+
         void detachView();
 
-        WillBeHeapHashSet<RawPtrWillBeWeakMember<FrameDestructionObserver> > m_destructionObservers;
+        // Paints the area for the given rect into a DragImage, with the given displayItemClient id attached.
+        // The rect is in the coordinate space of the frame.
+        PassOwnPtr<DragImage> paintIntoDragImage(DisplayItemClient, DisplayItem::Type, RespectImageOrientationEnum shouldRespectImageOrientation, IntRect paintingRect);
+
+        WillBeHeapHashSet<RawPtrWillBeWeakMember<FrameDestructionObserver>> m_destructionObservers;
         mutable FrameLoader m_loader;
         mutable NavigationScheduler m_navigationScheduler;
 

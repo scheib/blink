@@ -33,7 +33,7 @@ namespace SVGTestInterfaceV8Internal {
 
 static void typeAttributeGetter(const v8::PropertyCallbackInfo<v8::Value>& info)
 {
-    v8::Handle<v8::Object> holder = info.Holder();
+    v8::Local<v8::Object> holder = info.Holder();
     SVGTestInterface* impl = V8SVGTestInterface::toImpl(holder);
     v8SetReturnValueString(info, impl->fastGetAttribute(SVGNames::typeAttr), info.GetIsolate());
 }
@@ -47,7 +47,7 @@ static void typeAttributeGetterCallback(v8::Local<v8::String>, const v8::Propert
 
 static void typeAttributeSetter(v8::Local<v8::Value> v8Value, const v8::PropertyCallbackInfo<void>& info)
 {
-    v8::Handle<v8::Object> holder = info.Holder();
+    v8::Local<v8::Object> holder = info.Holder();
     SVGTestInterface* impl = V8SVGTestInterface::toImpl(holder);
     TOSTRING_VOID(V8StringResource<>, cppValue, v8Value);
     CustomElementProcessingStack::CallbackDeliveryScope deliveryScope;
@@ -68,7 +68,7 @@ static const V8DOMConfiguration::AttributeConfiguration V8SVGTestInterfaceAttrib
     {"type", SVGTestInterfaceV8Internal::typeAttributeGetterCallback, SVGTestInterfaceV8Internal::typeAttributeSetterCallback, 0, 0, 0, static_cast<v8::AccessControl>(v8::DEFAULT), static_cast<v8::PropertyAttribute>(v8::None), V8DOMConfiguration::ExposedToAllScripts, V8DOMConfiguration::OnInstance},
 };
 
-static void installV8SVGTestInterfaceTemplate(v8::Handle<v8::FunctionTemplate> functionTemplate, v8::Isolate* isolate)
+static void installV8SVGTestInterfaceTemplate(v8::Local<v8::FunctionTemplate> functionTemplate, v8::Isolate* isolate)
 {
     functionTemplate->ReadOnlyPrototype();
 
@@ -86,24 +86,24 @@ static void installV8SVGTestInterfaceTemplate(v8::Handle<v8::FunctionTemplate> f
     functionTemplate->Set(v8AtomicString(isolate, "toString"), V8PerIsolateData::from(isolate)->toStringTemplate());
 }
 
-v8::Handle<v8::FunctionTemplate> V8SVGTestInterface::domTemplate(v8::Isolate* isolate)
+v8::Local<v8::FunctionTemplate> V8SVGTestInterface::domTemplate(v8::Isolate* isolate)
 {
     return V8DOMConfiguration::domClassTemplate(isolate, const_cast<WrapperTypeInfo*>(&wrapperTypeInfo), installV8SVGTestInterfaceTemplate);
 }
 
-bool V8SVGTestInterface::hasInstance(v8::Handle<v8::Value> v8Value, v8::Isolate* isolate)
+bool V8SVGTestInterface::hasInstance(v8::Local<v8::Value> v8Value, v8::Isolate* isolate)
 {
     return V8PerIsolateData::from(isolate)->hasInstance(&wrapperTypeInfo, v8Value);
 }
 
-v8::Handle<v8::Object> V8SVGTestInterface::findInstanceInPrototypeChain(v8::Handle<v8::Value> v8Value, v8::Isolate* isolate)
+v8::Local<v8::Object> V8SVGTestInterface::findInstanceInPrototypeChain(v8::Local<v8::Value> v8Value, v8::Isolate* isolate)
 {
     return V8PerIsolateData::from(isolate)->findInstanceInPrototypeChain(&wrapperTypeInfo, v8Value);
 }
 
-SVGTestInterface* V8SVGTestInterface::toImplWithTypeCheck(v8::Isolate* isolate, v8::Handle<v8::Value> value)
+SVGTestInterface* V8SVGTestInterface::toImplWithTypeCheck(v8::Isolate* isolate, v8::Local<v8::Value> value)
 {
-    return hasInstance(value, isolate) ? toImpl(v8::Handle<v8::Object>::Cast(value)) : 0;
+    return hasInstance(value, isolate) ? toImpl(v8::Local<v8::Object>::Cast(value)) : 0;
 }
 
 void V8SVGTestInterface::refObject(ScriptWrappable* scriptWrappable)

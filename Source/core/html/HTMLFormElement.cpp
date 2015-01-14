@@ -434,7 +434,7 @@ void HTMLFormElement::scheduleFormSubmission(PassRefPtrWillBeRawPtr<FormSubmissi
         return;
     }
 
-    LocalFrame* targetFrame = document().frame()->loader().findFrameForNavigation(submission->target(), submission->state()->sourceDocument());
+    Frame* targetFrame = document().frame()->findFrameForNavigation(submission->target(), *submission->state()->sourceDocument()->frame());
     if (!targetFrame) {
         if (!LocalDOMWindow::allowPopUp(*document().frame()) && !UserGestureIndicator::processingUserGesture())
             return;
@@ -442,18 +442,16 @@ void HTMLFormElement::scheduleFormSubmission(PassRefPtrWillBeRawPtr<FormSubmissi
     } else {
         submission->clearTarget();
     }
-    if (!targetFrame->page())
+    if (!targetFrame->host())
         return;
 
-    if (MixedContentChecker::isMixedContent(document().securityOrigin(), submission->action())) {
-        UseCounter::count(document(), UseCounter::MixedContentFormsSubmitted);
-        if (!document().frame()->loader().mixedContentChecker()->canSubmitToInsecureForm(document().securityOrigin(), submission->action()))
-            return;
-    } else {
-        UseCounter::count(document(), UseCounter::FormsSubmitted);
-    }
+    UseCounter::count(document(), UseCounter::FormsSubmitted);
+    if (MixedContentChecker::isMixedFormAction(document().frame(), submission->action()))
+        UseCounter::count(document().frame(), UseCounter::MixedContentFormsSubmitted);
 
-    targetFrame->navigationScheduler().scheduleFormSubmission(submission);
+    // FIXME: Plumb form submission for remote frames.
+    if (targetFrame->isLocalFrame())
+        toLocalFrame(targetFrame)->navigationScheduler().scheduleFormSubmission(submission);
 }
 
 void HTMLFormElement::reset()
@@ -522,8 +520,8 @@ void HTMLFormElement::parseAttribute(const QualifiedName& name, const AtomicStri
         // If the new action attribute is pointing to insecure "action" location from a secure page
         // it is marked as "passive" mixed content.
         KURL actionURL = document().completeURL(m_attributes.action().isEmpty() ? document().url().string() : m_attributes.action());
-        if (document().frame() && MixedContentChecker::isMixedContent(document().securityOrigin(), actionURL))
-            document().frame()->loader().mixedContentChecker()->canSubmitToInsecureForm(document().securityOrigin(), actionURL);
+        if (MixedContentChecker::isMixedFormAction(document().frame(), actionURL))
+            UseCounter::count(document().frame(), UseCounter::MixedContentFormPresent);
     } else if (name == targetAttr)
         m_attributes.setTarget(value);
     else if (name == methodAttr)

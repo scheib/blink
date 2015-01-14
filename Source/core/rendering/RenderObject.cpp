@@ -64,6 +64,7 @@
 #include "core/rendering/RenderInline.h"
 #include "core/rendering/RenderLayer.h"
 #include "core/rendering/RenderListItem.h"
+#include "core/rendering/RenderMultiColumnSpannerPlaceholder.h"
 #include "core/rendering/RenderObjectInlines.h"
 #include "core/rendering/RenderPart.h"
 #include "core/rendering/RenderScrollbarPart.h"
@@ -133,7 +134,7 @@ struct SameSizeAsRenderObject {
     LayoutPoint position; // Stores the previous position from the paint invalidation container.
 };
 
-COMPILE_ASSERT(sizeof(RenderObject) == sizeof(SameSizeAsRenderObject), RenderObject_should_stay_small);
+static_assert(sizeof(RenderObject) == sizeof(SameSizeAsRenderObject), "RenderObject should stay small");
 
 bool RenderObject::s_affectsParentBlock = false;
 
@@ -835,6 +836,8 @@ RenderBlock* RenderObject::containingBlock() const
 
         while (o && o->isAnonymousBlock())
             o = o->containingBlock();
+    } else if (isColumnSpanAll()) {
+        o = spannerPlaceholder()->containingBlock();
     } else {
         while (o && ((o->isInline() && !o->isReplaced()) || !o->isRenderBlock()))
             o = o->parent();
@@ -1110,12 +1113,11 @@ LayoutRect RenderObject::computePaintInvalidationRect(const RenderLayerModelObje
     return clippedOverflowRectForPaintInvalidation(paintInvalidationContainer, paintInvalidationState);
 }
 
-void RenderObject::invalidatePaintUsingContainer(const RenderLayerModelObject* paintInvalidationContainer, const LayoutRect& r, PaintInvalidationReason invalidationReason)
+void RenderObject::invalidatePaintUsingContainer(const RenderLayerModelObject* paintInvalidationContainer, const LayoutRect& r, PaintInvalidationReason invalidationReason) const
 {
     if (RuntimeEnabledFeatures::slimmingPaintEnabled()) {
         if (RenderLayer* container = enclosingLayer()->enclosingLayerForPaintInvalidationCrossingFrameBoundaries())
             container->graphicsLayerBacking()->displayItemList()->invalidate(displayItemClient());
-        setNeedsPaint();
     }
 
     if (r.isEmpty())
@@ -1149,7 +1151,7 @@ LayoutRect RenderObject::boundsRectForPaintInvalidation(const RenderLayerModelOb
     return RenderLayer::computePaintInvalidationRect(this, paintInvalidationContainer->layer(), paintInvalidationState);
 }
 
-void RenderObject::invalidatePaintRectangle(const LayoutRect& r)
+void RenderObject::invalidatePaintRectangle(const LayoutRect& r) const
 {
     RELEASE_ASSERT(isRooted());
 
@@ -1197,8 +1199,6 @@ static PassRefPtr<TraceEvent::ConvertableToTraceFormat> jsonObjectForOldAndNewRe
 
 LayoutRect RenderObject::previousSelectionRectForPaintInvalidation() const
 {
-    ASSERT(shouldInvalidateSelection());
-
     if (!selectionPaintInvalidationMap)
         return LayoutRect();
 
@@ -1207,25 +1207,34 @@ LayoutRect RenderObject::previousSelectionRectForPaintInvalidation() const
 
 void RenderObject::setPreviousSelectionRectForPaintInvalidation(const LayoutRect& selectionRect)
 {
-    if (!selectionPaintInvalidationMap)
+    if (!selectionPaintInvalidationMap) {
+        if (selectionRect.isEmpty())
+            return;
         selectionPaintInvalidationMap = new SelectionPaintInvalidationMap();
+    }
 
-    selectionPaintInvalidationMap->set(this, selectionRect);
+    if (selectionRect.isEmpty())
+        selectionPaintInvalidationMap->remove(this);
+    else
+        selectionPaintInvalidationMap->set(this, selectionRect);
 }
 
 void RenderObject::invalidateSelectionIfNeeded(const RenderLayerModelObject& paintInvalidationContainer, PaintInvalidationReason invalidationReason)
 {
-    if (!shouldInvalidateSelection())
+    // Update selection rect when we are doing full invalidation (in case that the object is moved, composite status changed, etc.)
+    // or shouldInvalidationSelection is set (in case that the selection itself changed).
+    bool fullInvalidation = view()->doingFullPaintInvalidation() || isFullPaintInvalidationReason(invalidationReason);
+    if (!fullInvalidation && !shouldInvalidateSelection())
         return;
 
     LayoutRect oldSelectionRect = previousSelectionRectForPaintInvalidation();
-    LayoutRect previousSelectionRectForPaintInvalidation = selectionRectForPaintInvalidation(&paintInvalidationContainer);
-    setPreviousSelectionRectForPaintInvalidation(previousSelectionRectForPaintInvalidation);
+    LayoutRect newSelectionRect = selectionRectForPaintInvalidation(&paintInvalidationContainer);
+    setPreviousSelectionRectForPaintInvalidation(newSelectionRect);
 
-    if (view()->doingFullPaintInvalidation() || isFullPaintInvalidationReason(invalidationReason))
+    if (fullInvalidation)
         return;
 
-    fullyInvalidatePaint(paintInvalidationContainer, PaintInvalidationSelection, oldSelectionRect, previousSelectionRectForPaintInvalidation);
+    fullyInvalidatePaint(paintInvalidationContainer, PaintInvalidationSelection, oldSelectionRect, newSelectionRect);
 }
 
 PaintInvalidationReason RenderObject::invalidatePaintIfNeeded(const PaintInvalidationState& paintInvalidationState, const RenderLayerModelObject& paintInvalidationContainer)
@@ -2231,6 +2240,19 @@ RenderObject* RenderObject::container(const RenderLayerModelObject* paintInvalid
 
             o = o->parent();
         }
+    } else if (isColumnSpanAll()) {
+        RenderObject* multicolContainer = spannerPlaceholder()->container();
+        if (paintInvalidationContainerSkipped && paintInvalidationContainer) {
+            // We jumped directly from the spanner to the multicol container. Need to check if
+            // we skipped |paintInvalidationContainer| on the way.
+            for (RenderObject* walker = parent(); walker && walker != multicolContainer; walker = walker->parent()) {
+                if (walker == paintInvalidationContainer) {
+                    *paintInvalidationContainerSkipped = true;
+                    break;
+                }
+            }
+        }
+        return multicolContainer;
     }
 
     return o;
@@ -2384,6 +2406,9 @@ void RenderObject::removeFromRenderFlowThreadRecursive(RenderFlowThread* renderF
         for (RenderObject* child = children->firstChild(); child; child = child->nextSibling())
             child->removeFromRenderFlowThreadRecursive(renderFlowThread);
     }
+
+    if (renderFlowThread && renderFlowThread != this)
+        renderFlowThread->flowThreadDescendantWillBeRemoved(this);
     setFlowThreadState(NotInsideFlowThread);
 }
 

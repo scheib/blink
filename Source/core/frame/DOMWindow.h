@@ -39,10 +39,9 @@ class StyleMedia;
 
 typedef WillBeHeapVector<RefPtrWillBeMember<MessagePort>, 1> MessagePortArray;
 
-class DOMWindow : public RefCountedWillBeGarbageCollectedFinalized<DOMWindow>, public EventTargetWithInlineData, public DOMWindowBase64 {
+class DOMWindow : public EventTargetWithInlineData, public RefCountedWillBeNoBase<DOMWindow>, public DOMWindowBase64 {
     DEFINE_WRAPPERTYPEINFO();
     REFCOUNTED_EVENT_TARGET(DOMWindow);
-    WILL_BE_USING_GARBAGE_COLLECTED_MIXIN(DOMWindow);
 public:
     // RefCountedWillBeGarbageCollectedFinalized overrides:
     void trace(Visitor* visitor) override
@@ -51,6 +50,7 @@ public:
     }
 
     virtual bool isLocalDOMWindow() const { return false; }
+    virtual bool isRemoteDOMWindow() const { return false; }
 
     virtual Frame* frame() const = 0;
 
@@ -65,7 +65,8 @@ public:
     virtual BarProp* toolbar() const = 0;
     virtual Navigator* navigator() const = 0;
     Navigator* clientInformation() const { return navigator(); }
-    virtual Location& location() const = 0;
+    // FIXME: Temporary, until window.location is implemented for remote frames.
+    virtual Location* location() const = 0;
 
     virtual bool offscreenBuffering() const = 0;
 
@@ -82,9 +83,11 @@ public:
     double pageXOffset() const { return scrollX(); }
     double pageYOffset() const { return scrollY(); }
 
-    virtual bool closed() const = 0;
+    bool closed() const;
 
-    virtual unsigned length() const = 0;
+    // FIXME: This is not listed as a cross-origin accessible attribute, but in
+    // Blink, it's currently marked as DoNotCheckSecurity.
+    unsigned length() const;
 
     virtual const AtomicString& name() const = 0;
     virtual void setName(const AtomicString&) = 0;
@@ -95,13 +98,13 @@ public:
     virtual void setDefaultStatus(const String&) = 0;
 
     // Self-referential attributes
-    virtual DOMWindow* self() const = 0;
+    DOMWindow* self() const;
     DOMWindow* window() const { return self(); }
     DOMWindow* frames() const { return self(); }
 
-    virtual DOMWindow* opener() const = 0;
-    virtual DOMWindow* parent() const = 0;
-    virtual DOMWindow* top() const = 0;
+    DOMWindow* opener() const;
+    DOMWindow* parent() const;
+    DOMWindow* top() const;
 
     // DOM Level 2 AbstractView Interface
     virtual Document* document() const = 0;
@@ -130,9 +133,9 @@ public:
 
     virtual DOMSelection* getSelection() = 0;
 
-    virtual void focus(ExecutionContext* = 0) = 0;
+    virtual void focus(ExecutionContext*) = 0;
     virtual void blur() = 0;
-    virtual void close(ExecutionContext* = 0) = 0;
+    virtual void close(ExecutionContext*) = 0;
     virtual void print() = 0;
     virtual void stop() = 0;
 
@@ -170,7 +173,10 @@ public:
     void captureEvents() { }
     void releaseEvents() { }
 
-    virtual DOMWindow* anonymousIndexedGetter(uint32_t) = 0;
+    // FIXME: This handles both window[index] and window.frames[index]. However,
+    // the spec exposes window.frames[index] across origins but not
+    // window[index]...
+    DOMWindow* anonymousIndexedGetter(uint32_t) const;
 
     virtual void postMessage(PassRefPtr<SerializedScriptValue> message, const MessagePortArray*, const String& targetOrigin, LocalDOMWindow* source, ExceptionState&) = 0;
 

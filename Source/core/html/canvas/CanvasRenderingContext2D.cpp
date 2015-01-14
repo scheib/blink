@@ -41,7 +41,6 @@
 #include "core/css/StylePropertySet.h"
 #include "core/css/parser/CSSParser.h"
 #include "core/css/resolver/StyleResolver.h"
-#include "core/dom/DOMTypedArray.h"
 #include "core/dom/ExceptionCode.h"
 #include "core/dom/StyleEngine.h"
 #include "core/events/Event.h"
@@ -66,11 +65,12 @@
 #include "platform/geometry/FloatQuad.h"
 #include "platform/graphics/DrawLooperBuilder.h"
 #include "platform/graphics/GraphicsContextStateSaver.h"
+#include "platform/text/BidiTextRun.h"
 #include "platform/text/TextRun.h"
-#include "wtf/ArrayBufferContents.h"
 #include "wtf/CheckedArithmetic.h"
 #include "wtf/MathExtras.h"
 #include "wtf/OwnPtr.h"
+#include "wtf/Uint8ClampedArray.h"
 #include "wtf/text/StringBuilder.h"
 
 namespace blink {
@@ -90,14 +90,13 @@ static bool contextLostRestoredEventsEnabled()
     return RuntimeEnabledFeatures::experimentalCanvasFeaturesEnabled();
 }
 
-CanvasRenderingContext2D::CanvasRenderingContext2D(HTMLCanvasElement* canvas, const Canvas2DContextAttributes* attrs, Document& document)
+CanvasRenderingContext2D::CanvasRenderingContext2D(HTMLCanvasElement* canvas, const CanvasContextCreationAttributes& attrs, Document& document)
     : CanvasRenderingContext(canvas)
     , m_usesCSSCompatibilityParseMode(document.inQuirksMode())
     , m_clipAntialiasing(NotAntiAliased)
-    , m_hasAlpha(!attrs || attrs->alpha())
+    , m_hasAlpha(attrs.alpha())
     , m_isContextLost(false)
     , m_contextRestorable(true)
-    , m_storageMode(!attrs ? PersistentStorage : attrs->parsedStorage())
     , m_tryRestoreContextAttemptCount(0)
     , m_dispatchContextLostEventTimer(this, &CanvasRenderingContext2D::dispatchContextLostEvent)
     , m_dispatchContextRestoredEventTimer(this, &CanvasRenderingContext2D::dispatchContextRestoredEvent)
@@ -250,15 +249,14 @@ void CanvasRenderingContext2D::restoreCanvasMatrixClipStack()
     if (!c)
         return;
     WillBeHeapVector<OwnPtrWillBeMember<State>>::iterator currState;
-    WillBeHeapVector<OwnPtrWillBeMember<State>>::iterator lastState = m_stateStack.end() - 1;
     for (currState = m_stateStack.begin(); currState < m_stateStack.end(); currState++) {
+        // We are only restoring state stored in the SkCanvas, and not
+        // state stored in the graphics context, so we call save() only on the canvas.
+        // The initial save accounts for the save installed by HTMLCanvasElement::m_contextStateSaver
+        c->canvas()->save();
         c->setMatrix(SkMatrix::I());
         currState->get()->m_clipList.playback(c);
         c->setCTM(currState->get()->m_transform);
-        // We are only restoring state stored in the SkCanvas, and not
-        // state stored in the graphics context, so we call save() only on the canvas.
-        if (currState < lastState)
-            c->canvas()->save();
     }
 }
 
@@ -1510,6 +1508,14 @@ void CanvasRenderingContext2D::drawImageInternal(CanvasImageSource* imageSource,
     if (imageSource->isVideoElement())
         canvas()->buffer()->willDrawVideo();
 
+    // FIXME: crbug.com/447218
+    // We make the destination canvas fall out of display list mode by calling
+    // willAccessPixels. This is to prevent run-away memory consumption caused by SkSurface
+    // copyOnWrite when the source canvas is animated and consumed at a rate higher than the
+    // presentation frame rate of the destination canvas.
+    if (imageSource->isCanvasElement())
+        canvas()->buffer()->willAccessPixels();
+
     CompositeOperator op = state().m_globalComposite;
     if (rectContainsTransformedRect(dstRect, clipBounds)) {
         drawImageOnContext(c, imageSource, image.get(), srcRect, dstRect);
@@ -1682,9 +1688,19 @@ GraphicsContext* CanvasRenderingContext2D::drawingContext() const
     return canvas()->drawingContext();
 }
 
+static PassRefPtrWillBeRawPtr<ImageData> createEmptyImageData(const IntSize& size)
+{
+    if (RefPtrWillBeRawPtr<ImageData> data = ImageData::create(size)) {
+        data->data()->zeroFill();
+        return data.release();
+    }
+
+    return nullptr;
+}
+
 PassRefPtrWillBeRawPtr<ImageData> CanvasRenderingContext2D::createImageData(PassRefPtrWillBeRawPtr<ImageData> imageData) const
 {
-    return ImageData::create(imageData->size());
+    return createEmptyImageData(imageData->size());
 }
 
 PassRefPtrWillBeRawPtr<ImageData> CanvasRenderingContext2D::createImageData(float sw, float sh, ExceptionState& exceptionState) const
@@ -1704,7 +1720,7 @@ PassRefPtrWillBeRawPtr<ImageData> CanvasRenderingContext2D::createImageData(floa
     if (size.height() < 1)
         size.setHeight(1);
 
-    return ImageData::create(size);
+    return createEmptyImageData(size);
 }
 
 PassRefPtrWillBeRawPtr<ImageData> CanvasRenderingContext2D::getImageData(float sx, float sy, float sw, float sh, ExceptionState& exceptionState) const
@@ -1737,16 +1753,13 @@ PassRefPtrWillBeRawPtr<ImageData> CanvasRenderingContext2D::getImageData(float s
     IntRect imageDataRect = enclosingIntRect(logicalRect);
     ImageBuffer* buffer = canvas()->buffer();
     if (!buffer || isContextLost())
-        return ImageData::create(imageDataRect.size());
+        return createEmptyImageData(imageDataRect.size());
 
-    WTF::ArrayBufferContents contents;
-    if (!buffer->getImageData(Unmultiplied, imageDataRect, contents))
+    RefPtr<Uint8ClampedArray> byteArray = buffer->getImageData(Unmultiplied, imageDataRect);
+    if (!byteArray)
         return nullptr;
 
-    RefPtr<DOMArrayBuffer> arrayBuffer = DOMArrayBuffer::create(contents);
-    return ImageData::create(
-        imageDataRect.size(),
-        DOMUint8ClampedArray::create(arrayBuffer, 0, arrayBuffer->byteLength()));
+    return ImageData::create(imageDataRect.size(), byteArray.release());
 }
 
 void CanvasRenderingContext2D::putImageData(ImageData* data, float dx, float dy)
@@ -1781,7 +1794,7 @@ void CanvasRenderingContext2D::putImageData(ImageData* data, float dx, float dy,
     IntRect sourceRect(destRect);
     sourceRect.move(-destOffset);
 
-    buffer->putByteArray(Unmultiplied, data->data()->data(), IntSize(data->width(), data->height()), sourceRect, IntPoint(destOffset));
+    buffer->putByteArray(Unmultiplied, data->data(), IntSize(data->width(), data->height()), sourceRect, IntPoint(destOffset));
 
     didDraw(destRect);
 }
@@ -2010,10 +2023,16 @@ PassRefPtrWillBeRawPtr<TextMetrics> CanvasRenderingContext2D::measureText(const 
     if (!canvas()->document().frame())
         return metrics.release();
 
-    FontCachePurgePreventer fontCachePurgePreventer;
     canvas()->document().updateRenderTreeIfNeeded();
     const Font& font = accessFont();
-    const TextRun textRun(text, 0, 0, TextRun::AllowTrailingExpansion | TextRun::ForbidLeadingExpansion, toTextDirection(state().m_direction), false, true, true);
+
+    bool hasStrongDirectionality;
+    TextDirection direction;
+    if (state().m_direction == DirectionInherit)
+        direction = determineDirectionality(text, hasStrongDirectionality);
+    else
+        direction = toTextDirection(state().m_direction);
+    const TextRun textRun(text, 0, 0, TextRun::AllowTrailingExpansion | TextRun::ForbidLeadingExpansion, direction, false, true, true);
     FloatRect textBounds = font.selectionRectForText(textRun, FloatPoint(), font.fontDescription().computedSize(), 0, -1, true);
 
     // x direction
@@ -2227,11 +2246,9 @@ void CanvasRenderingContext2D::setImageSmoothingEnabled(bool enabled)
         c->setImageInterpolationQuality(enabled ? CanvasDefaultInterpolationQuality : InterpolationNone);
 }
 
-PassRefPtrWillBeRawPtr<Canvas2DContextAttributes> CanvasRenderingContext2D::getContextAttributes() const
+void CanvasRenderingContext2D::getContextAttributes(Canvas2DContextAttributes& attrs) const
 {
-    RefPtrWillBeRawPtr<Canvas2DContextAttributes> attributes = Canvas2DContextAttributes::create();
-    attributes->setAlpha(m_hasAlpha);
-    return attributes.release();
+    attrs.setAlpha(m_hasAlpha);
 }
 
 void CanvasRenderingContext2D::drawFocusIfNeeded(Element* element)

@@ -42,7 +42,7 @@ struct SameSizeAsRootInlineBox : public InlineFlowBox {
     LayoutUnit layoutVariables[6];
 };
 
-COMPILE_ASSERT(sizeof(RootInlineBox) == sizeof(SameSizeAsRootInlineBox), RootInlineBox_should_stay_small);
+static_assert(sizeof(RootInlineBox) == sizeof(SameSizeAsRootInlineBox), "RootInlineBox should stay small");
 
 typedef WTF::HashMap<const RootInlineBox*, EllipsisBox*> EllipsisBoxMap;
 static EllipsisBoxMap* gEllipsisBoxMap = 0;
@@ -118,7 +118,7 @@ FloatWillBeLayoutUnit RootInlineBox::placeEllipsis(const AtomicString& ellipsisS
 {
     // Create an ellipsis box.
     EllipsisBox* ellipsisBox = new EllipsisBox(renderer(), ellipsisStr, this,
-        ellipsisWidth - (markupBox ? markupBox->logicalWidth() : 0), logicalHeight(),
+        ellipsisWidth - (markupBox ? markupBox->logicalWidth().toFloat() : 0), logicalHeight().toFloat(),
         x(), y(), !prevRootBox(), isHorizontal(), markupBox);
 
     if (!gEllipsisBoxMap)
@@ -247,7 +247,7 @@ LayoutUnit RootInlineBox::alignBoxesInBlockDirection(LayoutUnit heightOfBlock, G
 
 FloatWillBeLayoutUnit RootInlineBox::maxLogicalTop() const
 {
-    FloatWillBeLayoutUnit maxLogicalTop = 0;
+    FloatWillBeLayoutUnit maxLogicalTop;
     computeMaxLogicalTop(maxLogicalTop);
     return maxLogicalTop;
 }
@@ -678,8 +678,6 @@ void RootInlineBox::ascentAndDescentForBox(InlineBox* box, GlyphOverflowAndFallb
         setAscentAndDescent(ascent, descent, glyphOverflow->top, glyphOverflow->bottom, ascentDescentSet);
         affectsAscent = glyphOverflow->top - box->logicalTop() > 0;
         affectsDescent = glyphOverflow->bottom + box->logicalTop() > 0;
-        glyphOverflow->top = std::min(glyphOverflow->top, std::max(0, glyphOverflow->top - box->renderer().style(isFirstLineStyle())->fontMetrics().ascent(baselineType())));
-        glyphOverflow->bottom = std::min(glyphOverflow->bottom, std::max(0, glyphOverflow->bottom - box->renderer().style(isFirstLineStyle())->fontMetrics().descent(baselineType())));
     }
 
     if (includeMarginForBox(box)) {

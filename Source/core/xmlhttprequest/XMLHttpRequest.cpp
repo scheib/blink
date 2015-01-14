@@ -315,6 +315,7 @@ XMLHttpRequest::XMLHttpRequest(ExecutionContext* context, PassRefPtr<SecurityOri
     , m_uploadComplete(false)
     , m_sameOriginRequest(true)
     , m_downloadingToFile(false)
+    , m_responseTextOverflow(false)
 {
 #ifndef NDEBUG
     xmlHttpRequestCounter.increment();
@@ -791,13 +792,12 @@ void XMLHttpRequest::send(Document* document, ExceptionState& exceptionState)
     RefPtr<FormData> httpBody;
 
     if (areMethodAndURLValidForSend()) {
-        if (getRequestHeader("Content-Type").isEmpty()) {
-            // FIXME: this should include the charset used for encoding.
-            setRequestHeaderInternal("Content-Type", "application/xml");
-        }
+        // FIXME: Per https://xhr.spec.whatwg.org/#dom-xmlhttprequest-send the
+        // Content-Type header and whether to serialize as HTML or XML should
+        // depend on |document->isHTMLDocument()|.
+        if (getRequestHeader("Content-Type").isEmpty())
+            setRequestHeaderInternal("Content-Type", "application/xml;charset=UTF-8");
 
-        // FIXME: According to XMLHttpRequest Level 2, this should use the Document.innerHTML algorithm
-        // from the HTML5 specification to serialize the document.
         String body = createMarkup(document);
 
         httpBody = FormData::create(UTF8Encoding().encode(body, WTF::EntitiesForUnencodables));
@@ -980,7 +980,7 @@ void XMLHttpRequest::createRequest(PassRefPtr<FormData> httpBody, ExceptionState
     resourceLoaderOptions.allowCredentials = (m_sameOriginRequest || m_includeCredentials) ? AllowStoredCredentials : DoNotAllowStoredCredentials;
     resourceLoaderOptions.credentialsRequested = m_includeCredentials ? ClientRequestedCredentials : ClientDidNotRequestCredentials;
     resourceLoaderOptions.securityOrigin = securityOrigin();
-    resourceLoaderOptions.mixedContentBlockingTreatment = RuntimeEnabledFeatures::laxMixedContentCheckingEnabled() ? TreatAsPassiveContent : TreatAsActiveContent;
+    resourceLoaderOptions.mixedContentBlockingTreatment = TreatAsActiveContent;
 
     // When responseType is set to "blob", we redirect the downloaded data to a
     // file-handle directly.
@@ -1472,8 +1472,13 @@ void XMLHttpRequest::didFinishLoadingInternal()
         return;
     }
 
-    if (m_decoder)
-        m_responseText = m_responseText.concatenateWith(m_decoder->flush());
+    if (m_decoder) {
+        auto text = m_decoder->flush();
+        if (!text.isEmpty() && !m_responseTextOverflow) {
+            m_responseText = m_responseText.concatenateWith(text);
+            m_responseTextOverflow = m_responseText.isEmpty();
+        }
+    }
 
     if (m_responseLegacyStream)
         m_responseLegacyStream->finalize();
@@ -1610,7 +1615,7 @@ void XMLHttpRequest::parseDocumentChunk(const char* data, unsigned len)
         if (!m_responseDocument)
             return;
 
-        m_responseDocumentParser = m_responseDocument->implicitOpen();
+        m_responseDocumentParser = m_responseDocument->implicitOpen(AllowAsynchronousParsing);
         m_responseDocumentParser->addClient(this);
     }
     ASSERT(m_responseDocumentParser);
@@ -1668,7 +1673,11 @@ void XMLHttpRequest::didReceiveData(const char* data, unsigned len)
         if (!m_decoder)
             m_decoder = createDecoder();
 
-        m_responseText = m_responseText.concatenateWith(m_decoder->decode(data, len));
+        auto text = m_decoder->decode(data, len);
+        if (!text.isEmpty() && !m_responseTextOverflow) {
+            m_responseText = m_responseText.concatenateWith(text);
+            m_responseTextOverflow = m_responseText.isEmpty();
+        }
     } else if (m_responseTypeCode == ResponseTypeArrayBuffer || m_responseTypeCode == ResponseTypeBlob) {
         // Buffer binary data.
         if (!m_binaryResponseBuilder)
@@ -1796,6 +1805,7 @@ void XMLHttpRequest::trace(Visitor* visitor)
     visitor->trace(m_blobLoader);
     XMLHttpRequestEventTarget::trace(visitor);
     DocumentParserClient::trace(visitor);
+    ActiveDOMObject::trace(visitor);
 }
 
 } // namespace blink

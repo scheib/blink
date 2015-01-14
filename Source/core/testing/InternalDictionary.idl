@@ -8,6 +8,8 @@ dictionary InternalDictionary {
     long longMember;
     [Clamp] long longMemberWithClamp;
     [EnforceRange] long longMemberWithEnforceRange;
+    // We don't want to add a UseCounter feature for testing, so using KeyboardEventKeyLocation.
+    [DeprecateAs=KeyboardEventKeyLocation, ImplementedAs=longMember] long deprecateLongMember;
     long longMemberWithDefault = 42;
     long? longOrNullMember;
     long? longOrNullMemberWithDefault = null;
@@ -27,4 +29,5 @@ dictionary InternalDictionary {
     object objectMember;
     object? objectOrNullMemberWithDefault = null;
     (double or DOMString) doubleOrStringMember;
+    EventTarget? eventTargetOrNullMember = null;
 };

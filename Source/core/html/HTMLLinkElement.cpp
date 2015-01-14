@@ -508,9 +508,10 @@ void LinkStyle::setCSSStyleSheet(const String& href, const KURL& baseURL, const 
         return;
     }
 
-    if (!SubresourceIntegrity::CheckSubresourceIntegrity(*m_owner, cachedStyleSheet->sheetText(), KURL(KURL(), href))) {
+    if (!SubresourceIntegrity::CheckSubresourceIntegrity(*m_owner, cachedStyleSheet->sheetText(), KURL(KURL(), href), cachedStyleSheet->mimeType())) {
         m_loading = false;
         removePendingSheet();
+        notifyLoadedSheetAndAllCriticalSubresources(true);
         return;
     }
 

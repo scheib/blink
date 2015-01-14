@@ -38,6 +38,8 @@
 #include "core/editing/htmlediting.h"
 #include "core/frame/FrameView.h"
 #include "core/html/HTMLElement.h"
+#include "core/html/HTMLImageElement.h"
+#include "core/html/HTMLInputElement.h"
 #include "core/html/HTMLTextFormControlElement.h"
 #include "core/rendering/InlineTextBox.h"
 #include "core/rendering/RenderImage.h"
@@ -470,6 +472,7 @@ void TextIterator::advance()
                     || (m_node && m_node->isHTMLElement()
                     && (isHTMLFormControlElement(toHTMLElement(*m_node))
                     || isHTMLLegendElement(toHTMLElement(*m_node))
+                    || isHTMLImageElement(toHTMLElement(*m_node))
                     || isHTMLMeterElement(toHTMLElement(*m_node))
                     || isHTMLProgressElement(toHTMLElement(*m_node)))))) {
                     handledNode = handleReplacedElement();
@@ -716,6 +719,21 @@ void TextIterator::handleTextBox()
             } else {
                 nextTextBox = m_textBox->nextTextBox();
             }
+
+            // FIXME: Based on the outcome of crbug.com/446502 it's possible we can
+            //   remove this block. The reason we new it now is because BIDI and
+            //   FirstLetter seem to have different ideas of where things can split.
+            //   FirstLetter takes the punctuation + first letter, and BIDI will
+            //   split out the punctuation and possibly reorder it.
+            if (nextTextBox && nextTextBox->renderer() != renderer) {
+                if (runStart < runEnd && static_cast<unsigned>(m_positionEndOffset) < textBoxEnd)
+                    return;
+
+                m_textBox = nextTextBox;
+                if (renderer->containsReversedText())
+                    ++m_sortedTextBoxesPosition;
+                continue;
+            }
             ASSERT(!nextTextBox || nextTextBox->renderer() == renderer);
 
             if (runStart < runEnd) {
@@ -789,6 +807,20 @@ void TextIterator::handleTextNodeFirstLetter(RenderTextFragment* renderer)
     m_firstLetterText = toRenderText(firstLetter);
 }
 
+static bool supportsAltText(Node* m_node)
+{
+    if (!m_node->isHTMLElement())
+        return false;
+    HTMLElement& element = toHTMLElement(*m_node);
+
+    // FIXME: Add isSVGImageElement.
+    if (isHTMLImageElement(element))
+        return true;
+    if (isHTMLInputElement(toHTMLElement(*m_node)) && toHTMLInputElement(*m_node).isImage())
+        return true;
+    return false;
+}
+
 bool TextIterator::handleReplacedElement()
 {
     if (m_fullyClippedStack.top())
@@ -829,8 +861,8 @@ bool TextIterator::handleReplacedElement()
     m_positionEndOffset = 1;
     m_singleCharacterBuffer = 0;
 
-    if (m_emitsImageAltText && renderer->isImage() && renderer->isRenderImage()) {
-        m_text = toRenderImage(renderer)->altText();
+    if (m_emitsImageAltText && supportsAltText(m_node)) {
+        m_text = toHTMLElement(m_node)->altText();
         if (!m_text.isEmpty()) {
             m_textLength = m_text.length();
             m_lastCharacter = m_text[m_textLength - 1];
@@ -1411,7 +1443,7 @@ void SimplifiedBackwardsTextIterator::advance()
                 // FIXME: What about CDATA_SECTION_NODE?
                 if (renderer->style()->visibility() == VISIBLE && m_offset > 0)
                     m_handledNode = handleTextNode();
-            } else if (renderer && (renderer->isImage() || renderer->isRenderPart())) {
+            } else if (renderer && (renderer->isRenderPart() || supportsAltText(m_node))) {
                 if (renderer->style()->visibility() == VISIBLE && m_offset > 0)
                     m_handledNode = handleReplacedElement();
             } else {

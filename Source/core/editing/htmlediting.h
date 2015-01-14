@@ -36,7 +36,6 @@ namespace blink {
 
 class Document;
 class Element;
-class ExceptionState;
 class HTMLBRElement;
 class HTMLElement;
 class HTMLLIElement;
@@ -87,6 +86,11 @@ int caretMaxOffset(const Node*);
 
 // boolean functions on Node
 
+inline bool isEmptyNonEditableNodeInEditable(const Node* node)
+{
+    return !node->hasChildren() && !node->hasEditableStyle() && node->parentNode() && node->parentNode()->hasEditableStyle();
+}
+
 // FIXME: editingIgnoresContent, canHaveChildrenForEditing, and isAtomicNode
 // should be renamed to reflect its usage.
 
@@ -94,7 +98,7 @@ int caretMaxOffset(const Node*);
 // There are no VisiblePositions inside these nodes.
 inline bool editingIgnoresContent(const Node* node)
 {
-    return !node->canContainRangeEndPoint();
+    return !node->canContainRangeEndPoint() || isEmptyNonEditableNodeInEditable(node);
 }
 
 inline bool canHaveChildrenForEditing(const Node* node)

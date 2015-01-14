@@ -7,7 +7,8 @@
 
 #include "core/paint/BoxPainter.h"
 
-#include "core/rendering/GraphicsContextAnnotator.h"
+#include "core/paint/GraphicsContextAnnotator.h"
+#include "core/paint/ScrollableAreaPainter.h"
 #include "core/rendering/PaintInfo.h"
 #include "core/rendering/RenderLayer.h"
 #include "core/rendering/RenderPart.h"
@@ -45,7 +46,7 @@ void PartPainter::paint(const PaintInfo& paintInfo, const LayoutPoint& paintOffs
 
         // Push a clip if we have a border radius, since we want to round the foreground content that gets painted.
         paintInfo.context->save();
-        RoundedRect roundedInnerRect = m_renderPart.style()->getRoundedInnerBorderFor(borderRect,
+        FloatRoundedRect roundedInnerRect = m_renderPart.style()->getRoundedInnerBorderFor(borderRect,
             m_renderPart.paddingTop() + m_renderPart.borderTop(), m_renderPart.paddingBottom() + m_renderPart.borderBottom(), m_renderPart.paddingLeft() + m_renderPart.borderLeft(), m_renderPart.paddingRight() + m_renderPart.borderRight(), true, true);
         BoxPainter::clipRoundedInnerRect(paintInfo.context, borderRect, roundedInnerRect);
     }
@@ -64,7 +65,7 @@ void PartPainter::paint(const PaintInfo& paintInfo, const LayoutPoint& paintOffs
     }
 
     if (m_renderPart.canResize())
-        m_renderPart.layer()->scrollableArea()->paintResizer(paintInfo.context, roundedIntPoint(adjustedPaintOffset), paintInfo.rect);
+        ScrollableAreaPainter(*m_renderPart.layer()->scrollableArea()).paintResizer(paintInfo.context, roundedIntPoint(adjustedPaintOffset), paintInfo.rect);
 }
 
 void PartPainter::paintContents(const PaintInfo& paintInfo, const LayoutPoint& paintOffset)

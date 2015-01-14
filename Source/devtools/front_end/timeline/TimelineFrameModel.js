@@ -83,10 +83,126 @@ WebInspector.TimelineFrameModelBase.prototype = {
         return frames.slice(firstFrame, lastFrame);
     },
 
+    /**
+     * @param {!WebInspector.TracingModel.Event} rasterTask
+     * @return {boolean}
+     */
+    hasRasterTile: function(rasterTask)
+    {
+        var data = rasterTask.args["tileData"];
+        if (!data)
+            return false;
+        var frameId = data["sourceFrameNumber"];
+        var frame = frameId && this._frameById[frameId];
+        if (!frame || !frame.layerTree)
+            return false;
+        return true;
+    },
+
+    /**
+     * @param {!WebInspector.TracingModel.Event} rasterTask
+     * @param {function(?DOMAgent.Rect, ?WebInspector.PaintProfilerSnapshot)} callback
+     */
+    requestRasterTile: function(rasterTask, callback)
+    {
+        var target = this._target;
+        if (!target) {
+            callback(null, null);
+            return;
+        }
+        var data = rasterTask.args["tileData"];
+        var frameId = data["sourceFrameNumber"];
+        var frame = frameId && this._frameById[frameId];
+        if (!frame || !frame.layerTree) {
+            callback(null, null);
+            return;
+        }
+
+        var tileId = data["tileId"] && data["tileId"]["id_ref"];
+        /** @type {!Array.<!WebInspector.PictureFragment>}> */
+        var fragments = [];
+        /** @type {?WebInspector.TracingLayerTile} */
+        var tile = null;
+        var x0 = Infinity;
+        var y0 = Infinity;
+
+        frame.layerTree.resolve(layerTreeResolved);
+        /**
+         * @param {!WebInspector.LayerTreeBase} layerTree
+         */
+        function layerTreeResolved(layerTree)
+        {
+            tile = tileId && (/** @type {!WebInspector.TracingLayerTree} */ (layerTree)).tileById("cc::Tile/" + tileId);
+            if (!tile) {
+                console.error("Tile " + tileId + " missing in frame " + frameId);
+                callback(null, null);
+                return;
+            }
+            var fetchPictureFragmentsBarrier = new CallbackBarrier();
+            for (var paint of frame.paints) {
+                if (tile.layer_id === paint.layerId())
+                    paint.loadPicture(fetchPictureFragmentsBarrier.createCallback(pictureLoaded));
+            }
+            fetchPictureFragmentsBarrier.callWhenDone(allPicturesLoaded);
+        }
+
+        /**
+         * @param {number} a1
+         * @param {number} a2
+         * @param {number} b1
+         * @param {number} b2
+         * @return {boolean}
+         */
+        function segmentsOverlap(a1, a2, b1, b2)
+        {
+            console.assert(a1 <= a2 && b1 <= b2, "segments should be specified as ordered pairs");
+            return a2 > b1 && a1 < b2;
+        }
+        /**
+         * @param {!Array.<number>} a
+         * @param {!Array.<number>} b
+         * @return {boolean}
+         */
+        function rectsOverlap(a, b)
+        {
+            return segmentsOverlap(a[0], a[0] + a[2], b[0], b[0] + b[2]) && segmentsOverlap(a[1], a[1] + a[3], b[1], b[1] + b[3]);
+        }
+
+        /**
+         * @param {?Array.<number>} rect
+         * @param {?string} picture
+         */
+        function pictureLoaded(rect, picture)
+        {
+            if (!rect || !picture)
+                return;
+            if (!rectsOverlap(rect, tile.content_rect))
+                return;
+            var x = rect[0];
+            var y = rect[1];
+            x0 = Math.min(x0, x);
+            y0 = Math.min(y0, y);
+            fragments.push({x: x, y: y, picture: picture});
+        }
+
+        function allPicturesLoaded()
+        {
+            if (!fragments.length) {
+                callback(null, null);
+                return;
+            }
+            var rectArray = tile.content_rect;
+            // Rect is in layer content coordinates, make it relative to picture by offsetting to the top left corner.
+            var rect = {x: rectArray[0] - x0, y: rectArray[1] - y0, width: rectArray[2], height: rectArray[3]};
+            WebInspector.PaintProfilerSnapshot.loadFromFragments(target, fragments, callback.bind(null, rect));
+        }
+    },
+
     reset: function()
     {
         this._minimumRecordTime = Infinity;
         this._frames = [];
+        this._frameById = {};
         this._lastFrame = null;
         this._lastLayerTree = null;
         this._hasThreadedCompositing = false;
@@ -130,6 +246,7 @@ WebInspector.TimelineFrameModelBase.prototype = {
         if (this._framePendingActivation) {
             this._lastFrame._addTimeForCategories(this._framePendingActivation.timeByCategory);
             this._lastFrame.paints = this._framePendingActivation.paints;
+            this._lastFrame._mainFrameId = this._framePendingActivation.mainFrameId;
             this._framePendingActivation = null;
         }
     },
@@ -174,12 +291,14 @@ WebInspector.TimelineFrameModelBase.prototype = {
 
     /**
      * @param {number} startTime
+     * @param {number=} frameId
      */
-    _startMainThreadFrame: function(startTime)
+    _startMainThreadFrame: function(startTime, frameId)
     {
         if (this._lastFrame)
             this._flushFrame(this._lastFrame, startTime);
         this._lastFrame = new WebInspector.TimelineFrame(startTime, startTime - this._minimumRecordTime);
+        this._lastFrame._mainFrameId = frameId;
     },
 
     /**
@@ -191,6 +310,8 @@ WebInspector.TimelineFrameModelBase.prototype = {
         frame._setLayerTree(this._lastLayerTree);
         frame._setEndTime(endTime);
         this._frames.push(frame);
+        if (typeof frame._mainFrameId === "number")
+            this._frameById[frame._mainFrameId] = frame;
     },
 
     /**
@@ -311,7 +432,7 @@ WebInspector.TracingTimelineFrameModel.prototype = {
 
         if (!this._hasThreadedCompositing) {
             if (event.name === eventNames.BeginMainThreadFrame)
-                this._startMainThreadFrame(timestamp);
+                this._startMainThreadFrame(timestamp, event.args["data"] && event.args["data"]["frameId"]);
             if (!this._lastFrame)
                 return;
             if (!selfTime)
@@ -326,6 +447,8 @@ WebInspector.TracingTimelineFrameModel.prototype = {
             this._framePendingCommit = new WebInspector.PendingFrame();
         if (!this._framePendingCommit)
             return;
+        if (event.name === eventNames.BeginMainThreadFrame && event.args["data"] && event.args["data"]["frameId"])
+            this._framePendingCommit.mainFrameId = event.args["data"]["frameId"];
         if (event.name === eventNames.Paint && event.args["data"]["layerId"] && event.picture && this._target)
             this._framePendingCommit.paints.push(new WebInspector.LayerPaintEvent(event, this._target));
 
@@ -369,9 +492,11 @@ WebInspector.DeferredTracingLayerTree.prototype = {
             if (!result)
                 return;
             var viewport = result["device_viewport_size"];
+            var tiles = result["active_tiles"];
             var rootLayer = result["active_tree"]["root_layer"];
             var layerTree = new WebInspector.TracingLayerTree(this._target);
             layerTree.setViewportSize(viewport);
+            layerTree.setTiles(tiles);
             layerTree.setLayers(rootLayer, callback.bind(null, layerTree));
         }
     },
@@ -395,6 +520,8 @@ WebInspector.TimelineFrame = function(startTime, startTimeOffset)
     this.cpuTime = 0;
     /** @type {?WebInspector.DeferredLayerTree} */
     this.layerTree = null;
+    /** @type {number|undefined} */
+    this._mainFrameId = undefined;
 }
 
 WebInspector.TimelineFrame.prototype = {
@@ -464,23 +591,43 @@ WebInspector.LayerPaintEvent.prototype = {
     },
 
     /**
-     * @param {function(?Array.<number>, ?WebInspector.PaintProfilerSnapshot)} callback
+     * @param {function(?Array.<number>, ?string)} callback
      */
     loadPicture: function(callback)
     {
-        this._event.picture.requestObject(onGotObject.bind(this));
+        this._event.picture.requestObject(onGotObject);
         /**
          * @param {?Object} result
-         * @this {WebInspector.LayerPaintEvent}
          */
         function onGotObject(result)
         {
-            if (!result || !result["skp64"] || !this._target) {
+            if (!result || !result["skp64"]) {
                 callback(null, null);
                 return;
             }
             var rect = result["params"] && result["params"]["layer_rect"];
-            WebInspector.PaintProfilerSnapshot.load(this._target, result["skp64"], callback.bind(null, rect));
+            callback(rect, result["skp64"]);
+        }
+    },
+
+    /**
+     * @param {function(?Array.<number>, ?WebInspector.PaintProfilerSnapshot)} callback
+     */
+    loadSnapshot: function(callback)
+    {
+        this.loadPicture(onGotPicture.bind(this));
+        /**
+         * @param {?Array.<number>} rect
+         * @param {?string} picture
+         * @this {WebInspector.LayerPaintEvent}
+         */
+        function onGotPicture(rect, picture)
+        {
+            if (!rect || !picture || !this._target) {
+                callback(null, null);
+                return;
+            }
+            WebInspector.PaintProfilerSnapshot.load(this._target, picture, callback.bind(null, rect));
         }
     }
 };
@@ -494,4 +641,6 @@ WebInspector.PendingFrame = function()
     this.timeByCategory = {};
     /** @type {!Array.<!WebInspector.LayerPaintEvent>} */
     this.paints = [];
+    /** @type {number|undefined} */
+    this.mainFrameId = undefined;
 }

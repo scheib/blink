@@ -96,11 +96,11 @@ static void promiseMethodPartialOverload3Method(const v8::FunctionCallbackInfo<v
     TestInterfaceImplementation* impl = V8TestInterface::toImpl(info.Holder());
     Document* document;
     {
-        if (info.Length() > 0 && !V8Document::hasInstance(info[0], info.GetIsolate())) {
+        document = V8Document::toImplWithTypeCheck(info.GetIsolate(), info[0]);
+        if (!document) {
             v8SetReturnValue(info, ScriptPromise::rejectRaw(info.GetIsolate(), V8ThrowException::createTypeError(info.GetIsolate(), ExceptionMessages::failedToExecute("promiseMethodPartialOverload", "TestInterface", "parameter 1 is not of type 'Document'."))));
             return;
         }
-        document = V8Document::toImpl(v8::Handle<v8::Object>::Cast(info[0]));
     }
     v8SetReturnValue(info, TestPartialInterfaceImplementation3::promiseMethodPartialOverload(*impl, document).v8Value());
 }
@@ -168,11 +168,11 @@ static void partial2VoidMethod3Method(const v8::FunctionCallbackInfo<v8::Value>&
     TestInterfaceImplementation* impl = V8TestInterface::toImpl(info.Holder());
     Node* node;
     {
-        if (info.Length() > 0 && !V8Node::hasInstance(info[0], info.GetIsolate())) {
+        node = V8Node::toImplWithTypeCheck(info.GetIsolate(), info[0]);
+        if (!node) {
             V8ThrowException::throwTypeError(info.GetIsolate(), ExceptionMessages::failedToExecute("partial2VoidMethod", "TestInterface", "parameter 1 is not of type 'Node'."));
             return;
         }
-        node = V8Node::toImpl(v8::Handle<v8::Object>::Cast(info[0]));
     }
     TestPartialInterfaceImplementation3::partial2VoidMethod(*impl, node);
 }
@@ -230,7 +230,7 @@ static void partial2StaticVoidMethodMethod(const v8::FunctionCallbackInfo<v8::Va
 
 } // namespace TestInterfaceImplementationPartialV8Internal
 
-void V8TestInterfacePartial::installV8TestInterfaceTemplate(v8::Handle<v8::FunctionTemplate> functionTemplate, v8::Isolate* isolate)
+void V8TestInterfacePartial::installV8TestInterfaceTemplate(v8::Local<v8::FunctionTemplate> functionTemplate, v8::Isolate* isolate)
 {
     V8TestInterface::installV8TestInterfaceTemplate(functionTemplate, isolate);
 
@@ -253,7 +253,7 @@ void V8TestInterfacePartial::installV8TestInterfaceTemplate(v8::Handle<v8::Funct
     functionTemplate->InstanceTemplate()->SetCallAsFunctionHandler(V8TestInterface::legacyCallCustom);
 }
 
-void V8TestInterfacePartial::installConditionallyEnabledMethods(v8::Handle<v8::Object> prototypeObject, v8::Isolate* isolate)
+void V8TestInterfacePartial::installConditionallyEnabledMethods(v8::Local<v8::Object> prototypeObject, v8::Isolate* isolate)
 {
     V8TestInterface::installConditionallyEnabledMethods(prototypeObject, isolate);
 }
@@ -264,7 +264,7 @@ bool V8TestInterface::PrivateScript::shortMethodWithShortArgumentImplementedInPr
         return false;
     v8::HandleScope handleScope(toIsolate(frame));
     ScriptForbiddenScope::AllowUserAgentScript script;
-    v8::Handle<v8::Context> contextInPrivateScript = toV8Context(frame, DOMWrapperWorld::privateScriptIsolatedWorld());
+    v8::Local<v8::Context> contextInPrivateScript = toV8Context(frame, DOMWrapperWorld::privateScriptIsolatedWorld());
     if (contextInPrivateScript.IsEmpty())
         return false;
     ScriptState* scriptState = ScriptState::from(contextInPrivateScript);
@@ -273,12 +273,12 @@ bool V8TestInterface::PrivateScript::shortMethodWithShortArgumentImplementedInPr
         return false;
 
     ScriptState::Scope scope(scriptState);
-    v8::Handle<v8::Value> holder = toV8(holderImpl, scriptState->context()->Global(), scriptState->isolate());
+    v8::Local<v8::Value> holder = toV8(holderImpl, scriptState->context()->Global(), scriptState->isolate());
 
-    v8::Handle<v8::Value> valueHandle = v8::Integer::New(scriptState->isolate(), value);
-    v8::Handle<v8::Value> argv[] = { valueHandle };
+    v8::Local<v8::Value> valueHandle = v8::Integer::New(scriptState->isolate(), value);
+    v8::Local<v8::Value> argv[] = { valueHandle };
     ExceptionState exceptionState(ExceptionState::ExecutionContext, "shortMethodWithShortArgumentImplementedInPrivateScript", "TestInterfaceImplementation", scriptState->context()->Global(), scriptState->isolate());
-    v8::Handle<v8::Value> v8Value = PrivateScriptRunner::runDOMMethod(scriptState, scriptStateInUserScript, "TestInterfaceImplementation", "shortMethodWithShortArgumentImplementedInPrivateScript", holder, 1, argv);
+    v8::Local<v8::Value> v8Value = PrivateScriptRunner::runDOMMethod(scriptState, scriptStateInUserScript, "TestInterfaceImplementation", "shortMethodWithShortArgumentImplementedInPrivateScript", holder, 1, argv);
     if (v8Value.IsEmpty())
         return false;
     TONATIVE_DEFAULT_EXCEPTIONSTATE(int, cppValue, toInt16(v8Value, exceptionState), exceptionState, false);

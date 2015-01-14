@@ -33,6 +33,7 @@
 #include "core/dom/ActiveDOMObject.h"
 #include "core/dom/DOMTypedArray.h"
 #include "core/html/canvas/CanvasRenderingContext.h"
+#include "core/html/canvas/WebGLContextAttributes.h"
 #include "core/html/canvas/WebGLExtensionName.h"
 #include "core/html/canvas/WebGLVertexArrayObjectOES.h"
 #include "core/page/Page.h"
@@ -80,7 +81,6 @@ class WebGLCompressedTextureATC;
 class WebGLCompressedTextureETC1;
 class WebGLCompressedTexturePVRTC;
 class WebGLCompressedTextureS3TC;
-class WebGLContextAttributes;
 class WebGLContextGroup;
 class WebGLContextObject;
 class WebGLDebugRendererInfo;
@@ -194,7 +194,7 @@ public:
     Nullable<WillBeHeapVector<RefPtrWillBeMember<WebGLShader>>> getAttachedShaders(WebGLProgram*);
     GLint getAttribLocation(WebGLProgram*, const String& name);
     ScriptValue getBufferParameter(ScriptState*, GLenum target, GLenum pname);
-    PassRefPtrWillBeRawPtr<WebGLContextAttributes> getContextAttributes();
+    void getContextAttributes(Nullable<WebGLContextAttributes>&);
     GLenum getError();
     PassRefPtrWillBeRawPtr<WebGLExtension> getExtension(const String& name);
     ScriptValue getFramebufferAttachmentParameter(ScriptState*, GLenum target, GLenum attachment, GLenum pname);
@@ -375,6 +375,9 @@ public:
 
     virtual void trace(Visitor*) override;
 
+    // Returns approximate gpu memory allocated per pixel.
+    int externallyAllocatedBytesPerPixel();
+
     class TextureUnitState {
         ALLOW_ONLY_INLINE_ALLOCATION();
     public:
@@ -383,6 +386,8 @@ public:
 
         void trace(Visitor*);
     };
+
+    void setFilterLevel(SkPaint::FilterLevel);
 
 protected:
     friend class WebGLDrawBuffers;
@@ -398,8 +403,9 @@ protected:
     friend class WebGLRenderingContextErrorMessageCallback;
     friend class WebGLVertexArrayObjectOES;
     friend class ScopedTexture2DRestorer;
+    friend class ScopedFramebufferRestorer;
 
-    WebGLRenderingContextBase(HTMLCanvasElement*, PassOwnPtr<blink::WebGraphicsContext3D>, WebGLContextAttributes*);
+    WebGLRenderingContextBase(HTMLCanvasElement*, PassOwnPtr<blink::WebGraphicsContext3D>, const WebGLContextAttributes&);
     PassRefPtr<DrawingBuffer> createDrawingBuffer(PassOwnPtr<blink::WebGraphicsContext3D>);
     void initializeNewContext();
     void setupFlags();
@@ -412,7 +418,7 @@ protected:
     virtual bool is3d() const override { return true; }
     virtual bool isAccelerated() const override { return true; }
     virtual void setIsHidden(bool) override;
-    virtual void paintRenderingResultsToCanvas(SourceDrawingBuffer) override;
+    bool paintRenderingResultsToCanvas(SourceDrawingBuffer) override;
     virtual blink::WebLayer* platformLayer() const override;
 
     void addSharedObject(WebGLSharedObject*);
@@ -556,7 +562,7 @@ protected:
     bool m_unpackFlipY;
     bool m_unpackPremultiplyAlpha;
     GLenum m_unpackColorspaceConversion;
-    RefPtrWillBeMember<WebGLContextAttributes> m_requestedAttributes;
+    WebGLContextAttributes m_requestedAttributes;
 
     GLfloat m_clearColor[4];
     bool m_scissorEnabled;
@@ -742,6 +748,14 @@ protected:
     void texSubImage2DBase(GLenum target, GLint level, GLint xoffset, GLint yoffset, GLsizei width, GLsizei height, GLenum format, GLenum type, const void* pixels, ExceptionState&);
     void texSubImage2DImpl(GLenum target, GLint level, GLint xoffset, GLint yoffset, GLenum format, GLenum type, Image*, WebGLImageConversion::ImageHtmlDomSource, bool flipY, bool premultiplyAlpha, ExceptionState&);
 
+    enum TexImageFunctionType {
+        NotTexSubImage2D,
+        TexSubImage2D,
+    };
+    // Copy from the canvas element directly to the texture via the GPU, without a read-back to system memory.
+    void texImage2DCanvasByGPU(TexImageFunctionType, WebGLTexture*, GLenum target, GLint level,
+        GLenum internalformat, GLenum type, GLint xoffset, GLint yoffset, HTMLCanvasElement*);
+
     void handleTextureCompleteness(const char*, bool);
     void createFallbackBlackTextures1x1();
 
@@ -781,11 +795,6 @@ protected:
     // Generates GL error and returns false if not.
     bool validateValueFitNonNegInt32(const char* functionName, const char* paramName, long long value);
 
-    enum TexFuncValidationFunctionType {
-        NotTexSubImage2D,
-        TexSubImage2D,
-    };
-
     enum TexFuncValidationSourceType {
         SourceArrayBufferView,
         SourceImageData,
@@ -796,16 +805,16 @@ protected:
 
     // Helper function for tex{Sub}Image2D to check if the input format/type/level/target/width/height/border/xoffset/yoffset are valid.
     // Otherwise, it would return quickly without doing other work.
-    bool validateTexFunc(const char* functionName, TexFuncValidationFunctionType, TexFuncValidationSourceType, GLenum target, GLint level, GLenum internalformat, GLsizei width,
+    bool validateTexFunc(const char* functionName, TexImageFunctionType, TexFuncValidationSourceType, GLenum target, GLint level, GLenum internalformat, GLsizei width,
         GLsizei height, GLint border, GLenum format, GLenum type, GLint xoffset, GLint yoffset);
 
     // Helper function to check input width and height for functions {copy, compressed}Tex{Sub}Image.
     // Generates GL error and returns false if width or height is invalid.
-    bool validateTexFuncDimensions(const char* functionName, TexFuncValidationFunctionType, GLenum target, GLint level, GLsizei width, GLsizei height);
+    bool validateTexFuncDimensions(const char* functionName, TexImageFunctionType, GLenum target, GLint level, GLsizei width, GLsizei height);
 
     // Helper function to check input parameters for functions {copy}Tex{Sub}Image.
     // Generates GL error and returns false if parameters are invalid.
-    bool validateTexFuncParameters(const char* functionName, TexFuncValidationFunctionType, GLenum target, GLint level, GLenum internalformat, GLsizei width, GLsizei height, GLint border, GLenum format, GLenum type);
+    bool validateTexFuncParameters(const char* functionName, TexImageFunctionType, GLenum target, GLint level, GLenum internalformat, GLsizei width, GLsizei height, GLint border, GLenum format, GLenum type);
 
     enum NullDisposition {
         NullAllowed,
@@ -832,7 +841,7 @@ protected:
 
     // Helper function to validate compressed texture dimensions are valid for
     // the given format.
-    bool validateCompressedTexDimensions(const char* functionName, TexFuncValidationFunctionType, GLenum target, GLint level, GLsizei width, GLsizei height, GLenum format);
+    bool validateCompressedTexDimensions(const char* functionName, TexImageFunctionType, GLenum target, GLint level, GLsizei width, GLsizei height, GLenum format);
 
     // Helper function to validate compressed texture dimensions are valid for
     // the given format.

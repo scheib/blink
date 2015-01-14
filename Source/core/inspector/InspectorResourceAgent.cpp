@@ -44,6 +44,7 @@
 #include "core/fileapi/FileReaderLoader.h"
 #include "core/fileapi/FileReaderLoaderClient.h"
 #include "core/frame/LocalFrame.h"
+#include "core/html/HTMLFrameOwnerElement.h"
 #include "core/inspector/IdentifiersFactory.h"
 #include "core/inspector/InspectorOverlay.h"
 #include "core/inspector/InspectorPageAgent.h"
@@ -94,9 +95,8 @@ const char kDevToolsEmulateNetworkConditionsClientId[] = "X-DevTools-Emulate-Net
 static PassRefPtr<JSONObject> buildObjectForHeaders(const HTTPHeaderMap& headers)
 {
     RefPtr<JSONObject> headersObject = JSONObject::create();
-    HTTPHeaderMap::const_iterator end = headers.end();
-    for (HTTPHeaderMap::const_iterator it = headers.begin(); it != end; ++it)
-        headersObject->setString(it->key.string(), it->value);
+    for (const auto& header : headers)
+        headersObject->setString(header.key.string(), header.value);
     return headersObject;
 }
 
@@ -360,6 +360,26 @@ static PassRefPtr<TypeBuilder::Network::Response> buildObjectForResourceResponse
         responseObject->setRemotePort(response.remotePort());
     }
 
+    String protocol;
+    if (response.resourceLoadInfo())
+        protocol = response.resourceLoadInfo()->npnNegotiatedProtocol;
+    if (protocol.isEmpty() || protocol == "unknown") {
+        if (response.wasFetchedViaSPDY()) {
+            protocol = "spdy";
+        } else if (response.isHTTP()) {
+            protocol = "http";
+            if (response.httpVersion() == ResourceResponse::HTTPVersion::HTTP_0_9)
+                protocol = "http/0.9";
+            else if (response.httpVersion() == ResourceResponse::HTTPVersion::HTTP_1_0)
+                protocol = "http/1.0";
+            else if (response.httpVersion() == ResourceResponse::HTTPVersion::HTTP_1_1)
+                protocol = "http/1.1";
+        } else {
+            protocol = response.url().protocol();
+        }
+    }
+    responseObject->setProtocol(protocol);
+
     return responseObject;
 }
 
@@ -409,11 +429,10 @@ void InspectorResourceAgent::willSendRequest(unsigned long identifier, DocumentL
     RefPtr<JSONObject> headers = m_state->getObject(ResourceAgentState::extraRequestHeaders);
 
     if (headers) {
-        JSONObject::const_iterator end = headers->end();
-        for (JSONObject::const_iterator it = headers->begin(); it != end; ++it) {
+        for (const auto& header : *headers) {
             String value;
-            if (it->value->asString(&value))
-                request.setHTTPHeaderField(AtomicString(it->key), AtomicString(value));
+            if (header.value->asString(&value))
+                request.setHTTPHeaderField(AtomicString(header.key), AtomicString(value));
         }
     }
 
@@ -574,9 +593,8 @@ void InspectorResourceAgent::willLoadXHR(XMLHttpRequest* xhr, ThreadableLoaderCl
 {
     ASSERT(xhr);
     RefPtrWillBeRawPtr<XHRReplayData> xhrReplayData = XHRReplayData::create(xhr->executionContext(), method, urlWithoutFragment(url), async, formData.get(), includeCredentials);
-    HTTPHeaderMap::const_iterator end = headers.end();
-    for (HTTPHeaderMap::const_iterator it = headers.begin(); it!= end; ++it)
-        xhrReplayData->addHeader(it->key, it->value);
+    for (const auto& header : headers)
+        xhrReplayData->addHeader(header.key, header.value);
     m_pendingXHRReplayData.set(client, xhrReplayData);
 }
 
@@ -617,9 +635,8 @@ void InspectorResourceAgent::willDestroyResource(Resource* cachedResource)
     bool base64Encoded;
     if (!InspectorPageAgent::cachedResourceContent(cachedResource, &content, &base64Encoded))
         return;
-    Vector<String>::iterator end = requestIds.end();
-    for (Vector<String>::iterator it = requestIds.begin(); it != end; ++it)
-        m_resourcesData->setResourceContent(*it, content, base64Encoded);
+    for (auto& request : requestIds)
+        m_resourcesData->setResourceContent(request, content, base64Encoded);
 }
 
 void InspectorResourceAgent::applyUserAgentOverride(String* userAgent)
@@ -659,6 +676,8 @@ PassRefPtr<TypeBuilder::Network::Initiator> InspectorResourceAgent::buildInitiat
         return initiatorObject;
     }
 
+    while (document && !document->scriptableDocumentParser())
+        document = document->ownerElement() ? document->ownerElement()->ownerDocument() : nullptr;
     if (document && document->scriptableDocumentParser()) {
         RefPtr<TypeBuilder::Network::Initiator> initiatorObject = TypeBuilder::Network::Initiator::create()
             .setType(TypeBuilder::Network::Initiator::Type::Parser);
@@ -841,9 +860,10 @@ void InspectorResourceAgent::replayXHR(ErrorString*, const String& requestId)
     memoryCache()->removeURLFromCache(executionContext, xhrReplayData->url());
 
     xhr->open(xhrReplayData->method(), xhrReplayData->url(), xhrReplayData->async(), IGNORE_EXCEPTION);
-    HTTPHeaderMap::const_iterator end = xhrReplayData->headers().end();
-    for (HTTPHeaderMap::const_iterator it = xhrReplayData->headers().begin(); it!= end; ++it)
-        xhr->setRequestHeader(it->key, it->value, IGNORE_EXCEPTION);
+    if (xhrReplayData->includeCredentials())
+        xhr->setWithCredentials(true, IGNORE_EXCEPTION);
+    for (const auto& header : xhrReplayData->headers())
+        xhr->setRequestHeader(header.key, header.value, IGNORE_EXCEPTION);
     xhr->sendForInspectorXHRReplay(xhrReplayData->formData(), IGNORE_EXCEPTION);
 
     m_replayXHRs.add(xhr);
@@ -892,14 +912,14 @@ void InspectorResourceAgent::loadResourceForFrontend(ErrorString* errorString, c
     request.setRequestContext(blink::WebURLRequest::RequestContextInternal);
     request.setCachePolicy(ReloadIgnoringCacheData);
     if (requestHeaders) {
-        for (JSONObject::iterator it = (*requestHeaders)->begin(); it != (*requestHeaders)->end(); ++it) {
+        for (auto& header : *(*requestHeaders)) {
             String value;
-            bool success = it->value->asString(&value);
+            bool success = header.value->asString(&value);
             if (!success) {
-                *errorString = "Request header \"" + it->key + "\" value is not a string";
+                *errorString = "Request header \"" + header.key + "\" value is not a string";
                 return;
             }
-            request.addHTTPHeaderField(AtomicString(it->key), AtomicString(value));
+            request.addHTTPHeaderField(AtomicString(header.key), AtomicString(value));
         }
     }
     request.addHTTPHeaderField(kDevToolsRequestInitiator, "frontend");
@@ -959,11 +979,10 @@ bool InspectorResourceAgent::fetchResourceContent(Document* document, const KURL
         return true;
 
     // Then fall back to resource data.
-    Vector<NetworkResourcesData::ResourceData*> resources = m_resourcesData->resources();
-    for (Vector<NetworkResourcesData::ResourceData*>::iterator it = resources.begin(); it != resources.end(); ++it) {
-        if ((*it)->url() == url) {
-            *content = (*it)->content();
-            *base64Encoded = (*it)->base64Encoded();
+    for (auto& resource : m_resourcesData->resources()) {
+        if (resource->url() == url) {
+            *content = resource->content();
+            *base64Encoded = resource->base64Encoded();
             return true;
         }
     }

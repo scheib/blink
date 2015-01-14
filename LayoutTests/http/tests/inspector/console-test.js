@@ -32,7 +32,7 @@ InspectorTest.evaluateInConsoleAndDump = function(code, callback)
 
     function mycallback(text)
     {
-        InspectorTest.addResult(code + " = " + text);
+        InspectorTest.addResult(code + " = " + text.replace(/\bVM\d+/g, "VM"));
         callback(text);
     }
     InspectorTest.evaluateInConsole(code, mycallback);
@@ -207,7 +207,7 @@ InspectorTest.expandConsoleMessages = function(callback, deepFilter, sectionFilt
                     continue;
                 if (sectionFilter && !sectionFilter(node._section))
                     continue;
-                node._section.expanded = true;
+                node._section.expand();
 
                 if (!deepFilter)
                     continue;

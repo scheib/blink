@@ -97,7 +97,7 @@ invalid_non_object_type_regex = re.compile(r'@(?:' + type_checked_jsdoc_tags_or 
 error_warning_regex = re.compile(r'WARNING|ERROR')
 loaded_css_regex = re.compile(r'(?:registerRequiredCSS|WebInspector\.View\.createStyleElement)\s*\(\s*"(.+)"\s*\)')
 
-java_build_regex = re.compile(r'(Runtime Environment)?.+build\s+(\d+).(\d+).(\d+)')
+java_build_regex = re.compile(r'^\w+ version "(\d+)\.(\d+)')
 errors_found = False
 
 generate_protocol_externs.generate_protocol_externs(protocol_externs_file, path.join(devtools_path, 'protocol.json'))
@@ -218,14 +218,11 @@ def find_java():
     is_ok = False
     java_version_out, _ = run_in_shell('%s -version' % java_path).communicate()
     # pylint: disable=E1103
-    for line in java_version_out.splitlines():
-        match = re.search(java_build_regex, line)
-        if match:
-            major = int(match.group(2))
-            minor = int(match.group(3))
-            is_ok = major >= required_major and minor >= required_minor
-            if match.group(1):
-                break
+    match = re.search(java_build_regex, java_version_out)
+    if match:
+        major = int(match.group(1))
+        minor = int(match.group(2))
+        is_ok = major >= required_major and minor >= required_minor
     if is_ok:
         exec_command = '%s -Xms1024m -server -XX:+TieredCompilation' % java_path
         check_server_proc = run_in_shell('%s -version' % exec_command)
@@ -248,7 +245,7 @@ closure_runner_jar = to_platform_path(path.join(scripts_path, 'compiler-runner',
 jsdoc_validator_jar = to_platform_path(path.join(scripts_path, 'jsdoc-validator', 'jsdoc-validator.jar'))
 
 modules_dir = tempfile.mkdtemp()
-common_closure_args = ' --summary_detail_level 3 --jscomp_error visibility --compilation_level SIMPLE_OPTIMIZATIONS --warning_level VERBOSE --language_in=ES6_STRICT --language_out=ES5_STRICT --accept_const_keyword --module_output_path_prefix %s' % to_platform_path_exact(modules_dir + path.sep)
+common_closure_args = ' --summary_detail_level 3 --jscomp_error visibility --compilation_level SIMPLE_OPTIMIZATIONS --warning_level VERBOSE --language_in=ES6_STRICT --language_out=ES5_STRICT --accept_const_keyword --extra_annotation_name suppressReceiverCheck --extra_annotation_name suppressGlobalPropertiesCheck --module_output_path_prefix %s' % to_platform_path_exact(modules_dir + path.sep)
 
 worker_modules_by_name = {}
 dependents_by_module_name = {}

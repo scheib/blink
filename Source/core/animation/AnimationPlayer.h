@@ -42,12 +42,10 @@ namespace blink {
 class AnimationTimeline;
 class ExceptionState;
 
-class AnimationPlayer;
-WILL_BE_EAGERLY_TRACED(AnimationPlayer);
-
-class AnimationPlayer final : public RefCountedWillBeGarbageCollectedFinalized<AnimationPlayer>
-    , public ActiveDOMObject
-    , public EventTargetWithInlineData {
+class AnimationPlayer final
+    : public EventTargetWithInlineData
+    , public RefCountedWillBeNoBase<AnimationPlayer>
+    , public ActiveDOMObject {
     DEFINE_WRAPPERTYPEINFO();
     REFCOUNTED_EVENT_TARGET(AnimationPlayer);
     WILL_BE_USING_GARBAGE_COLLECTED_MIXIN(AnimationPlayer);
@@ -90,11 +88,9 @@ public:
     void play();
     void reverse();
     void finish(ExceptionState&);
-    bool finished() const { return m_playState != Idle && limited(currentTimeInternal()); }
-    bool playing() const { return !(playStateInternal() == Idle || finished() || m_paused || m_isPausedForTesting); }
-    // FIXME: Resolve whether finished() should just return the flag, and
-    // remove this method.
-    bool finishedInternal() const { return m_finished; }
+
+    bool playing() const { return !(playStateInternal() == Idle || limited() || m_paused || m_isPausedForTesting); }
+    bool limited() const { return limited(currentTimeInternal()); }
 
     DEFINE_ATTRIBUTE_EVENT_LISTENER(finish);
 
@@ -174,10 +170,11 @@ private:
     double calculateCurrentTime() const;
 
     void unpauseInternal();
-    void uncancel();
     void setPlaybackRateInternal(double);
     void updateCurrentTimingState(TimingUpdateReason);
 
+    void beginUpdatingState();
+    void endUpdatingState();
 
     AnimationPlayState m_playState;
     double m_playbackRate;
@@ -238,7 +235,7 @@ private:
         PlayStateUpdateScope(AnimationPlayer&, TimingUpdateReason, CompositorPendingChange = SetCompositorPending);
         ~PlayStateUpdateScope();
     private:
-        AnimationPlayer& m_player;
+        RawPtrWillBeMember<AnimationPlayer> m_player;
         AnimationPlayState m_initial;
         CompositorPendingChange m_compositorPendingChange;
     };
@@ -251,6 +248,8 @@ private:
     int m_compositorGroup;
 
     bool m_currentTimePending;
+    bool m_stateIsBeingUpdated;
+
 };
 
 } // namespace blink

@@ -30,10 +30,12 @@ public:
     static PassRefPtrWillBeRawPtr<ImmutableStylePropertySet> parseInlineStyleDeclaration(const String&, Element*);
 
     static PassOwnPtr<Vector<double> > parseKeyframeKeyList(const String&);
-    static PassRefPtrWillBeRawPtr<StyleKeyframe> parseKeyframeRule(const CSSParserContext&, StyleSheetContents*, const String&);
+    static PassRefPtrWillBeRawPtr<StyleRuleKeyframe> parseKeyframeRule(const CSSParserContext&, StyleSheetContents*, const String&);
 
     static bool parseSupportsCondition(const String&);
 
+    // The color will only be changed when string contains a valid CSS color, so callers
+    // can set it to a default color and ignore the boolean result.
     static bool parseColor(RGBA32& color, const String&, bool strict = false);
     static bool parseSystemColor(RGBA32& color, const String&);
     static StyleColor colorFromRGBColorString(const String&);

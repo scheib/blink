@@ -10,11 +10,13 @@
 #include "core/animation/AnimationEffect.h"
 #include "core/animation/AnimationNode.h"
 #include "core/animation/AnimationPlayer.h"
+#include "core/animation/ComputedTimingProperties.h"
 #include "core/animation/ElementAnimation.h"
 #include "core/animation/KeyframeEffectModel.h"
 #include "core/animation/StringKeyframe.h"
 #include "core/css/CSSKeyframeRule.h"
 #include "core/css/CSSKeyframesRule.h"
+#include "core/css/resolver/StyleResolver.h"
 #include "core/inspector/InspectorDOMAgent.h"
 #include "core/inspector/InspectorNodeIds.h"
 #include "core/inspector/InspectorState.h"
@@ -30,7 +32,7 @@ namespace blink {
 InspectorAnimationAgent::InspectorAnimationAgent(InspectorDOMAgent* domAgent)
     : InspectorBaseAgent<InspectorAnimationAgent>("Animation")
     , m_domAgent(domAgent)
-    , m_frontend(0)
+    , m_frontend(nullptr)
     , m_element(nullptr)
 {
 }
@@ -42,7 +44,7 @@ void InspectorAnimationAgent::setFrontend(InspectorFrontend* frontend)
 
 void InspectorAnimationAgent::clearFrontend()
 {
-    m_instrumentingAgents->setInspectorAnimationAgent(0);
+    m_instrumentingAgents->setInspectorAnimationAgent(nullptr);
     m_frontend = nullptr;
     reset();
 }
@@ -68,15 +70,16 @@ void InspectorAnimationAgent::enable(ErrorString*)
 
 PassRefPtr<TypeBuilder::Animation::AnimationNode> InspectorAnimationAgent::buildObjectForAnimationNode(AnimationNode* animationNode)
 {
+    ComputedTimingProperties computedTiming;
+    animationNode->computedTiming(computedTiming);
     RefPtr<TypeBuilder::Animation::AnimationNode> animationObject = TypeBuilder::Animation::AnimationNode::create()
-        .setStartDelay(animationNode->specifiedTiming().startDelay)
-        .setPlaybackRate(animationNode->specifiedTiming().playbackRate)
-        .setIterationStart(animationNode->specifiedTiming().iterationStart)
-        .setIterationCount(animationNode->specifiedTiming().iterationCount)
-        .setDuration(animationNode->duration())
-        .setDirection(animationNode->specifiedTiming().direction)
-        .setFillMode(animationNode->specifiedTiming().fillMode)
-        .setTimeFraction(animationNode->timeFraction())
+        .setDelay(computedTiming.delay())
+        .setPlaybackRate(computedTiming.playbackRate())
+        .setIterationStart(computedTiming.iterationStart())
+        .setIterations(computedTiming.iterations())
+        .setDuration(computedTiming.duration().getAsUnrestrictedDouble())
+        .setDirection(computedTiming.direction())
+        .setFill(computedTiming.fill())
         .setName(animationNode->name())
         .setBackendNodeId(InspectorNodeIds::idForNode(toAnimation(animationNode)->target()));
     return animationObject.release();
@@ -104,7 +107,7 @@ PassRefPtr<TypeBuilder::Animation::AnimationPlayer> InspectorAnimationAgent::bui
     return playerObject.release();
 }
 
-static PassRefPtr<TypeBuilder::Animation::KeyframeStyle> buildObjectForStyleKeyframe(StyleKeyframe* keyframe)
+static PassRefPtr<TypeBuilder::Animation::KeyframeStyle> buildObjectForStyleRuleKeyframe(StyleRuleKeyframe* keyframe)
 {
     RefPtrWillBeRawPtr<InspectorStyle> inspectorStyle = InspectorStyle::create(InspectorCSSId(), keyframe->mutableProperties().ensureCSSStyleDeclaration(), 0);
     RefPtr<TypeBuilder::Animation::KeyframeStyle> keyframeObject = TypeBuilder::Animation::KeyframeStyle::create()
@@ -129,9 +132,9 @@ static PassRefPtr<TypeBuilder::Animation::KeyframeStyle> buildObjectForStringKey
 static PassRefPtr<TypeBuilder::Animation::KeyframesRule> buildObjectForStyleRuleKeyframes(const StyleRuleKeyframes* keyframesRule)
 {
     RefPtr<TypeBuilder::Array<TypeBuilder::Animation::KeyframeStyle> > keyframes = TypeBuilder::Array<TypeBuilder::Animation::KeyframeStyle>::create();
-    const WillBeHeapVector<RefPtrWillBeMember<StyleKeyframe> >& styleKeyframes = keyframesRule->keyframes();
+    const WillBeHeapVector<RefPtrWillBeMember<StyleRuleKeyframe> >& styleKeyframes = keyframesRule->keyframes();
     for (const auto& styleKeyframe : styleKeyframes)
-        keyframes->addItem(buildObjectForStyleKeyframe(styleKeyframe.get()));
+        keyframes->addItem(buildObjectForStyleRuleKeyframe(styleKeyframe.get()));
 
     RefPtr<TypeBuilder::Animation::KeyframesRule> keyframesObject = TypeBuilder::Animation::KeyframesRule::create()
         .setKeyframes(keyframes);
@@ -169,7 +172,7 @@ static PassRefPtr<TypeBuilder::Animation::KeyframesRule> buildObjectForKeyframes
 
     if (!animationName.isNull()) {
         // CSS Animations
-        const StyleRuleKeyframes* keyframes = cssAnimations.matchScopedKeyframesRule(&styleResolver, element, animationName.impl());
+        const StyleRuleKeyframes* keyframes = styleResolver.findKeyframesRule(element, animationName);
         keyframeRule = buildObjectForStyleRuleKeyframes(keyframes);
     } else {
         // Web Animations
@@ -257,7 +260,7 @@ void InspectorAnimationAgent::startListening(ErrorString* errorString, int nodeI
 
 void InspectorAnimationAgent::stopListening(ErrorString*)
 {
-    m_element = 0;
+    m_element = nullptr;
 }
 
 void InspectorAnimationAgent::didCreateAnimationPlayer(AnimationPlayer& player)
@@ -280,7 +283,7 @@ AnimationPlayer* InspectorAnimationAgent::assertAnimationPlayer(ErrorString* err
     AnimationPlayer* player = m_idToAnimationPlayer.get(id);
     if (!player) {
         *errorString = "Could not find animation player with given id";
-        return 0;
+        return nullptr;
     }
     return player;
 }

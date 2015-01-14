@@ -85,6 +85,7 @@
 #include "core/frame/LocalDOMWindow.h"
 #include "core/frame/LocalFrame.h"
 #include "core/frame/PinchViewport.h"
+#include "core/frame/ScrollToOptions.h"
 #include "core/frame/Settings.h"
 #include "core/frame/UseCounter.h"
 #include "core/frame/csp/ContentSecurityPolicy.h"
@@ -634,7 +635,7 @@ double Element::scrollLeft()
 
         if (FrameView* view = document().view()) {
             if (RenderView* renderView = document().renderView())
-                return adjustScrollForAbsoluteZoom(view->scrollX(), *renderView);
+                return adjustScrollForAbsoluteZoom(view->scrollPositionDouble().x(), *renderView);
         }
     }
 
@@ -657,7 +658,7 @@ double Element::scrollTop()
 
         if (FrameView* view = document().view()) {
             if (RenderView* renderView = document().renderView())
-                return adjustScrollForAbsoluteZoom(view->scrollY(), *renderView);
+                return adjustScrollForAbsoluteZoom(view->scrollPositionDouble().y(), *renderView);
         }
     }
 
@@ -689,29 +690,8 @@ void Element::setScrollLeft(double newLeft)
         if (!view)
             return;
 
-        view->setScrollPosition(DoublePoint(newLeft * frame->pageZoomFactor(), view->scrollY()));
+        view->setScrollPosition(DoublePoint(newLeft * frame->pageZoomFactor(), view->scrollPositionDouble().y()), ScrollBehaviorAuto);
     }
-}
-
-void Element::setScrollLeft(const Dictionary& scrollOptionsHorizontal, ExceptionState& exceptionState)
-{
-    String scrollBehaviorString;
-    ScrollBehavior scrollBehavior = ScrollBehaviorAuto;
-    if (DictionaryHelper::get(scrollOptionsHorizontal, "behavior", scrollBehaviorString)) {
-        if (!ScrollableArea::scrollBehaviorFromString(scrollBehaviorString, scrollBehavior)) {
-            exceptionState.throwTypeError("The ScrollBehavior provided is invalid.");
-            return;
-        }
-    }
-
-    double position;
-    if (!DictionaryHelper::get(scrollOptionsHorizontal, "x", position)) {
-        exceptionState.throwTypeError("ScrollOptionsHorizontal must include an 'x' member.");
-        return;
-    }
-
-    // FIXME: Use scrollBehavior to decide whether to scroll smoothly or instantly.
-    setScrollLeft(position);
 }
 
 void Element::setScrollTop(double newTop)
@@ -739,29 +719,8 @@ void Element::setScrollTop(double newTop)
         if (!view)
             return;
 
-        view->setScrollPosition(DoublePoint(view->scrollX(), newTop * frame->pageZoomFactor()));
+        view->setScrollPosition(DoublePoint(view->scrollPositionDouble().x(), newTop * frame->pageZoomFactor()), ScrollBehaviorAuto);
     }
-}
-
-void Element::setScrollTop(const Dictionary& scrollOptionsVertical, ExceptionState& exceptionState)
-{
-    String scrollBehaviorString;
-    ScrollBehavior scrollBehavior = ScrollBehaviorAuto;
-    if (DictionaryHelper::get(scrollOptionsVertical, "behavior", scrollBehaviorString)) {
-        if (!ScrollableArea::scrollBehaviorFromString(scrollBehaviorString, scrollBehavior)) {
-            exceptionState.throwTypeError("The ScrollBehavior provided is invalid.");
-            return;
-        }
-    }
-
-    double position;
-    if (!DictionaryHelper::get(scrollOptionsVertical, "y", position)) {
-        exceptionState.throwTypeError("ScrollOptionsVertical must include a 'y' member.");
-        return;
-    }
-
-    // FIXME: Use scrollBehavior to decide whether to scroll smoothly or instantly.
-    setScrollTop(position);
 }
 
 int Element::scrollWidth()
@@ -778,6 +737,144 @@ int Element::scrollHeight()
     if (RenderBox* rend = renderBox())
         return adjustLayoutUnitForAbsoluteZoom(rend->scrollHeight(), *rend).toDouble();
     return 0;
+}
+
+void Element::scrollBy(double x, double y)
+{
+    ScrollToOptions scrollToOptions;
+    scrollToOptions.setLeft(x);
+    scrollToOptions.setTop(y);
+    scrollBy(scrollToOptions);
+}
+
+void Element::scrollBy(const ScrollToOptions& scrollToOptions)
+{
+    // FIXME: This should be removed once scroll updates are processed only after
+    // the compositing update. See http://crbug.com/420741.
+    document().updateLayoutIgnorePendingStylesheets();
+
+    if (document().documentElement() != this) {
+        scrollRenderBoxBy(scrollToOptions);
+        return;
+    }
+
+    if (RuntimeEnabledFeatures::scrollTopLeftInteropEnabled()) {
+        if (document().inQuirksMode())
+            return;
+        scrollFrameBy(scrollToOptions);
+    }
+}
+
+void Element::scrollTo(double x, double y)
+{
+    ScrollToOptions scrollToOptions;
+    scrollToOptions.setLeft(x);
+    scrollToOptions.setTop(y);
+    scrollTo(scrollToOptions);
+}
+
+void Element::scrollTo(const ScrollToOptions& scrollToOptions)
+{
+    // FIXME: This should be removed once scroll updates are processed only after
+    // the compositing update. See http://crbug.com/420741.
+    document().updateLayoutIgnorePendingStylesheets();
+
+    if (document().documentElement() != this) {
+        scrollRenderBoxTo(scrollToOptions);
+        return;
+    }
+
+    if (RuntimeEnabledFeatures::scrollTopLeftInteropEnabled()) {
+        if (document().inQuirksMode())
+            return;
+        scrollFrameTo(scrollToOptions);
+    }
+}
+
+void Element::scrollRenderBoxBy(const ScrollToOptions& scrollToOptions)
+{
+    double left = scrollToOptions.hasLeft() ? scrollToOptions.left() : 0.0;
+    double top = scrollToOptions.hasTop() ? scrollToOptions.top() : 0.0;
+    if (std::isnan(left) || std::isnan(top))
+        return;
+
+    ScrollBehavior scrollBehavior = ScrollBehaviorAuto;
+    ScrollableArea::scrollBehaviorFromString(scrollToOptions.behavior(), scrollBehavior);
+    RenderBox* rend = renderBox();
+    if (rend) {
+        double currentScaledLeft = rend->scrollLeft();
+        double currentScaledTop = rend->scrollTop();
+        double newScaledLeft = left * rend->style()->effectiveZoom() + currentScaledLeft;
+        double newScaledTop = top * rend->style()->effectiveZoom() + currentScaledTop;
+        rend->scrollToOffset(DoubleSize(newScaledLeft, newScaledTop), scrollBehavior);
+    }
+}
+
+void Element::scrollRenderBoxTo(const ScrollToOptions& scrollToOptions)
+{
+    if ((scrollToOptions.hasLeft() && std::isnan(scrollToOptions.left()))
+        || (scrollToOptions.hasTop() && std::isnan(scrollToOptions.top())))
+        return;
+
+    ScrollBehavior scrollBehavior = ScrollBehaviorAuto;
+    ScrollableArea::scrollBehaviorFromString(scrollToOptions.behavior(), scrollBehavior);
+
+    RenderBox* rend = renderBox();
+    if (rend) {
+        double scaledLeft = rend->scrollLeft();
+        double scaledTop = rend->scrollTop();
+        if (scrollToOptions.hasLeft())
+            scaledLeft = scrollToOptions.left() * rend->style()->effectiveZoom();
+        if (scrollToOptions.hasTop())
+            scaledTop = scrollToOptions.top() * rend->style()->effectiveZoom();
+        rend->scrollToOffset(DoubleSize(scaledLeft, scaledTop), scrollBehavior);
+    }
+}
+
+void Element::scrollFrameBy(const ScrollToOptions& scrollToOptions)
+{
+    double left = scrollToOptions.hasLeft() ? scrollToOptions.left() : 0.0;
+    double top = scrollToOptions.hasTop() ? scrollToOptions.top() : 0.0;
+    if (std::isnan(left) || std::isnan(top))
+        return;
+
+    ScrollBehavior scrollBehavior = ScrollBehaviorAuto;
+    ScrollableArea::scrollBehaviorFromString(scrollToOptions.behavior(), scrollBehavior);
+    LocalFrame* frame = document().frame();
+    if (!frame)
+        return;
+    FrameView* view = frame->view();
+    if (!view)
+        return;
+
+    double newScaledLeft = left * frame->pageZoomFactor() + view->scrollPositionDouble().x();
+    double newScaledTop = top * frame->pageZoomFactor() + view->scrollPositionDouble().y();
+    view->setScrollPosition(DoublePoint(newScaledLeft, newScaledTop), scrollBehavior);
+}
+
+void Element::scrollFrameTo(const ScrollToOptions& scrollToOptions)
+{
+    double left = scrollToOptions.hasLeft() ? scrollToOptions.left() : 0.0;
+    double top = scrollToOptions.hasTop() ? scrollToOptions.top() : 0.0;
+    if (std::isnan(left) || std::isnan(top))
+        return;
+
+    ScrollBehavior scrollBehavior = ScrollBehaviorAuto;
+    ScrollableArea::scrollBehaviorFromString(scrollToOptions.behavior(), scrollBehavior);
+    LocalFrame* frame = document().frame();
+    if (!frame)
+        return;
+    FrameView* view = frame->view();
+    if (!view)
+        return;
+
+    double scaledLeft = view->scrollPositionDouble().x();
+    double scaledTop = view->scrollPositionDouble().y();
+    if (scrollToOptions.hasLeft())
+        scaledLeft = scrollToOptions.left() * frame->pageZoomFactor();
+    if (scrollToOptions.hasTop())
+        scaledTop = scrollToOptions.top() * frame->pageZoomFactor();
+    view->setScrollPosition(DoublePoint(scaledLeft, scaledTop), scrollBehavior);
 }
 
 IntRect Element::boundsInRootViewSpace()
@@ -821,16 +918,16 @@ PassRefPtrWillBeRawPtr<ClientRectList> Element::getClientRects()
 {
     document().updateLayoutIgnorePendingStylesheets();
 
-    RenderBoxModelObject* renderBoxModelObject = this->renderBoxModelObject();
-    if (!renderBoxModelObject)
+    RenderObject* elementRenderer = renderer();
+    if (!elementRenderer || (!elementRenderer->isBoxModelObject() && !elementRenderer->isBR()))
         return ClientRectList::create();
 
     // FIXME: Handle SVG elements.
     // FIXME: Handle table/inline-table with a caption.
 
     Vector<FloatQuad> quads;
-    renderBoxModelObject->absoluteQuads(quads);
-    document().adjustFloatQuadsForScrollAndAbsoluteZoom(quads, *renderBoxModelObject);
+    elementRenderer->absoluteQuads(quads);
+    document().adjustFloatQuadsForScrollAndAbsoluteZoom(quads, *elementRenderer);
     return ClientRectList::create(quads);
 }
 
@@ -839,16 +936,17 @@ PassRefPtrWillBeRawPtr<ClientRect> Element::getBoundingClientRect()
     document().updateLayoutIgnorePendingStylesheets();
 
     Vector<FloatQuad> quads;
-    if (isSVGElement() && renderer() && !renderer()->isSVGRoot()) {
-        // Get the bounding rectangle from the SVG model.
-        SVGElement* svgElement = toSVGElement(this);
-        FloatRect localRect;
-        if (svgElement->getBoundingBox(localRect))
-            quads.append(renderer()->localToAbsoluteQuad(localRect));
-    } else {
-        // Get the bounding rectangle from the box model.
-        if (renderBoxModelObject())
-            renderBoxModelObject()->absoluteQuads(quads);
+    RenderObject* elementRenderer = renderer();
+    if (elementRenderer) {
+        if (isSVGElement() && !elementRenderer->isSVGRoot()) {
+            // Get the bounding rectangle from the SVG model.
+            SVGElement* svgElement = toSVGElement(this);
+            FloatRect localRect;
+            if (svgElement->getBoundingBox(localRect))
+                quads.append(elementRenderer->localToAbsoluteQuad(localRect));
+        } else if (elementRenderer->isBoxModelObject() || elementRenderer->isBR()) {
+            elementRenderer->absoluteQuads(quads);
+        }
     }
 
     if (quads.isEmpty())
@@ -858,8 +956,8 @@ PassRefPtrWillBeRawPtr<ClientRect> Element::getBoundingClientRect()
     for (size_t i = 1; i < quads.size(); ++i)
         result.unite(quads[i].boundingBox());
 
-    ASSERT(renderer());
-    document().adjustFloatRectForScrollAndAbsoluteZoom(result, *renderer());
+    ASSERT(elementRenderer);
+    document().adjustFloatRectForScrollAndAbsoluteZoom(result, *elementRenderer);
     return ClientRect::create(result);
 }
 
@@ -869,6 +967,20 @@ IntRect Element::screenRect() const
         return IntRect();
     // FIXME: this should probably respect transforms
     return document().view()->contentsToScreen(renderer()->absoluteBoundingBoxRectIgnoringTransforms());
+}
+
+const AtomicString& Element::computedRole()
+{
+    document().updateLayoutIgnorePendingStylesheets();
+    ScopedAXObjectCache cache(document());
+    return cache->computedRoleForNode(this);
+}
+
+String Element::computedName()
+{
+    document().updateLayoutIgnorePendingStylesheets();
+    ScopedAXObjectCache cache(document());
+    return cache->computedNameForNode(this);
 }
 
 const AtomicString& Element::getAttribute(const AtomicString& localName) const
@@ -934,12 +1046,13 @@ ALWAYS_INLINE void Element::setAttributeInternal(size_t index, const QualifiedNa
     }
 
     const Attribute& existingAttribute = elementData()->attributes().at(index);
+    AtomicString existingAttributeValue = existingAttribute.value();
     QualifiedName existingAttributeName = existingAttribute.name();
 
     if (!inSynchronizationOfLazyAttribute)
-        willModifyAttribute(existingAttributeName, existingAttribute.value(), newValue);
+        willModifyAttribute(existingAttributeName, existingAttributeValue, newValue);
 
-    if (newValue != existingAttribute.value()) {
+    if (newValue != existingAttributeValue) {
         // If there is an Attr node hooked to this attribute, the Attr::setValue() call below
         // will write into the ElementData.
         // FIXME: Refactor this so it makes some sense.
@@ -1274,8 +1387,13 @@ void Element::removedFrom(ContainerNode* insertionPoint)
 
     ASSERT(!hasRareData() || !elementRareData()->hasPseudoElements());
 
-    if (containsFullScreenElement())
+    if (Fullscreen::isActiveFullScreenElement(*this)) {
         setContainsFullScreenElementOnAncestorsCrossingFrameBoundaries(false);
+        if (insertionPoint->isElementNode()) {
+            toElement(insertionPoint)->setContainsFullScreenElement(false);
+            toElement(insertionPoint)->setContainsFullScreenElementOnAncestorsCrossingFrameBoundaries(false);
+        }
+    }
 
     if (Fullscreen* fullscreen = Fullscreen::fromIfExists(document()))
         fullscreen->elementRemoved(*this);
@@ -1472,6 +1590,7 @@ void Element::recalcStyle(StyleRecalcChange change, Text* nextTextSibling)
 {
     ASSERT(document().inStyleRecalc());
     ASSERT(!parentOrShadowHostNode()->needsStyleRecalc());
+    ASSERT(inActiveDocument());
 
     if (hasCustomStyleCallbacks())
         willRecalcStyle(change);
@@ -2827,21 +2946,21 @@ void Element::willModifyAttribute(const QualifiedName& name, const AtomicString&
 void Element::didAddAttribute(const QualifiedName& name, const AtomicString& value)
 {
     attributeChanged(name, value);
-    InspectorInstrumentation::didModifyDOMAttr(this, name.toString(), value);
+    InspectorInstrumentation::didModifyDOMAttr(this, name, value);
     dispatchSubtreeModifiedEvent();
 }
 
 void Element::didModifyAttribute(const QualifiedName& name, const AtomicString& value)
 {
     attributeChanged(name, value);
-    InspectorInstrumentation::didModifyDOMAttr(this, name.toString(), value);
+    InspectorInstrumentation::didModifyDOMAttr(this, name, value);
     // Do not dispatch a DOMSubtreeModified event here; see bug 81141.
 }
 
 void Element::didRemoveAttribute(const QualifiedName& name)
 {
     attributeChanged(name, nullAtom);
-    InspectorInstrumentation::didRemoveDOMAttr(this, name.toString());
+    InspectorInstrumentation::didRemoveDOMAttr(this, name);
     dispatchSubtreeModifiedEvent();
 }
 
@@ -3303,12 +3422,8 @@ v8::Handle<v8::Object> Element::wrapCustomElement(v8::Isolate* isolate, v8::Hand
         return v8::Handle<v8::Object>();
 
     V8PerContextData* perContextData = V8PerContextData::from(context);
-    if (!perContextData)
-        return wrapper;
-
-    CustomElementBinding* binding = perContextData->customElementBinding(customElementDefinition());
-
-    wrapper->SetPrototype(binding->prototype());
+    if (perContextData)
+        wrapper->SetPrototype(perContextData->customElementBinding(customElementDefinition())->prototype());
 
     return V8DOMWrapper::associateObjectWithWrapper(isolate, this, wrapperType, wrapper);
 }

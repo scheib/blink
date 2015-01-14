@@ -59,6 +59,7 @@ WebInspector.TimelineUIUtils._initEventStyles = function()
     var categories = WebInspector.TimelineUIUtils.categories();
 
     var eventStyles = {};
+    eventStyles[recordTypes.Task] = new WebInspector.TimelineRecordStyle(WebInspector.UIString("Task"), categories["other"]);
     eventStyles[recordTypes.Program] = new WebInspector.TimelineRecordStyle(WebInspector.UIString("Other"), categories["other"]);
     eventStyles[recordTypes.EventDispatch] = new WebInspector.TimelineRecordStyle(WebInspector.UIString("Event"), categories["scripting"]);
     eventStyles[recordTypes.RequestMainThreadFrame] = new WebInspector.TimelineRecordStyle(WebInspector.UIString("Request Main Thread Frame"), categories["rendering"], true);
@@ -108,6 +109,7 @@ WebInspector.TimelineUIUtils._initEventStyles = function()
     eventStyles[recordTypes.DecodeImage] = new WebInspector.TimelineRecordStyle(WebInspector.UIString("Image Decode"), categories["painting"]);
     eventStyles[recordTypes.ResizeImage] = new WebInspector.TimelineRecordStyle(WebInspector.UIString("Image Resize"), categories["painting"]);
     eventStyles[recordTypes.GPUTask] = new WebInspector.TimelineRecordStyle(WebInspector.UIString("GPU"), categories["gpu"]);
+    eventStyles[recordTypes.UpdateCounters] = new WebInspector.TimelineRecordStyle(WebInspector.UIString("UpdateCounters"), categories["other"]);
     WebInspector.TimelineUIUtils._eventStylesMap = eventStyles;
     return eventStyles;
 }
@@ -147,6 +149,8 @@ WebInspector.TimelineUIUtils.testContentMatching = function(record, regExp)
     var traceEvent = record.traceEvent();
     var title = WebInspector.TimelineUIUtils.eventStyle(traceEvent).title;
     var tokens = [title];
+    if (traceEvent.url)
+        tokens.push(traceEvent.url);
     for (var argName in traceEvent.args) {
         var argValue = traceEvent.args[argName];
         for (var key in argValue)
@@ -300,7 +304,7 @@ WebInspector.TimelineUIUtils.buildDetailsNodeForTraceEvent = function(event, tar
     case recordType.DecodeImage:
     case recordType.ResizeImage:
     case recordType.DecodeLazyPixelRef:
-            var url = event.imageURL;
+            var url = event.url;
             if (url)
                 detailsText = WebInspector.displayNameForURL(url);
         break;
@@ -365,8 +369,8 @@ WebInspector.TimelineUIUtils.buildTraceEventDetails = function(event, model, lin
     var relatedNode = null;
     var barrier = new CallbackBarrier();
     if (!event.previewElement) {
-        if (event.imageURL)
-            WebInspector.DOMPresentationUtils.buildImagePreviewContents(target, event.imageURL, false, barrier.createCallback(saveImage));
+        if (event.url)
+            WebInspector.DOMPresentationUtils.buildImagePreviewContents(target, event.url, false, barrier.createCallback(saveImage));
         else if (event.picture)
             WebInspector.TimelineUIUtils.buildPicturePreviewContent(event, target, barrier.createCallback(saveImage));
     }
@@ -512,8 +516,8 @@ WebInspector.TimelineUIUtils._buildTraceEventDetailsSynchronously = function(eve
     case recordTypes.ResizeImage:
     case recordTypes.DrawLazyPixelRef:
         relatedNodeLabel = WebInspector.UIString("Owner element");
-        if (event.imageURL)
-            contentHelper.appendElementRow(WebInspector.UIString("Image URL"), WebInspector.linkifyResourceAsNode(event.imageURL));
+        if (event.url)
+            contentHelper.appendElementRow(WebInspector.UIString("Image URL"), WebInspector.linkifyResourceAsNode(event.url));
         break;
     case recordTypes.ParseAuthorStyleSheet:
         var url = eventData["styleSheetUrl"];
@@ -958,7 +962,7 @@ WebInspector.TimelineUIUtils._aggregatedStatsForTraceEvent = function(total, mod
 WebInspector.TimelineUIUtils.buildPicturePreviewContent = function(event, target, callback)
 {
 
-    new WebInspector.LayerPaintEvent(event, target).loadPicture(onSnapshotLoaded);
+    new WebInspector.LayerPaintEvent(event, target).loadSnapshot(onSnapshotLoaded);
     /**
      * @param {?Array.<number>} rect
      * @param {?WebInspector.PaintProfilerSnapshot} snapshot
@@ -1245,7 +1249,7 @@ WebInspector.TimelineUIUtils.createStyleRuleForCategory = function(category)
     var selector = ".timeline-category-" + category.name + " .timeline-graph-bar, " +
         ".panel.timeline .timeline-filters-header .filter-checkbox-filter.filter-checkbox-filter-" + category.name + " .checkbox-filter-checkbox, " +
         ".timeline-details-view .timeline-" + category.name + ", " +
-        ".timeline-category-" + category.name + " .timeline-tree-icon"
+        ".timeline-category-" + category.name + " .timeline-tree-icon";
 
     return selector + " { background-image: linear-gradient(" +
        category.fillColorStop0 + ", " + category.fillColorStop1 + " 25%, " + category.fillColorStop1 + " 25%, " + category.fillColorStop1 + ");" +
@@ -1350,7 +1354,7 @@ WebInspector.TimelineUIUtils.markerStyleForEvent = function(event)
             color: orange,
             tall: false,
             lowPriority: false,
-        }
+        };
     }
     var recordTypes = WebInspector.TimelineModel.RecordType;
     var tall = false;
@@ -1379,7 +1383,7 @@ WebInspector.TimelineUIUtils.markerStyleForEvent = function(event)
         color: color,
         tall: tall,
         lowPriority: false,
-    }
+    };
 }
 
 /**
@@ -1394,7 +1398,7 @@ WebInspector.TimelineUIUtils.markerStyleForFrame = function()
         dashStyle: [3],
         tall: true,
         lowPriority: true
-    }
+    };
 }
 
 /**

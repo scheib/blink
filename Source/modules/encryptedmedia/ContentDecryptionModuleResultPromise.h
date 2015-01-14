@@ -24,6 +24,7 @@ public:
 
     // ContentDecryptionModuleResult implementation.
     virtual void complete() override;
+    virtual void completeWithContentDecryptionModule(WebContentDecryptionModule*) override;
     virtual void completeWithSession(WebContentDecryptionModuleResult::SessionStatus) override;
     virtual void completeWithError(WebContentDecryptionModuleException, unsigned long systemCode, const WebString&) final;
 
@@ -50,7 +51,7 @@ protected:
     ExecutionContext* executionContext() const;
 
 private:
-    RefPtr<ScriptPromiseResolver> m_resolver;
+    RefPtrWillBeMember<ScriptPromiseResolver> m_resolver;
 };
 
 } // namespace blink

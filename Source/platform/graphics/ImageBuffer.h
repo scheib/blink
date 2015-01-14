@@ -36,17 +36,14 @@
 #include "platform/graphics/GraphicsTypes.h"
 #include "platform/graphics/GraphicsTypes3D.h"
 #include "platform/graphics/ImageBufferSurface.h"
+#include "platform/graphics/paint/DisplayItemList.h"
 #include "platform/transforms/AffineTransform.h"
+#include "third_party/skia/include/core/SkPaint.h"
 #include "wtf/Forward.h"
 #include "wtf/OwnPtr.h"
 #include "wtf/PassOwnPtr.h"
 #include "wtf/PassRefPtr.h"
-
-namespace WTF {
-
-class ArrayBufferContents;
-
-} // namespace WTF
+#include "wtf/Uint8ClampedArray.h"
 
 namespace blink {
 
@@ -85,10 +82,12 @@ public:
 
     const IntSize& size() const { return m_surface->size(); }
     bool isAccelerated() const { return m_surface->isAccelerated(); }
+    bool isRecording() const { return m_surface->isRecording(); }
     bool isSurfaceValid() const;
     bool restoreSurface() const;
     bool needsClipTracking() const { return m_surface->needsClipTracking(); }
 
+    void setFilterLevel(SkPaint::FilterLevel filterLevel) { m_surface->setFilterLevel(filterLevel); }
     void setIsHidden(bool hidden) { m_surface->setIsHidden(hidden); }
 
     // Called by subclasses of ImageBufferSurface to install a new canvas object
@@ -106,18 +105,19 @@ public:
 
     const SkBitmap& bitmap() const;
 
+    void willAccessPixels() { m_surface->willAccessPixels(); }
+
     PassRefPtr<Image> copyImage(BackingStoreCopy = CopyBackingStore, ScaleBehavior = Scaled) const;
     // Give hints on the faster copyImage Mode, return DontCopyBackingStore if it supports the DontCopyBackingStore behavior
     // or return CopyBackingStore if it doesn't.
     static BackingStoreCopy fastCopyImageMode();
 
-    bool getImageData(Multiply, const IntRect&, WTF::ArrayBufferContents&) const;
+    PassRefPtr<Uint8ClampedArray> getImageData(Multiply, const IntRect&) const;
 
-    void putByteArray(Multiply, const unsigned char* source, const IntSize& sourceSize, const IntRect& sourceRect, const IntPoint& destPoint);
+    void putByteArray(Multiply, Uint8ClampedArray*, const IntSize& sourceSize, const IntRect& sourceRect, const IntPoint& destPoint);
 
     String toDataURL(const String& mimeType, const double* quality = 0) const;
     AffineTransform baseTransform() const { return AffineTransform(); }
-    void transformColorSpace(ColorSpace srcColorSpace, ColorSpace dstColorSpace);
     WebLayer* platformLayer() const;
 
     // FIXME: current implementations of this method have the restriction that they only work
@@ -137,6 +137,8 @@ public:
 
     PassRefPtr<SkImage> newImageSnapshot() const;
 
+    DisplayItemClient displayItemClient() const { return static_cast<DisplayItemClientInternalVoid*>((void*)this); }
+
 private:
     ImageBuffer(PassOwnPtr<ImageBufferSurface>);
 
@@ -153,6 +155,16 @@ private:
     OwnPtr<ImageBufferSurface> m_surface;
     OwnPtr<GraphicsContext> m_context;
     ImageBufferClient* m_client;
+};
+
+struct ImageDataBuffer {
+    ImageDataBuffer(const IntSize& size, unsigned char* data) : m_data(data), m_size(size) { }
+    String PLATFORM_EXPORT toDataURL(const String& mimeType, const double* quality) const;
+    unsigned char* pixels() const { return m_data; }
+    int height() const { return m_size.height(); }
+    int width() const { return m_size.width(); }
+    unsigned char* m_data;
+    IntSize m_size;
 };
 
 } // namespace blink

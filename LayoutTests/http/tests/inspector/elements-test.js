@@ -25,6 +25,11 @@ InspectorTest.firstMatchedStyleSection = function()
     return WebInspector.panels.elements.sidebarPanes.styles.sections[0][1];
 }
 
+InspectorTest.firstMediaTextElementInSection = function(section)
+{
+    return section.element.querySelector(".media-text");
+}
+
 InspectorTest.findNode = function(matchFunction, callback)
 {
     callback = InspectorTest.safeWrap(callback);
@@ -181,6 +186,11 @@ InspectorTest.waitForSelectorCommitted = function(callback)
     InspectorTest.addSniffer(WebInspector.StylePropertiesSection.prototype, "_editingSelectorCommittedForTest", callback);
 }
 
+InspectorTest.waitForMediaTextCommitted = function(callback)
+{
+    InspectorTest.addSniffer(WebInspector.StylePropertiesSection.prototype, "_editingMediaTextCommittedForTest", callback);
+}
+
 InspectorTest.waitForStyleApplied = function(callback)
 {
     InspectorTest.addSniffer(WebInspector.StylePropertyTreeElement.prototype, "styleTextAppliedForTest", callback);
@@ -210,14 +220,12 @@ InspectorTest.selectNodeAndWaitForStyles = function(idValue, callback)
 InspectorTest.selectNodeAndWaitForStylesWithComputed = function(idValue, callback)
 {
     callback = InspectorTest.safeWrap(callback);
+    InspectorTest.selectNodeAndWaitForStyles(idValue, onSidebarRendered);
 
-    function stylesCallback(targetNode)
+    function onSidebarRendered()
     {
-        InspectorTest.addSniffer(WebInspector.ComputedStyleSidebarPane.prototype, "onContentReady", callback);
-        WebInspector.panels.elements.sidebarPanes.computedStyle.expand();
+        WebInspector.panels.elements.sidebarPanes.computedStyle.doUpdate(callback);
     }
-
-    InspectorTest.selectNodeAndWaitForStyles(idValue, stylesCallback);
 }
 
 InspectorTest.firstElementsTreeOutline = function()
@@ -249,6 +257,8 @@ InspectorTest.dumpSelectedElementStyles = function(excludeComputed, excludeMatch
 
 function printStyleSection(section, omitLonghands, includeSelectorGroupMarks)
 {
+    if (!section)
+        return;
     InspectorTest.addResult((section.expanded ? "[expanded] " : "[collapsed] ") + (section.element.classList.contains("no-affect") ? "[no-affect] " : ""));
     var chainEntries = section.titleElement.querySelectorAll(".media-list .media");
     chainEntries = Array.prototype.slice.call(chainEntries);
@@ -437,8 +447,8 @@ InspectorTest.dumpStyleTreeItem = function(treeItem, prefix, depth)
 {
     // Filter out width and height properties in order to minimize
     // potential diffs.
-    if (!treeItem.listItemElement.textContent.indexOf("width") ||
-        !treeItem.listItemElement.textContent.indexOf("height"))
+    if (!treeItem.listItemElement.textContent.indexOf("  width") ||
+        !treeItem.listItemElement.textContent.indexOf("  height"))
         return;
 
     if (treeItem.listItemElement.classList.contains("inherited"))
@@ -515,6 +525,14 @@ InspectorTest.dumpElementsTree = function(rootNode, depth, resultsArray)
 
             var userProperties = userPropertyDataDump(treeItem);
             var value = prefix + expander + beautify(treeItem.listItemElement) + userProperties;
+            if (treeItem.shadowHostToolbar) {
+                value = prefix + expander;
+                for (var button of treeItem.buttons) {
+                    var toggled = button.disabled;
+                    var name = (toggled ? "<" : "") + button.textContent + (toggled ? ">" : "");
+                    value += name + " ";
+                }
+            }
             if (resultsArray)
                 resultsArray.push(value);
             else

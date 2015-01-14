@@ -81,6 +81,30 @@ PassRefPtrWillBeRawPtr<MediaControls> MediaControls::create(HTMLMediaElement& me
     return nullptr;
 }
 
+// The media controls DOM structure looks like:
+//
+// MediaControls                                       (-webkit-media-controls)
+// +-MediaControlOverlayEnclosureElement               (-webkit-media-controls-overlay-enclosure)
+// | +-MediaControlTextTrackContainerElement           (-webkit-media-text-track-container)
+// | | {when text tracks are enabled}
+// | +-MediaControlOverlayPlayButtonElement            (-webkit-media-controls-overlay-play-button)
+// | | {if mediaControlsOverlayPlayButtonEnabled}
+// | \-MediaControlCastButtonElement                   (-internal-media-controls-overlay-cast-button)
+// \-MediaControlPanelEnclosureElement                 (-webkit-media-controls-enclosure)
+//   \-MediaControlPanelElement                        (-webkit-media-controls-panel)
+//     +-MediaControlPlayButtonElement                 (-webkit-media-controls-play-button)
+//     +-MediaControlTimelineElement                   (-webkit-media-controls-timeline)
+//     +-MediaControlCurrentTimeDisplayElement         (-webkit-media-controls-current-time-display)
+//     +-MediaControlTimeRemainingDisplayElement       (-webkit-media-controls-time-remaining-display)
+//     +-MediaControlMuteButtonElement                 (-webkit-media-controls-mute-button)
+//     +-MediaControlVolumeSliderElement               (-webkit-media-controls-volume-slider)
+//     +-MediaControlToggleClosedCaptionsButtonElement (-webkit-media-controls-toggle-closed-captions-button)
+//     +-MediaControlCastButtonElement                 (-internal-media-controls-cast-button)
+//     \-MediaControlFullscreenButtonElement           (-webkit-media-controls-fullscreen-button)
+//
+// Most of the structure is built by MediaControls::initializeControls() - the
+// exception being MediaControlTextTrackContainerElement which is added
+// on-demand by MediaControls::createTextTrackDisplay().
 bool MediaControls::initializeControls()
 {
     TrackExceptionState exceptionState;
@@ -370,6 +394,24 @@ void MediaControls::textTracksChanged()
     refreshClosedCaptionsButtonVisibility();
 }
 
+static Element* elementFromCenter(Element& element)
+{
+    RefPtrWillBeRawPtr<ClientRect> clientRect = element.getBoundingClientRect();
+    int centerX = static_cast<int>((clientRect->left() + clientRect->right()) / 2);
+    int centerY = static_cast<int>((clientRect->top() + clientRect->bottom()) / 2);
+
+    return element.document().elementFromPoint(centerX , centerY);
+}
+
+void MediaControls::tryShowOverlayCastButton()
+{
+    // The element needs to be shown to have its dimensions and position.
+    m_overlayCastButton->show();
+
+    if (elementFromCenter(*m_overlayCastButton) != &mediaElement())
+        m_overlayCastButton->hide();
+}
+
 void MediaControls::refreshCastButtonVisibility()
 {
     if (mediaElement().hasRemoteRoutes()) {
@@ -386,7 +428,7 @@ void MediaControls::refreshCastButtonVisibility()
             // Check that the cast button actually fits on the bar.
             if (m_fullScreenButton->getBoundingClientRect()->right() > m_panel->getBoundingClientRect()->right()) {
                 m_castButton->hide();
-                m_overlayCastButton->show();
+                tryShowOverlayCastButton();
             }
         }
     } else {
@@ -397,7 +439,7 @@ void MediaControls::refreshCastButtonVisibility()
 
 void MediaControls::showOverlayCastButton()
 {
-    m_overlayCastButton->show();
+    tryShowOverlayCastButton();
     resetHideMediaControlsTimer();
 }
 
@@ -523,10 +565,7 @@ void MediaControls::createTextTrackDisplay()
     m_textDisplayContainer = textDisplayContainer.get();
 
     // Insert it before (behind) all other control elements.
-    if (m_overlayPlayButton)
-        m_overlayEnclosure->insertBefore(textDisplayContainer.release(), m_overlayPlayButton);
-    else
-        m_overlayEnclosure->insertBefore(textDisplayContainer.release(), m_overlayCastButton);
+    m_overlayEnclosure->insertBefore(textDisplayContainer.release(), m_overlayEnclosure->firstChild());
 }
 
 void MediaControls::showTextTrackDisplay()

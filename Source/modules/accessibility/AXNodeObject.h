@@ -34,6 +34,7 @@
 
 namespace blink {
 
+class AXObjectCacheImpl;
 class Element;
 class HTMLLabelElement;
 class LayoutRect;
@@ -41,10 +42,10 @@ class Node;
 
 class AXNodeObject : public AXObject {
 protected:
-    explicit AXNodeObject(Node*);
+    AXNodeObject(Node*, AXObjectCacheImpl*);
 
 public:
-    static PassRefPtr<AXNodeObject> create(Node*);
+    static PassRefPtr<AXNodeObject> create(Node*, AXObjectCacheImpl*);
     virtual ~AXNodeObject();
 
 protected:
@@ -61,6 +62,7 @@ protected:
     String accessibilityDescriptionForElements(WillBeHeapVector<RawPtrWillBeMember<Element> > &elements) const;
     void alterSliderValue(bool increase);
     String ariaAccessibilityDescription() const;
+    String ariaAutoComplete() const;
     void ariaLabeledByElements(WillBeHeapVector<RawPtrWillBeMember<Element> >& elements) const;
     void changeValueByStep(bool increase);
     AccessibilityRole determineAriaRoleAttribute() const;
@@ -73,6 +75,7 @@ protected:
     AXObject* menuButtonForMenu() const;
     Element* menuItemElementForMenu() const;
     Element* mouseButtonListener() const;
+    String placeholder() const;
     AccessibilityRole remapAriaRoleDueToParent(AccessibilityRole) const;
     bool isNativeCheckboxOrRadio() const;
     void setNode(Node*);
@@ -102,6 +105,7 @@ protected:
     virtual bool isLink() const override final;
     virtual bool isMenu() const override final;
     virtual bool isMenuButton() const override final;
+    virtual bool isMeter() const override final;
     virtual bool isMultiSelectable() const override;
     bool isNativeImage() const;
     virtual bool isNativeTextControl() const override final;
@@ -135,6 +139,9 @@ protected:
     // Properties of interactive elements.
     virtual AccessibilityButtonState checkboxOrRadioValue() const override final;
     virtual void colorValue(int& r, int& g, int& b) const override final;
+    virtual InvalidState invalidState() const override final;
+    // Only used when invalidState() returns InvalidStateOther.
+    virtual String ariaInvalidValue() const override final;
     virtual String valueDescription() const override;
     virtual float valueForRange() const override;
     virtual float maxValueForRange() const override;
@@ -150,11 +157,10 @@ protected:
 
     // Accessibility Text.
     virtual String textUnderElement() const override;
-
-    // Accessibility Text - (To be deprecated).
     virtual String accessibilityDescription() const override;
     virtual String title() const override;
     virtual String helpText() const override;
+    virtual String computedName() const override;
 
     // Location and click point in frame-relative coordinates.
     virtual LayoutRect elementRect() const override;

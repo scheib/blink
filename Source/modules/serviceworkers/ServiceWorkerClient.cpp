@@ -7,22 +7,25 @@
 
 #include "bindings/core/v8/CallbackPromiseAdapter.h"
 #include "bindings/core/v8/ExceptionState.h"
-#include "bindings/core/v8/ScriptPromiseResolver.h"
 #include "bindings/core/v8/SerializedScriptValue.h"
-#include "modules/serviceworkers/ServiceWorkerError.h"
 #include "modules/serviceworkers/ServiceWorkerGlobalScopeClient.h"
 #include "public/platform/WebString.h"
 #include "wtf/RefPtr.h"
 
 namespace blink {
 
-ServiceWorkerClient* ServiceWorkerClient::create(unsigned id)
+ServiceWorkerClient* ServiceWorkerClient::create(const WebServiceWorkerClientInfo& info)
 {
-    return new ServiceWorkerClient(id);
+    return new ServiceWorkerClient(info);
 }
 
-ServiceWorkerClient::ServiceWorkerClient(unsigned id)
-    : m_id(id)
+ServiceWorkerClient::ServiceWorkerClient(const WebServiceWorkerClientInfo& info)
+    : m_id(info.clientID)
+    , m_url(info.url.string())
+{
+}
+
+ServiceWorkerClient::~ServiceWorkerClient()
 {
 }
 
@@ -36,19 +39,6 @@ void ServiceWorkerClient::postMessage(ExecutionContext* context, PassRefPtr<Seri
     WebString messageString = message->toWireString();
     OwnPtr<WebMessagePortChannelArray> webChannels = MessagePort::toWebMessagePortChannelArray(channels.release());
     ServiceWorkerGlobalScopeClient::from(context)->postMessageToClient(m_id, messageString, webChannels.release());
-}
-
-ScriptPromise ServiceWorkerClient::focus(ScriptState* scriptState)
-{
-    RefPtr<ScriptPromiseResolver> resolver = ScriptPromiseResolver::create(scriptState);
-    ScriptPromise promise = resolver->promise();
-
-    // FIXME: there should be a check for whether the caller is allowed to focus
-    // the client. The promise should succeed with |false| if the call is not
-    // allowed. https://crbug.com/437149
-
-    ServiceWorkerGlobalScopeClient::from(scriptState->executionContext())->focus(m_id, new CallbackPromiseAdapter<bool, ServiceWorkerError>(resolver));
-    return promise;
 }
 
 } // namespace blink

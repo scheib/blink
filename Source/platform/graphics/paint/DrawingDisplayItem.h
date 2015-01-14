@@ -9,27 +9,33 @@
 #include "platform/geometry/FloatPoint.h"
 #include "platform/graphics/paint/DisplayItem.h"
 #include "third_party/skia/include/core/SkPicture.h"
+#include "wtf/PassOwnPtr.h"
 
 namespace blink {
 
 class PLATFORM_EXPORT DrawingDisplayItem : public DisplayItem {
 public:
-    DrawingDisplayItem(DisplayItemClient client, Type type, PassRefPtr<SkPicture> picture, const FloatPoint& location)
-        : DisplayItem(client, type), m_picture(picture), m_location(location) { ASSERT(m_picture.get()); }
+    static PassOwnPtr<DrawingDisplayItem> create(DisplayItemClient client, Type type, PassRefPtr<const SkPicture> picture)
+    {
+        return adoptPtr(new DrawingDisplayItem(client, type, picture));
+    }
 
     virtual void replay(GraphicsContext*);
     virtual void appendToWebDisplayItemList(WebDisplayItemList*) const override;
 
-    PassRefPtr<SkPicture> picture() const { return m_picture; }
-    const FloatPoint& location() const { return m_location; }
+    PassRefPtr<const SkPicture> picture() const { return m_picture; }
+
+protected:
+    DrawingDisplayItem(DisplayItemClient client, Type type, PassRefPtr<const SkPicture> picture)
+        : DisplayItem(client, type), m_picture(picture) { ASSERT(m_picture); }
 
 private:
-
-    RefPtr<SkPicture> m_picture;
-    const FloatPoint m_location;
 #ifndef NDEBUG
-    virtual WTF::String asDebugString() const override;
+    virtual const char* name() const override { return "Drawing"; }
+    virtual void dumpPropertiesAsDebugString(WTF::StringBuilder&) const override;
 #endif
+
+    RefPtr<const SkPicture> m_picture;
 };
 
 } // namespace blink

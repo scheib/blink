@@ -130,23 +130,22 @@ WebInspector.TimelineView.prototype = {
     {
         this._timelineGrid.removeEventDividers();
         var clientWidth = this._graphRowsElementWidth;
-        var dividers = [];
+        var dividers = new Map();
         var eventDividerRecords = this._model.eventDividerRecords();
 
         for (var i = 0; i < eventDividerRecords.length; ++i) {
             var record = eventDividerRecords[i];
             var position = this._calculator.computePosition(record.startTime());
             var dividerPosition = Math.round(position);
-            if (dividerPosition < 0 || dividerPosition >= clientWidth || dividers[dividerPosition])
+            if (dividerPosition < 0 || dividerPosition >= clientWidth || dividers.has(dividerPosition))
                 continue;
-            dividers[dividerPosition] = WebInspector.TimelineUIUtils.createDividerForRecord(record, dividerPosition);
+            dividers.set(dividerPosition, WebInspector.TimelineUIUtils.createDividerForRecord(record, dividerPosition));
         }
-        this._timelineGrid.addEventDividers(dividers);
+        this._timelineGrid.addEventDividers(dividers.valuesArray());
     },
 
     _updateFrameBars: function(frames)
     {
-        var clientWidth = this._graphRowsElementWidth;
         if (this._frameContainer) {
             this._frameContainer.removeChildren();
         } else {
@@ -555,7 +554,6 @@ WebInspector.TimelineView.prototype = {
 
         // Update visible rows.
         var listRowElement = this._sidebarListElement.firstChild;
-        var width = this._graphRowsElementWidth;
         this._itemsGraphsElement.removeChild(this._graphRowsElement);
         var graphRowElement = this._graphRowsElement.firstChild;
         var scheduleRefreshCallback = this._invalidateAndScheduleRefresh.bind(this, true, true);
@@ -1053,7 +1051,7 @@ WebInspector.TimelineRecordListRow = function(linkifier, target, selectRecord, s
 
     this._expandArrowElement = this.element.createChild("div", "timeline-tree-item-expand-arrow");
     this._expandArrowElement.addEventListener("click", this._onExpandClick.bind(this), false);
-    var iconElement = this.element.createChild("span", "timeline-tree-icon");
+    this.element.createChild("span", "timeline-tree-icon");
     this._typeElement = this.element.createChild("span", "type");
 
     this._dataElement = this.element.createChild("span", "data dimmed");

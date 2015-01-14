@@ -46,7 +46,7 @@ public:
         FontFace,
         Page,
         Keyframes,
-        Keyframe, // Not used. These are internally non-rule StyleKeyframe objects.
+        Keyframe,
         Supports = 12,
         Viewport = 15,
         Filter = 17
@@ -56,6 +56,7 @@ public:
 
     bool isFontFaceRule() const { return type() == FontFace; }
     bool isKeyframesRule() const { return type() == Keyframes; }
+    bool isKeyframeRule() const { return type() == Keyframe; }
     bool isMediaRule() const { return type() == Media; }
     bool isPageRule() const { return type() == Page; }
     bool isStyleRule() const { return type() == Style; }
@@ -95,8 +96,6 @@ private:
 
     unsigned m_type : 5;
 };
-
-WILL_BE_EAGERLY_TRACED(StyleRuleBase);
 
 class StyleRule : public StyleRuleBase {
     WTF_MAKE_FAST_ALLOCATED_WILL_BE_REMOVED;

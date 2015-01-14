@@ -25,6 +25,7 @@ class UnderlyingSource;
 
 class ReadableStream : public GarbageCollectedFinalized<ReadableStream>, public ScriptWrappable, public ActiveDOMObject {
     DEFINE_WRAPPERTYPEINFO();
+    WILL_BE_USING_GARBAGE_COLLECTED_MIXIN(ReadableStream);
 public:
     enum State {
         Readable,
@@ -46,7 +47,7 @@ public:
     String stateString() const;
 
     virtual ScriptValue read(ScriptState*, ExceptionState&) = 0;
-    ScriptPromise wait(ScriptState*);
+    ScriptPromise ready(ScriptState*);
     ScriptPromise cancel(ScriptState*, ScriptValue reason);
     ScriptPromise closed(ScriptState*);
 
@@ -56,7 +57,7 @@ public:
     void didSourceStart();
 
     bool hasPendingActivity() const override;
-    virtual void trace(Visitor*);
+    virtual void trace(Visitor*) override;
 
 protected:
     bool enqueuePreliminaryCheck();
@@ -81,7 +82,7 @@ private:
     bool m_isPulling;
     State m_state;
 
-    Member<WaitPromise> m_wait;
+    Member<WaitPromise> m_ready;
     Member<ClosedPromise> m_closed;
     RefPtrWillBeMember<DOMException> m_exception;
 };

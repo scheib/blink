@@ -67,7 +67,7 @@ static IntSize sizeFor(HTMLVideoElement* video)
 
 static ScriptPromise fulfillImageBitmap(ScriptState* scriptState, PassRefPtrWillBeRawPtr<ImageBitmap> imageBitmap)
 {
-    RefPtr<ScriptPromiseResolver> resolver = ScriptPromiseResolver::create(scriptState);
+    RefPtrWillBeRawPtr<ScriptPromiseResolver> resolver = ScriptPromiseResolver::create(scriptState);
     ScriptPromise promise = resolver->promise();
     if (imageBitmap) {
         resolver->resolve(imageBitmap);
@@ -104,7 +104,8 @@ ScriptPromise ImageBitmapFactories::createImageBitmap(ScriptState* scriptState, 
         exceptionState.throwSecurityError("The source image contains image data from multiple origins.");
         return ScriptPromise();
     }
-    if (!image->cachedImage()->passesAccessControlCheck(eventTarget.toDOMWindow()->document()->securityOrigin()) && eventTarget.toDOMWindow()->document()->securityOrigin()->taintsCanvas(image->src())) {
+    Document* document = eventTarget.toDOMWindow()->document();
+    if (!image->cachedImage()->passesAccessControlCheck(document, document->securityOrigin()) && document->securityOrigin()->taintsCanvas(image->src())) {
         exceptionState.throwSecurityError("Cross-origin access to the source image is denied.");
         return ScriptPromise();
     }
@@ -334,6 +335,7 @@ void ImageBitmapFactories::ImageBitmapLoader::didFail(FileError::ErrorCode)
 void ImageBitmapFactories::ImageBitmapLoader::trace(Visitor* visitor)
 {
     visitor->trace(m_factory);
+    visitor->trace(m_resolver);
 }
 
 } // namespace blink

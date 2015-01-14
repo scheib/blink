@@ -103,7 +103,7 @@ public:
 
     virtual void setResizable(bool) override { }
 
-    virtual bool shouldReportDetailedMessageForSource(const String&) override { return false; }
+    virtual bool shouldReportDetailedMessageForSource(LocalFrame&, const String&) override { return false; }
     virtual void addMessageToConsole(LocalFrame*, MessageSource, MessageLevel, const String&, unsigned, const String&, const String&) override { }
 
     virtual bool canRunBeforeUnloadConfirmPanel() override { return false; }
@@ -116,7 +116,7 @@ public:
     virtual bool runJavaScriptPrompt(LocalFrame*, const String&, const String&, String&) override { return false; }
 
     virtual bool hasOpenedPopup() const override { return false; }
-    virtual PassRefPtrWillBeRawPtr<PopupMenu> createPopupMenu(LocalFrame&, PopupMenuClient*) const override;
+    virtual PassRefPtrWillBeRawPtr<PopupMenu> createPopupMenu(LocalFrame&, PopupMenuClient*) override;
     virtual DOMWindow* pagePopupWindowForTesting() const override { return nullptr; }
 
     virtual void setStatusbarText(const String&) override { }
@@ -125,8 +125,7 @@ public:
 
     virtual IntRect windowResizerRect() const override { return IntRect(); }
 
-    virtual void invalidateContentsAndRootView(const IntRect&) override { }
-    virtual void invalidateContentsForSlowScroll(const IntRect&) override { }
+    virtual void invalidateRect(const IntRect&) override { }
     virtual void scheduleAnimation() override { }
 
     virtual IntRect rootViewToScreen(const IntRect& r) const override { return r; }
@@ -188,7 +187,7 @@ public:
     virtual void dispatchDidHandleOnloadEvents() override { }
     virtual void dispatchDidReceiveServerRedirectForProvisionalLoad() override { }
     virtual void dispatchWillClose() override { }
-    virtual void dispatchDidStartProvisionalLoad(bool isTransitionNavigation) override { }
+    virtual void dispatchDidStartProvisionalLoad(bool isTransitionNavigation, double triggeringEventTime) override { }
     virtual void dispatchDidReceiveTitle(const String&) override { }
     virtual void dispatchDidChangeIcons(IconType) override { }
     virtual void dispatchDidCommitLoad(LocalFrame*, HistoryItem*, HistoryCommitType) override { }
@@ -224,7 +223,7 @@ public:
     virtual void didDetectXSS(const KURL&, bool) override { }
     virtual void didDispatchPingLoader(const KURL&) override { }
     virtual void selectorMatchChanged(const Vector<String>&, const Vector<String>&) override { }
-    virtual PassRefPtrWillBeRawPtr<LocalFrame> createFrame(const KURL&, const AtomicString&, HTMLFrameOwnerElement*) override;
+    virtual PassRefPtrWillBeRawPtr<LocalFrame> createFrame(const KURL&, const AtomicString&, HTMLFrameOwnerElement*, ContentSecurityPolicyDisposition) override;
     virtual PassOwnPtrWillBeRawPtr<PluginPlaceholder> createPluginPlaceholder(Document&, const KURL&, const Vector<String>& paramNames, const Vector<String>& paramValues, const String& mimeType, bool loadManually) override;
     virtual PassRefPtrWillBeRawPtr<Widget> createPlugin(HTMLPlugInElement*, const KURL&, const Vector<String>&, const Vector<String>&, const String&, bool, DetachedPluginPolicy) override;
     virtual bool canCreatePluginWithoutRenderer(const String& mimeType) const override { return false; }

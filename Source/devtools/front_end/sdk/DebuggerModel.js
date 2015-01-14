@@ -56,6 +56,7 @@ WebInspector.DebuggerModel = function(target)
     WebInspector.settings.enableAsyncStackTraces.addChangeListener(this.asyncStackTracesStateChanged, this);
     WebInspector.settings.skipStackFramesPattern.addChangeListener(this._applySkipStackFrameSettings, this);
     WebInspector.settings.skipContentScripts.addChangeListener(this._applySkipStackFrameSettings, this);
+    WebInspector.settings.disablePausedStateOverlay.addChangeListener(this._updateOverlayMessage, this);
 
     this.enableDebugger();
 
@@ -199,7 +200,7 @@ WebInspector.DebuggerModel.prototype = {
         {
             this._agent.stepInto();
         }
-        this._agent.setOverlayMessage(undefined, callback.bind(this));
+        this._setOverlayMessage(undefined).then(callback.bind(this));
     },
 
     stepIntoAsync: function()
@@ -211,7 +212,7 @@ WebInspector.DebuggerModel.prototype = {
         {
             this._agent.stepIntoAsync();
         }
-        this._agent.setOverlayMessage(undefined, callback.bind(this));
+        this._setOverlayMessage(undefined).then(callback.bind(this));
     },
 
     stepOver: function()
@@ -223,7 +224,7 @@ WebInspector.DebuggerModel.prototype = {
         {
             this._agent.stepOver();
         }
-        this._agent.setOverlayMessage(undefined, callback.bind(this));
+        this._setOverlayMessage(undefined).then(callback.bind(this));
     },
 
     stepOut: function()
@@ -235,7 +236,7 @@ WebInspector.DebuggerModel.prototype = {
         {
             this._agent.stepOut();
         }
-        this._agent.setOverlayMessage(undefined, callback.bind(this));
+        this._setOverlayMessage(undefined).then(callback.bind(this));
     },
 
     resume: function()
@@ -247,7 +248,7 @@ WebInspector.DebuggerModel.prototype = {
         {
             this._agent.resume();
         }
-        this._agent.setOverlayMessage(undefined, callback.bind(this));
+        this._setOverlayMessage(undefined).then(callback.bind(this));
         this._isPausing = false;
     },
 
@@ -446,13 +447,39 @@ WebInspector.DebuggerModel.prototype = {
         this._debuggerPausedDetails = debuggerPausedDetails;
         if (this._debuggerPausedDetails)
             this.dispatchEventToListeners(WebInspector.DebuggerModel.Events.DebuggerPaused, this._debuggerPausedDetails);
-        if (debuggerPausedDetails) {
+        if (debuggerPausedDetails)
             this.setSelectedCallFrame(debuggerPausedDetails.callFrames[0]);
-            this._agent.setOverlayMessage(WebInspector.UIString("Paused in debugger"));
-        } else {
+        else
             this.setSelectedCallFrame(null);
-            this._agent.setOverlayMessage();
+        this._updateOverlayMessage();
+    },
+
+    _updateOverlayMessage: function()
+    {
+        var message = this._debuggerPausedDetails && !WebInspector.settings.disablePausedStateOverlay.get() ? WebInspector.UIString("Paused in debugger") : undefined;
+        this._setOverlayMessage(message);
+    },
+
+    /**
+     * @param {string=} message
+     * @return {!Promise.<undefined>}
+     */
+    _setOverlayMessage: function(message)
+    {
+        /**
+         * @param {function(?):?} fulfill
+         * @param {function(*):?} reject
+         * @this {WebInspector.DebuggerModel}
+         */
+        function setOverlayMessagePromiseCallback(fulfill, reject)
+        {
+            var pageAgent = this.target().pageAgent();
+            if (pageAgent)
+                pageAgent.setOverlayMessage(message, fulfill);
+            else
+                fulfill(undefined);
         }
+        return new Promise(setOverlayMessagePromiseCallback.bind(this));
     },
 
     /**
@@ -918,7 +945,7 @@ WebInspector.DebuggerModel.Location.prototype = {
      */
     id: function()
     {
-        return this.target().id() + ":" + this.scriptId + ":" + this.lineNumber + ":" + this.columnNumber
+        return this.target().id() + ":" + this.scriptId + ":" + this.lineNumber + ":" + this.columnNumber;
     },
 
     __proto__: WebInspector.SDKObject.prototype
@@ -999,7 +1026,7 @@ WebInspector.DebuggerModel.CallFrame.prototype = {
      */
     returnValue: function()
     {
-        return this._payload.returnValue ?  this.target().runtimeModel.createRemoteObject(this._payload.returnValue) : null
+        return this._payload.returnValue ?  this.target().runtimeModel.createRemoteObject(this._payload.returnValue) : null;
     },
 
     /**

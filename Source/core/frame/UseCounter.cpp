@@ -268,12 +268,8 @@ int UseCounter::mapCSSPropertyIdToCSSSampleIdForHistogram(int id)
     case CSSPropertyWebkitColumnSpan: return 225;
     case CSSPropertyWebkitColumnWidth: return 226;
     case CSSPropertyWebkitColumns: return 227;
-#if defined(ENABLE_CSS_BOX_DECORATION_BREAK) && ENABLE_CSS_BOX_DECORATION_BREAK
-    case CSSPropertyWebkitBoxDecorationBreak: return 228;
-#endif
-#if defined(ENABLE_CSS_FILTERS) && ENABLE_CSS_FILTERS
-    case CSSPropertyWebkitFilter: return 229;
-#endif
+    // 228 was CSSPropertyWebkitBoxDecorationBreak (duplicated due to #ifdef).
+    // 229 was CSSPropertyWebkitFilter (duplicated due to #ifdef).
     case CSSPropertyAlignContent: return 230;
     case CSSPropertyAlignItems: return 231;
     case CSSPropertyAlignSelf: return 232;
@@ -389,12 +385,8 @@ int UseCounter::mapCSSPropertyIdToCSSSampleIdForHistogram(int id)
     // case CSSPropertyWebkitWrapFlow: return 350;
     // case CSSPropertyWebkitWrapThrough: return 351;
     // CSSPropertyWebkitWrap was 352.
-#if defined(ENABLE_TOUCH_EVENTS) && ENABLE_TOUCH_EVENTS
-    case CSSPropertyWebkitTapHighlightColor: return 353;
-#endif
-#if defined(ENABLE_DRAGGABLE_REGION) && ENABLE_DRAGGABLE_REGION
-    case CSSPropertyWebkitAppRegion: return 354;
-#endif
+    // 353 was CSSPropertyWebkitTapHighlightColor (duplicated due to #ifdef).
+    // 354 was CSSPropertyWebkitAppRegion (duplicated due to #ifdef).
     case CSSPropertyClipPath: return 355;
     case CSSPropertyClipRule: return 356;
     case CSSPropertyMask: return 357;
@@ -499,6 +491,10 @@ int UseCounter::mapCSSPropertyIdToCSSSampleIdForHistogram(int id)
     case CSSPropertyAll: return 454;
     case CSSPropertyJustifyItems: return 455;
     case CSSPropertyScrollBlocksOn: return 456;
+    case CSSPropertyMotionPath: return 457;
+    case CSSPropertyMotionPosition: return 458;
+    case CSSPropertyMotionRotation: return 459;
+    case CSSPropertyMotion: return 460;
 
     // 1. Add new features above this line (don't change the assigned numbers of the existing
     // items).
@@ -515,7 +511,7 @@ int UseCounter::mapCSSPropertyIdToCSSSampleIdForHistogram(int id)
     return 0;
 }
 
-static int maximumCSSSampleId() { return 456; }
+static int maximumCSSSampleId() { return 460; }
 
 void UseCounter::muteForInspector()
 {
@@ -665,7 +661,6 @@ void UseCounter::countDeprecationIfNotPrivateScript(v8::Isolate* isolate, Execut
     UseCounter::countDeprecation(context, feature);
 }
 
-// FIXME: Update other UseCounter::deprecationMessage() cases to use this.
 static String replacedBy(const char* oldString, const char* newString)
 {
     return String::format("'%s' is deprecated. Please use '%s' instead.", oldString, newString);
@@ -683,7 +678,7 @@ String UseCounter::deprecationMessage(Feature feature)
         return replacedBy("KeyboardEvent.keyLocation", "KeyboardEvent.location");
 
     case ConsoleMarkTimeline:
-        return "console.markTimeline is deprecated. Please use the console.timeStamp instead.";
+        return replacedBy("console.markTimeline", "console.timeStamp");
 
     case FileError:
         return "FileError is deprecated. Please use the 'name' or 'message' attributes of DOMError rather than 'code'.";
@@ -698,22 +693,19 @@ String UseCounter::deprecationMessage(Feature feature)
         return "'HTMLVideoElement.webkitSupportsFullscreen' is deprecated. Its value is true if the video is loaded.";
 
     case PrefixedVideoDisplayingFullscreen:
-        return "'HTMLVideoElement.webkitDisplayingFullscreen' is deprecated. Please use the 'fullscreenchange' and 'webkitfullscreenchange' events instead.";
+        return "'HTMLVideoElement.webkitDisplayingFullscreen' is deprecated. Please use the 'fullscreenchange' event instead.";
 
     case PrefixedVideoEnterFullscreen:
-        return "'HTMLVideoElement.webkitEnterFullscreen()' is deprecated. Please use 'Element.requestFullscreen()' and 'Element.webkitRequestFullscreen()' instead.";
+        return replacedBy("HTMLVideoElement.webkitEnterFullscreen()", "Element.requestFullscreen()");
 
     case PrefixedVideoExitFullscreen:
-        return "'HTMLVideoElement.webkitExitFullscreen()' is deprecated. Please use 'Document.exitFullscreen()' and 'Document.webkitExitFullscreen()' instead.";
+        return replacedBy("HTMLVideoElement.webkitExitFullscreen()", "Document.exitFullscreen()");
 
     case PrefixedVideoEnterFullScreen:
-        return "'HTMLVideoElement.webkitEnterFullScreen()' is deprecated. Please use 'Element.requestFullscreen()' and 'Element.webkitRequestFullscreen()' instead.";
+        return replacedBy("HTMLVideoElement.webkitEnterFullScreen()", "Element.requestFullscreen()");
 
     case PrefixedVideoExitFullScreen:
-        return "'HTMLVideoElement.webkitExitFullScreen()' is deprecated. Please use 'Document.exitFullscreen()' and 'Document.webkitExitFullscreen()' instead.";
-
-    case PrefixedGamepad:
-        return replacedBy("navigator.webkitGetGamepads", "navigator.getGamepads");
+        return replacedBy("HTMLVideoElement.webkitExitFullScreen()", "Document.exitFullscreen()");
 
     case PrefixedIndexedDB:
         return replacedBy("webkitIndexedDB", "indexedDB");
@@ -764,16 +756,16 @@ String UseCounter::deprecationMessage(Feature feature)
         return "Setting 'XMLHttpRequest.withCredentials' for synchronous requests is deprecated.";
 
     case EventSourceURL:
-        return "'EventSource.URL' is deprecated. Please use 'EventSource.url' instead.";
+        return replacedBy("EventSource.URL", "EventSource.url");
 
     case WebSocketURL:
-        return "'WebSocket.URL' is deprecated. Please use 'WebSocket.url' instead.";
+        return replacedBy("WebSocket.URL", "WebSocket.url");
 
     case HTMLTableElementVspace:
-        return "The 'vspace' attribute on table is deprecated. Please use CSS instead.";
+        return "The 'vspace' attribute on table is deprecated. Please use CSS margin-top and margin-bottom property instead.";
 
     case HTMLTableElementHspace:
-        return "The 'hspace' attribute on table is deprecated. Please use CSS instead.";
+        return "The 'hspace' attribute on table is deprecated. Please use CSS margin-left and margin-right property instead.";
 
     case PictureSourceSrc:
         return "<source src> with a <picture> parent is invalid and therefore ignored. Please use <source srcset> instead.";
@@ -785,16 +777,13 @@ String UseCounter::deprecationMessage(Feature feature)
         return "The XMLHttpRequest progress event property 'totalSize' is deprecated. Please use 'total' instead.";
 
     case ConsoleTimeline:
-        return "console.timeline is deprecated. Please use the console.time instead.";
+        return replacedBy("console.timeline", "console.time");
 
     case ConsoleTimelineEnd:
-        return "console.timelineEnd is deprecated. Please use the console.timeEnd instead.";
+        return replacedBy("console.timelineEnd", "console.timeEnd");
 
     case XMLHttpRequestSynchronousInNonWorkerOutsideBeforeUnload:
         return "Synchronous XMLHttpRequest on the main thread is deprecated because of its detrimental effects to the end user's experience. For more help, check http://xhr.spec.whatwg.org/.";
-
-    case FontFaceSetReady:
-        return "document.fonts.ready() method is going to be replaced with document.fonts.ready attribute in future releases. Please be prepared. For more help, check https://code.google.com/p/chromium/issues/detail?id=392077#c3 .";
 
     case DOMImplementationHasFeatureReturnFalse:
         return "'DOMImplementation.hasFeature()' returning false is deprecated. Please do not use it, as per DOM it should always return true (https://dom.spec.whatwg.org/#dom-domimplementation-hasfeature).";
@@ -804,6 +793,42 @@ String UseCounter::deprecationMessage(Feature feature)
 
     case DocumentSetCharset:
         return "Setting 'Document.charset' is deprecated. Please use '<meta charset=\"UTF-8\">' instead.";
+
+    case PrefixedImageSmoothingEnabled:
+        return replacedBy("CanvasRenderingContext2D.webkitImageSmoothingEnabled", "CanvasRenderingContext2D.imageSmoothingEnabled");
+
+    case AudioListenerDopplerFactor:
+        return "dopplerFactor is deprecated and will be removed in M45 when all doppler effects are removed";
+
+    case AudioListenerSpeedOfSound:
+        return "speedOfSound is deprecated and will be removed in M45 when all doppler effects are removed";
+
+    case AudioListenerSetVelocity:
+        return "setVelocity() is deprecated and will be removed in M45 when all doppler effects are removed";
+
+    case ShadowRootGetElementsByClassName:
+        return "ShadowRoot.getElementsByClassName() is deprecated. Please use 'querySelectorAll' instead";
+
+    case ShadowRootGetElementsByTagName:
+        return "ShadowRoot.getElementsByTagName() is deprecated. Please use 'querySelectorAll' instead";
+
+    case ShadowRootGetElementsByTagNameNS:
+        return "ShadowRoot.getElementsByTagNameNS() is deprecated. Please use 'querySelectorAll' instead";
+
+    case PrefixedWindowURL:
+        return replacedBy("webkitURL", "URL");
+
+    case PrefixedAudioContext:
+        return replacedBy("webkitAudioContext", "AudioContext");
+
+    case PrefixedOfflineAudioContext:
+        return replacedBy("webkitOfflineAudioContext", "OfflineAudioContext");
+
+    case RangeCompareNode:
+        return replacedBy("Range.compareNode()", "Range.compareBoundaryPoints()");
+
+    case RangeExpand:
+        return replacedBy("Range.expand()", "Selection.modify()");
 
     // Features that aren't deprecated don't have a deprecation message.
     default:

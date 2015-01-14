@@ -39,6 +39,7 @@
 #include "core/html/HTMLImageLoader.h"
 #include "core/html/PluginDocument.h"
 #include "core/loader/FrameLoaderClient.h"
+#include "core/loader/MixedContentChecker.h"
 #include "core/page/EventHandler.h"
 #include "core/page/Page.h"
 #include "core/page/scrolling/ScrollingCoordinator.h"
@@ -53,6 +54,7 @@
 #include "platform/MIMETypeRegistry.h"
 #include "platform/Widget.h"
 #include "platform/plugins/PluginData.h"
+#include "public/platform/WebURLRequest.h"
 
 namespace blink {
 
@@ -510,7 +512,7 @@ bool HTMLPlugInElement::requestObject(const String& url, const String& mimeType,
     // loadOrRedirectSubframe will re-use it. Otherwise, it will create a new
     // frame and set it as the RenderPart's widget, causing what was previously
     // in the widget to be torn down.
-    return loadOrRedirectSubframe(completedURL, getNameAttribute(), true);
+    return loadOrRedirectSubframe(completedURL, getNameAttribute(), true, CheckContentSecurityPolicy);
 }
 
 bool HTMLPlugInElement::loadPlugin(const KURL& url, const String& mimeType, const Vector<String>& paramNames, const Vector<String>& paramValues, bool useFallback, bool requireRenderer)
@@ -639,7 +641,7 @@ bool HTMLPlugInElement::pluginIsLoadable(const KURL& url, const String& mimeType
         return false;
     }
 
-    return frame->loader().mixedContentChecker()->canRunInsecureContent(document().securityOrigin(), url);
+    return !MixedContentChecker::shouldBlockFetch(frame, WebURLRequest::RequestContextObject, WebURLRequest::FrameTypeNone, url);
 }
 
 void HTMLPlugInElement::didAddUserAgentShadowRoot(ShadowRoot&)

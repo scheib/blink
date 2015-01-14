@@ -153,6 +153,7 @@
 #include "modules/push_messaging/PushController.h"
 #include "modules/screen_orientation/ScreenOrientationController.h"
 #include "modules/speech/SpeechRecognitionController.h"
+#include "platform/ScriptForbiddenScope.h"
 #include "platform/TraceEvent.h"
 #include "platform/UserGestureIndicator.h"
 #include "platform/clipboard/ClipboardUtilities.h"
@@ -542,7 +543,7 @@ WebRemoteFrame* WebLocalFrameImpl::toWebRemoteFrame()
 
 void WebLocalFrameImpl::close()
 {
-    m_client = 0;
+    m_client = nullptr;
 
 #if ENABLE(OILPAN)
     m_selfKeepAlive.clear();
@@ -570,7 +571,7 @@ WebVector<WebIconURL> WebLocalFrameImpl::iconURLs(int iconTypesMask) const
 {
     // The URL to the icon may be in the header. As such, only
     // ask the loader for the icon if it's finished loading.
-    if (frame()->loader().state() == FrameStateComplete)
+    if (frame()->document()->loadEventFinished())
         return frame()->document()->iconURLs(iconTypesMask);
     return WebVector<WebIconURL>();
 }
@@ -707,7 +708,7 @@ void WebLocalFrameImpl::dispatchUnloadEvent()
 
 NPObject* WebLocalFrameImpl::windowObject() const
 {
-    if (!frame())
+    if (!frame() || ScriptForbiddenScope::isScriptForbidden())
         return 0;
     return frame()->script().windowScriptNPObject();
 }
@@ -799,7 +800,12 @@ void WebLocalFrameImpl::collectGarbage()
 bool WebLocalFrameImpl::checkIfRunInsecureContent(const WebURL& url) const
 {
     ASSERT(frame());
-    return frame()->loader().mixedContentChecker()->canFrameInsecureContent(frame()->document()->securityOrigin(), url);
+
+    // This is only called (eventually, through proxies and delegates and IPC) from
+    // PluginURLFetcher::OnReceivedRedirect for redirects of NPAPI resources.
+    //
+    // FIXME: Remove this method entirely once we smother NPAPI.
+    return MixedContentChecker::shouldBlockFetch(frame(), WebURLRequest::RequestContextObject, WebURLRequest::FrameTypeNone, url);
 }
 
 v8::Handle<v8::Value> WebLocalFrameImpl::executeScriptAndReturnValue(const WebScriptSource& source)
@@ -817,7 +823,7 @@ void WebLocalFrameImpl::requestExecuteScriptAndReturnValue(const WebScriptSource
     SuspendableScriptExecutor::createAndRun(frame(), 0, createSourcesVector(&source, 1), 0, userGesture, callback);
 }
 
-void WebLocalFrameImpl::executeScriptInIsolatedWorld(int worldID, const WebScriptSource* sourcesIn, unsigned numSources, int extensionGroup, WebVector<v8::Local<v8::Value> >* results)
+void WebLocalFrameImpl::executeScriptInIsolatedWorld(int worldID, const WebScriptSource* sourcesIn, unsigned numSources, int extensionGroup, WebVector<v8::Local<v8::Value>>* results)
 {
     ASSERT(frame());
     RELEASE_ASSERT(worldID > 0);
@@ -826,9 +832,9 @@ void WebLocalFrameImpl::executeScriptInIsolatedWorld(int worldID, const WebScrip
     Vector<ScriptSourceCode> sources = createSourcesVector(sourcesIn, numSources);
 
     if (results) {
-        Vector<v8::Local<v8::Value> > scriptResults;
+        Vector<v8::Local<v8::Value>> scriptResults;
         frame()->script().executeScriptInIsolatedWorld(worldID, sources, extensionGroup, &scriptResults);
-        WebVector<v8::Local<v8::Value> > v8Results(scriptResults.size());
+        WebVector<v8::Local<v8::Value>> v8Results(scriptResults.size());
         for (unsigned i = 0; i < scriptResults.size(); i++)
             v8Results[i] = v8::Local<v8::Value>::New(toIsolate(frame()), scriptResults[i]);
         results->swap(v8Results);
@@ -1166,7 +1172,7 @@ WebString WebLocalFrameImpl::selectionAsMarkup() const
     if (!range)
         return WebString();
 
-    return createMarkup(range.get(), 0, AnnotateForInterchange, false, ResolveNonLocalURLs);
+    return createMarkup(range.get(), AnnotateForInterchange, false, ResolveNonLocalURLs);
 }
 
 void WebLocalFrameImpl::selectWordAroundPosition(LocalFrame* frame, VisiblePosition position)
@@ -1189,7 +1195,7 @@ void WebLocalFrameImpl::selectRange(const WebPoint& base, const WebPoint& extent
 
 void WebLocalFrameImpl::selectRange(const WebRange& webRange)
 {
-    if (RefPtrWillBeRawPtr<Range> range = static_cast<PassRefPtrWillBeRawPtr<Range> >(webRange))
+    if (RefPtrWillBeRawPtr<Range> range = static_cast<PassRefPtrWillBeRawPtr<Range>>(webRange))
         frame()->selection().setSelectedRange(range.get(), VP_DEFAULT_AFFINITY, FrameSelection::NonDirectional, NotUserTriggered);
 }
 
@@ -1291,7 +1297,7 @@ WebPlugin* WebLocalFrameImpl::focusedPluginIfInputMethodSupported()
 int WebLocalFrameImpl::printBegin(const WebPrintParams& printParams, const WebNode& constrainToNode)
 {
     ASSERT(!frame()->document()->isFrameSet());
-    WebPluginContainerImpl* pluginContainer = 0;
+    WebPluginContainerImpl* pluginContainer = nullptr;
     if (constrainToNode.isNull()) {
         // If this is a plugin document, check if the plugin supports its own
         // printing. If it does, we will delegate all printing to that.
@@ -1552,6 +1558,7 @@ WebLocalFrameImpl* WebLocalFrameImpl::create(WebFrameClient* client)
 
 WebLocalFrameImpl::WebLocalFrameImpl(WebFrameClient* client)
     : m_frameLoaderClientImpl(this)
+    , m_frameWidget(0)
     , m_client(client)
     , m_autofillClient(0)
     , m_permissionClient(0)
@@ -1652,7 +1659,7 @@ PassRefPtrWillBeRawPtr<LocalFrame> WebLocalFrameImpl::createChildFrame(const Fra
     if (childItem)
         child->loader().loadHistoryItem(childItem.get(), FrameLoadTypeInitialHistoryLoad);
     else
-        child->loader().load(FrameLoadRequest(request.originDocument(), request.resourceRequest(), "_self"));
+        child->loader().load(FrameLoadRequest(request.originDocument(), request.resourceRequest(), "_self", request.shouldCheckMainWorldContentSecurityPolicy()));
 
     // Note a synchronous navigation (about:blank) would have already processed
     // onload, so it is possible for the child frame to have already been
@@ -1860,7 +1867,7 @@ void WebLocalFrameImpl::loadJavaScriptURL(const KURL& url)
 void WebLocalFrameImpl::initializeToReplaceRemoteFrame(WebRemoteFrame* oldWebFrame)
 {
     Frame* oldFrame = toCoreFrame(oldWebFrame);
-    OwnPtr<FrameOwner> tempOwner = adoptPtr(new PlaceholderFrameOwner());
+    OwnPtrWillBePersistent<FrameOwner> tempOwner = adoptPtrWillBeNoop(new PlaceholderFrameOwner());
     m_frame = LocalFrame::create(&m_frameLoaderClientImpl, oldFrame->host(), tempOwner.get());
     m_frame->setOwner(oldFrame->owner());
     m_frame->tree().setName(oldFrame->tree().name());
@@ -1869,6 +1876,7 @@ void WebLocalFrameImpl::initializeToReplaceRemoteFrame(WebRemoteFrame* oldWebFra
     // during init(). Note that this may dispatch JS events; the frame may be
     // detached after init() returns.
     m_frame->init();
+    m_frame->loader().stateMachine()->advanceTo(m_frameLoaderClientImpl.backForwardLength() > 1 ? FrameLoaderStateMachine::CommittedMultipleRealLoads : FrameLoaderStateMachine::CommittedFirstRealLoad);
 }
 
 void WebLocalFrameImpl::setAutofillClient(WebAutofillClient* autofillClient)
@@ -1893,7 +1901,7 @@ bool WebLocalFrameImpl::isLoading() const
 {
     if (!frame() || !frame()->document())
         return false;
-    return frame()->loader().stateMachine()->isDisplayingInitialEmptyDocument() || !frame()->document()->loadEventFinished();
+    return frame()->loader().stateMachine()->isDisplayingInitialEmptyDocument() || frame()->loader().provisionalDocumentLoader() || !frame()->document()->loadEventFinished();
 }
 
 bool WebLocalFrameImpl::isResourceLoadInProgress() const
@@ -1999,6 +2007,16 @@ void WebLocalFrameImpl::invalidateAll() const
     FrameView* view = frame()->view();
     view->invalidateRect(view->frameRect());
     invalidateScrollbar();
+}
+
+void WebLocalFrameImpl::setFrameWidget(WebFrameWidgetImpl* frameWidget)
+{
+    m_frameWidget = frameWidget;
+}
+
+WebFrameWidgetImpl* WebLocalFrameImpl::frameWidget() const
+{
+    return m_frameWidget;
 }
 
 } // namespace blink

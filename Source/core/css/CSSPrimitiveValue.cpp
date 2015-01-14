@@ -539,7 +539,7 @@ double CSSPrimitiveValue::computeSeconds()
     return 0;
 }
 
-double CSSPrimitiveValue::computeDegrees()
+double CSSPrimitiveValue::computeDegrees() const
 {
     ASSERT(isAngle() || (isCalculated() && cssCalcValue()->category() == CalcAngle));
     UnitType currentType = isCalculated() ? cssCalcValue()->expressionNode()->primitiveType() : static_cast<UnitType>(m_primitiveUnitType);
@@ -665,18 +665,29 @@ double CSSPrimitiveValue::computeLengthDouble(const CSSToLengthConversionData& c
     return result * conversionData.zoom();
 }
 
-void CSSPrimitiveValue::accumulateLengthArray(CSSLengthArray& lengthArray, double multiplier) const
+void CSSPrimitiveValue::accumulateLengthArray(CSSLengthArray& lengthArray, CSSLengthTypeArray& lengthTypeArray, double multiplier) const
 {
     ASSERT(lengthArray.size() == LengthUnitTypeCount);
 
     if (m_primitiveUnitType == CSS_CALC) {
-        cssCalcValue()->accumulateLengthArray(lengthArray, multiplier);
+        cssCalcValue()->accumulateLengthArray(lengthArray, lengthTypeArray, multiplier);
         return;
     }
 
     LengthUnitType lengthType;
-    if (unitTypeToLengthUnitType(static_cast<UnitType>(m_primitiveUnitType), lengthType))
+    if (unitTypeToLengthUnitType(static_cast<UnitType>(m_primitiveUnitType), lengthType)) {
         lengthArray.at(lengthType) += m_value.num * conversionToCanonicalUnitsScaleFactor(static_cast<UnitType>(m_primitiveUnitType)) * multiplier;
+        lengthTypeArray.set(lengthType);
+    }
+}
+
+void CSSPrimitiveValue::accumulateLengthArray(CSSLengthArray& lengthArray, double multiplier) const
+{
+    CSSLengthTypeArray lengthTypeArray;
+    lengthTypeArray.resize(CSSPrimitiveValue::LengthUnitTypeCount);
+    for (size_t i = 0; i < CSSPrimitiveValue::LengthUnitTypeCount; ++i)
+        lengthTypeArray.clear(i);
+    return CSSPrimitiveValue::accumulateLengthArray(lengthArray, lengthTypeArray, multiplier);
 }
 
 double CSSPrimitiveValue::conversionToCanonicalUnitsScaleFactor(UnitType unitType)
@@ -1014,9 +1025,6 @@ const char* CSSPrimitiveValue::unitTypeToString(UnitType type)
 
 String CSSPrimitiveValue::customCSSText(CSSTextFormattingFlags formattingFlag) const
 {
-    // FIXME: return the original value instead of a generated one (e.g. color
-    // name if it was specified) - check what spec says about this
-
     if (m_hasCachedCSSText) {
         ASSERT(cssTextCache().contains(this));
         return cssTextCache().get(this);

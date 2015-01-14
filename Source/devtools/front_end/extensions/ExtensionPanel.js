@@ -41,7 +41,6 @@ WebInspector.ExtensionPanel = function(server, id, pageURL)
     WebInspector.Panel.call(this, id);
     this._server = server;
     this.setHideOnDetach();
-    this.element.classList.add("extension-panel");
     this._panelStatusBar = new WebInspector.StatusBar(this.element);
     this._panelStatusBar.element.classList.add("hidden");
 
@@ -309,7 +308,7 @@ WebInspector.ExtensionSidebarPane.prototype = {
         var section = new WebInspector.ObjectPropertiesSection(object, title);
         if (!title)
             section.headerElement.classList.add("hidden");
-        section.expanded = true;
+        section.expand();
         section.editable = false;
         this._objectPropertiesView.element.appendChild(section.element);
         callback();

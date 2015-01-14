@@ -57,6 +57,7 @@ void DictionaryTest::set(const InternalDictionary& testingDictionary)
     m_objectOrNullMemberWithDefault = testingDictionary.objectOrNullMemberWithDefault();
     if (testingDictionary.hasDoubleOrStringMember())
         m_doubleOrStringMember = testingDictionary.doubleOrStringMember();
+    m_eventTargetOrNullMember = testingDictionary.eventTargetOrNullMember();
 }
 
 void DictionaryTest::get(InternalDictionary& result)
@@ -95,6 +96,7 @@ void DictionaryTest::get(InternalDictionary& result)
     result.setObjectOrNullMemberWithDefault(m_objectOrNullMemberWithDefault);
     if (!m_doubleOrStringMember.isNull())
         result.setDoubleOrStringMember(m_doubleOrStringMember);
+    result.setEventTargetOrNullMember(m_eventTargetOrNullMember);
 }
 
 void DictionaryTest::setDerived(const InternalDictionaryDerived& derived)
@@ -114,18 +116,18 @@ void DictionaryTest::getDerived(InternalDictionaryDerived& result)
 
 void DictionaryTest::reset()
 {
-    m_longMember = Nullable<int>();
-    m_longMemberWithClamp = Nullable<int>();
-    m_longMemberWithEnforceRange = Nullable<int>();
+    m_longMember = nullptr;
+    m_longMemberWithClamp = nullptr;
+    m_longMemberWithEnforceRange = nullptr;
     m_longMemberWithDefault = -1; // This value should not be returned.
-    m_longOrNullMember = Nullable<int>();
-    m_longOrNullMemberWithDefault = Nullable<int>();
-    m_booleanMember = Nullable<bool>();
-    m_doubleMember = Nullable<double>();
+    m_longOrNullMember = nullptr;
+    m_longOrNullMemberWithDefault = nullptr;
+    m_booleanMember = nullptr;
+    m_doubleMember = nullptr;
     m_stringMember = String();
     m_stringMemberWithDefault = String("Should not be returned");
-    m_stringSequenceMember = Nullable<Vector<String> >();
-    m_stringSequenceOrNullMember = Nullable<Vector<String> >();
+    m_stringSequenceMember = nullptr;
+    m_stringSequenceOrNullMember = nullptr;
     m_enumMember = String();
     m_enumMemberWithDefault = String();
     m_enumOrNullMember = String();
@@ -134,6 +136,7 @@ void DictionaryTest::reset()
     m_objectMember = ScriptValue();
     m_objectOrNullMemberWithDefault = ScriptValue();
     m_doubleOrStringMember = DoubleOrString();
+    m_eventTargetOrNullMember = nullptr;
     m_derivedStringMember = String();
     m_derivedStringMemberWithDefault = String();
 }
@@ -142,6 +145,7 @@ void DictionaryTest::trace(Visitor* visitor)
 {
     visitor->trace(m_elementMember);
     visitor->trace(m_elementOrNullMember);
+    visitor->trace(m_eventTargetOrNullMember);
 }
 
 }

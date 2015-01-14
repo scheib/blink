@@ -193,6 +193,8 @@ public:
 
     void updateScrollingBlockSelection();
 
+    DisplayItemClient displayItemClient() const { return static_cast<DisplayItemClientInternalVoid*>((void*)this); }
+
 private:
     static const GraphicsLayerPaintInfo* containingSquashedLayer(const RenderObject*,  const Vector<GraphicsLayerPaintInfo>& layers, unsigned maxSquashedLayerIndex);
 
@@ -256,6 +258,7 @@ private:
     void updateTransform(const RenderStyle*);
     void updateLayerBlendMode(const RenderStyle*);
     void updateIsRootForIsolatedGroup();
+    void updateScrollBlocksOn(const RenderStyle*);
     // Return the opacity value that this layer should use for compositing.
     float compositingOpacity(float rendererOpacity) const;
 

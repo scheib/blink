@@ -3,23 +3,25 @@
     "prefix": "gpu",
     "base": "fast/canvas",
     "args": ["--enable-accelerated-2d-canvas",
-             "--disable-display-list-2d-canvas"]
+             "--disable-display-list-2d-canvas",
+             "--enable-impl-side-painting"]
   },
   {
     "prefix": "gpu",
     "base": "canvas/philip",
     "args": ["--enable-accelerated-2d-canvas",
-             "--disable-display-list-2d-canvas"]
+             "--disable-display-list-2d-canvas",
+             "--enable-impl-side-painting"]
   },
   {
     "prefix": "display_list_2d_canvas",
     "base": "fast/canvas",
-    "args": ["--force-display-list-2d-canvas"]
+    "args": ["--force-display-list-2d-canvas", "--enable-impl-side-painting"]
   },
   {
     "prefix": "display_list_2d_canvas",
     "base": "canvas/philip",
-    "args": ["--force-display-list-2d-canvas"]
+    "args": ["--force-display-list-2d-canvas", "--enable-impl-side-painting"]
   },
   {
     "prefix": "threaded",
@@ -46,12 +48,14 @@
   {
     "prefix": "prefer_compositing_to_lcd_text",
     "base": "compositing/overflow",
-    "args": ["--enable-prefer-compositing-to-lcd-text"]
+    "args": ["--enable-prefer-compositing-to-lcd-text",
+             "--enable-impl-side-painting"]
   },
   {
     "prefix": "prefer_compositing_to_lcd_text",
     "base": "scrollbars",
-    "args": ["--enable-prefer-compositing-to-lcd-text"]
+    "args": ["--enable-prefer-compositing-to-lcd-text",
+             "--enable-impl-side-painting"]
   },
   {
     "prefix": "threaded",
@@ -89,11 +93,6 @@
              "--disable-composited-antialiasing"]
   },
   {
-    "prefix": "implsidepainting",
-    "base": "inspector/tracing",
-    "args": ["--enable-threaded-compositing", "--enable-impl-side-painting"]
-  },
-  {
     "prefix": "stable",
     "base": "fast/css3-text/css3-text-decoration/stable",
     "args": ["--stable-release-mode"]
@@ -112,7 +111,8 @@
     "prefix": "antialiasedtext",
     "base": "fast/text",
     "args": ["--enable-direct-write",
-             "--enable-font-antialiasing"]
+             "--enable-font-antialiasing",
+             "--enable-impl-side-painting"]
   },
   {
     "prefix": "threaded",
@@ -121,53 +121,88 @@
   },
   {
     "prefix": "regionbasedmulticol",
-    "base": "fast/multicol",
+    "base": "compositing/columns",
     "args": ["--enable-region-based-columns"]
   },
   {
     "prefix": "regionbasedmulticol",
+    "base": "fast/multicol",
+    "args": ["--enable-region-based-columns", "--enable-impl-side-painting"]
+  },
+  {
+    "prefix": "regionbasedmulticol",
     "base": "fast/pagination",
-    "args": ["--enable-region-based-columns"]
-  },
-  {
-    "prefix": "textblob",
-    "base": "fast/text",
-    "args": ["--enable-text-blobs"]
-  },
-  {
-    "prefix": "textblob",
-    "base": "svg/text",
-    "args": ["--enable-text-blobs"]
+    "args": ["--enable-region-based-columns", "--enable-impl-side-painting"]
   },
   {
     "prefix": "slimmingpaint",
     "base": "fast/block",
-    "args": ["--enable-slimming-paint"]
+    "args": ["--enable-slimming-paint", "--enable-impl-side-painting"]
   },
   {
     "prefix": "slimmingpaint",
     "base": "fast/inline",
-    "args": ["--enable-slimming-paint"]
+    "args": ["--enable-slimming-paint", "--enable-impl-side-painting"]
   },
   {
     "prefix": "slimmingpaint",
     "base": "fast/inline-block",
-    "args": ["--enable-slimming-paint"]
+    "args": ["--enable-slimming-paint", "--enable-impl-side-painting"]
   },
   {
     "prefix": "slimmingpaint",
     "base": "fast/images",
-    "args": ["--enable-slimming-paint"]
+    "args": ["--enable-slimming-paint", "--enable-impl-side-painting"]
   },
   {
     "prefix": "slimmingpaint",
     "base": "fast/table",
-    "args": ["--enable-slimming-paint"]
+    "args": ["--enable-slimming-paint", "--enable-impl-side-painting"]
   },
   {
     "prefix": "slimmingpaint",
     "base": "fast/text",
-    "args": ["--enable-slimming-paint"]
+    "args": ["--enable-slimming-paint", "--enable-impl-side-painting"]
+  },
+  {
+    "prefix": "slimmingpaint",
+    "base": "fast/overflow",
+    "args": ["--enable-slimming-paint", "--enable-impl-side-painting"]
+  },
+  {
+    "prefix": "slimmingpaint",
+    "base": "fast/borders",
+    "args": ["--enable-slimming-paint", "--enable-impl-side-painting"]
+  },
+  {
+    "prefix": "slimmingpaint",
+    "base": "fast/events",
+    "args": ["--enable-slimming-paint", "--enable-impl-side-painting"]
+  },
+  {
+    "prefix": "slimmingpaint",
+    "base": "svg/text",
+    "args": ["--enable-slimming-paint", "--enable-impl-side-painting"]
+  },
+  {
+    "prefix": "slimmingpaint",
+    "base": "svg/stroke",
+    "args": ["--enable-slimming-paint", "--enable-impl-side-painting"]
+  },
+  {
+    "prefix": "slimmingpaint",
+    "base": "svg/foreignObject",
+    "args": ["--enable-slimming-paint", "--enable-impl-side-painting"]
+  },
+  {
+    "prefix": "slimmingpaint",
+    "base": "fast/css",
+    "args": ["--enable-slimming-paint", "--enable-impl-side-painting"]
+  },
+  {
+    "prefix": "slimmingpaint",
+    "base": "fast/multicol",
+    "args": ["--enable-slimming-paint", "--enable-impl-side-painting", "--enable-region-based-columns"]
   },
   {
     "prefix": "rootlayerscrolls",

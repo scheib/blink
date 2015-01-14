@@ -2,7 +2,8 @@
 <head>
 <link rel="stylesheet" href="resources/add-rule.css"/>
 <script type="text/javascript" src="../../http/tests/inspector-protocol/inspector-protocol-test.js"></script>
-<script type="text/javascript" src="css-protocol-test.js"></script>
+<script type="text/javascript" src="../../http/tests/inspector-protocol/css-protocol-test.js"></script>
+<script type="text/javascript" src="../../http/tests/inspector-protocol/dom-protocol-test.js"></script>
 <script type="text/javascript">
 function test()
 {
@@ -139,7 +140,7 @@ function test()
         function testAddingRuleInsideMedia1(next)
         {
             verifyProtocolError({
-                location: { startLine: 12, startColumn: 3, endLine: 12, endColumn: 3 },
+                location: { startLine: 12, startColumn: 9, endLine: 12, endColumn: 9 },
                 ruleText: "#test { content: 'EDITED'; }",
             }, next);
         },

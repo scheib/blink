@@ -72,8 +72,9 @@ WebInspector.PaintProfilerView.prototype = {
     /**
      * @param {?WebInspector.PaintProfilerSnapshot} snapshot
      * @param {!Array.<!WebInspector.PaintProfilerLogItem>} log
+     * @param {?DOMAgent.Rect} clipRect
      */
-    setSnapshotAndLog: function(snapshot, log)
+    setSnapshotAndLog: function(snapshot, log, clipRect)
     {
         this._reset();
         this._snapshot = snapshot;
@@ -87,7 +88,7 @@ WebInspector.PaintProfilerView.prototype = {
         }
         this._progressBanner.classList.remove("hidden");
         snapshot.requestImage(null, null, 1, this._showImageCallback);
-        snapshot.profile(onProfileDone.bind(this));
+        snapshot.profile(clipRect, onProfileDone.bind(this));
         /**
          * @param {!Array.<!LayerTreeAgent.PaintProfile>=} profiles
          * @this {WebInspector.PaintProfilerView}
@@ -112,7 +113,6 @@ WebInspector.PaintProfilerView.prototype = {
         var maxBars = Math.floor((this._canvas.width - 2 * this._barPaddingWidth) / this._outerBarWidth);
         var sampleCount = this._log.length;
         this._samplesPerBar = Math.ceil(sampleCount / maxBars);
-        var barCount = Math.floor(sampleCount / this._samplesPerBar);
 
         var maxBarTime = 0;
         var barTimes = [];
@@ -184,6 +184,8 @@ WebInspector.PaintProfilerView.prototype = {
 
     _updatePieChart: function()
     {
+        if (!this._profiles || !this._profiles.length)
+            return;
         var window = this.windowBoundaries();
         var totalTime = 0;
         var timeByCategory = {};

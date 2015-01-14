@@ -27,8 +27,11 @@
 #include "core/rendering/RenderOverflow.h"
 #include "core/rendering/shapes/ShapeOutsideInfo.h"
 #include "platform/scroll/ScrollTypes.h"
+#include "platform/scroll/ScrollableArea.h"
 
 namespace blink {
+
+class RenderMultiColumnSpannerPlaceholder;
 
 struct PaintInfo;
 
@@ -49,6 +52,7 @@ struct RenderBoxRareData {
 public:
     RenderBoxRareData()
         : m_inlineBoxWrapper(0)
+        , m_spannerPlaceholder(0)
         , m_overrideLogicalContentHeight(-1)
         , m_overrideLogicalContentWidth(-1)
         , m_previousBorderBoxSize(-1, -1)
@@ -57,6 +61,9 @@ public:
 
     // For inline replaced elements, the inline box that owns us.
     InlineBox* m_inlineBoxWrapper;
+
+    // For spanners, the spanner placeholder that lays us out within the multicol container.
+    RenderMultiColumnSpannerPlaceholder* m_spannerPlaceholder;
 
     LayoutUnit m_overrideLogicalContentHeight;
     LayoutUnit m_overrideLogicalContentWidth;
@@ -69,17 +76,7 @@ class RenderBox : public RenderBoxModelObject {
 public:
     explicit RenderBox(ContainerNode*);
 
-    // hasAutoZIndex only returns true if the element is positioned or a flex-item since
-    // position:static elements that are not flex-items get their z-index coerced to auto.
-    virtual LayerType layerTypeRequired() const override
-    {
-        if (isPositioned() || createsGroup() || hasClipPath() || hasTransformRelatedProperty() || hasHiddenBackface() || hasReflection() || style()->specifiesColumns() || !style()->hasAutoZIndex() || style()->shouldCompositeForCurrentAnimations())
-            return NormalLayer;
-        if (hasOverflowClip())
-            return OverflowClipLayer;
-
-        return NoLayer;
-    }
+    virtual LayerType layerTypeRequired() const override;
 
     virtual bool backgroundIsKnownToBeOpaqueInRect(const LayoutRect& localRect) const override;
 
@@ -188,6 +185,11 @@ public:
     RenderBox* nextInFlowSiblingBox() const;
     RenderBox* parentBox() const;
 
+    // Return the previous sibling column set or spanner placeholder. Only to be used on multicol container children.
+    RenderBox* previousSiblingMultiColumnBox() const;
+    // Return the next sibling column set or spanner placeholder. Only to be used on multicol container children.
+    RenderBox* nextSiblingMultiColumnBox() const;
+
     bool canResize() const;
 
     // Visual and layout overflow are in the coordinate space of the box.  This means that they aren't purely physical directions.
@@ -214,7 +216,7 @@ public:
     void addContentsVisualOverflow(const LayoutRect&);
 
     void addVisualEffectOverflow();
-    LayoutBoxExtent computeVisualEffectOverflowExtent() const;
+    LayoutRectOutsets computeVisualEffectOverflowOutsets() const;
     void addOverflowFromChild(RenderBox* child) { addOverflowFromChild(child, child->locationOffset()); }
     void addOverflowFromChild(RenderBox* child, const LayoutSize& delta);
     void clearLayoutOverflow();
@@ -264,46 +266,46 @@ public:
     virtual void setScrollLeft(LayoutUnit);
     virtual void setScrollTop(LayoutUnit);
 
-    void scrollToOffset(const DoubleSize&);
+    void scrollToOffset(const DoubleSize&, ScrollBehavior = ScrollBehaviorInstant);
     void scrollByRecursively(const DoubleSize& delta, ScrollOffsetClamping = ScrollOffsetUnclamped);
     void scrollRectToVisible(const LayoutRect&, const ScrollAlignment& alignX, const ScrollAlignment& alignY);
 
-    virtual LayoutBoxExtent marginBox() const override { return m_marginBox; }
-    virtual LayoutUnit marginTop() const override { return m_marginBox.top(); }
-    virtual LayoutUnit marginBottom() const override { return m_marginBox.bottom(); }
-    virtual LayoutUnit marginLeft() const override { return m_marginBox.left(); }
-    virtual LayoutUnit marginRight() const override { return m_marginBox.right(); }
-    void setMarginTop(LayoutUnit margin) { m_marginBox.setTop(margin); }
-    void setMarginBottom(LayoutUnit margin) { m_marginBox.setBottom(margin); }
-    void setMarginLeft(LayoutUnit margin) { m_marginBox.setLeft(margin); }
-    void setMarginRight(LayoutUnit margin) { m_marginBox.setRight(margin); }
+    virtual LayoutRectOutsets marginBoxOutsets() const override { return m_marginBoxOutsets; }
+    virtual LayoutUnit marginTop() const override { return m_marginBoxOutsets.top(); }
+    virtual LayoutUnit marginBottom() const override { return m_marginBoxOutsets.bottom(); }
+    virtual LayoutUnit marginLeft() const override { return m_marginBoxOutsets.left(); }
+    virtual LayoutUnit marginRight() const override { return m_marginBoxOutsets.right(); }
+    void setMarginTop(LayoutUnit margin) { m_marginBoxOutsets.setTop(margin); }
+    void setMarginBottom(LayoutUnit margin) { m_marginBoxOutsets.setBottom(margin); }
+    void setMarginLeft(LayoutUnit margin) { m_marginBoxOutsets.setLeft(margin); }
+    void setMarginRight(LayoutUnit margin) { m_marginBoxOutsets.setRight(margin); }
 
-    LayoutUnit marginLogicalLeft() const { return m_marginBox.logicalLeft(style()->writingMode()); }
-    LayoutUnit marginLogicalRight() const { return m_marginBox.logicalRight(style()->writingMode()); }
+    LayoutUnit marginLogicalLeft() const { return m_marginBoxOutsets.logicalLeft(style()->writingMode()); }
+    LayoutUnit marginLogicalRight() const { return m_marginBoxOutsets.logicalRight(style()->writingMode()); }
 
-    virtual LayoutUnit marginBefore(const RenderStyle* overrideStyle = 0) const override final { return m_marginBox.before((overrideStyle ? overrideStyle : style())->writingMode()); }
-    virtual LayoutUnit marginAfter(const RenderStyle* overrideStyle = 0) const override final { return m_marginBox.after((overrideStyle ? overrideStyle : style())->writingMode()); }
+    virtual LayoutUnit marginBefore(const RenderStyle* overrideStyle = 0) const override final { return m_marginBoxOutsets.before((overrideStyle ? overrideStyle : style())->writingMode()); }
+    virtual LayoutUnit marginAfter(const RenderStyle* overrideStyle = 0) const override final { return m_marginBoxOutsets.after((overrideStyle ? overrideStyle : style())->writingMode()); }
     virtual LayoutUnit marginStart(const RenderStyle* overrideStyle = 0) const override final
     {
         const RenderStyle* styleToUse = overrideStyle ? overrideStyle : style();
-        return m_marginBox.start(styleToUse->writingMode(), styleToUse->direction());
+        return m_marginBoxOutsets.start(styleToUse->writingMode(), styleToUse->direction());
     }
     virtual LayoutUnit marginEnd(const RenderStyle* overrideStyle = 0) const override final
     {
         const RenderStyle* styleToUse = overrideStyle ? overrideStyle : style();
-        return m_marginBox.end(styleToUse->writingMode(), styleToUse->direction());
+        return m_marginBoxOutsets.end(styleToUse->writingMode(), styleToUse->direction());
     }
-    void setMarginBefore(LayoutUnit value, const RenderStyle* overrideStyle = 0) { m_marginBox.setBefore((overrideStyle ? overrideStyle : style())->writingMode(), value); }
-    void setMarginAfter(LayoutUnit value, const RenderStyle* overrideStyle = 0) { m_marginBox.setAfter((overrideStyle ? overrideStyle : style())->writingMode(), value); }
+    void setMarginBefore(LayoutUnit value, const RenderStyle* overrideStyle = 0) { m_marginBoxOutsets.setBefore((overrideStyle ? overrideStyle : style())->writingMode(), value); }
+    void setMarginAfter(LayoutUnit value, const RenderStyle* overrideStyle = 0) { m_marginBoxOutsets.setAfter((overrideStyle ? overrideStyle : style())->writingMode(), value); }
     void setMarginStart(LayoutUnit value, const RenderStyle* overrideStyle = 0)
     {
         const RenderStyle* styleToUse = overrideStyle ? overrideStyle : style();
-        m_marginBox.setStart(styleToUse->writingMode(), styleToUse->direction(), value);
+        m_marginBoxOutsets.setStart(styleToUse->writingMode(), styleToUse->direction(), value);
     }
     void setMarginEnd(LayoutUnit value, const RenderStyle* overrideStyle = 0)
     {
         const RenderStyle* styleToUse = overrideStyle ? overrideStyle : style();
-        m_marginBox.setEnd(styleToUse->writingMode(), styleToUse->direction(), value);
+        m_marginBoxOutsets.setEnd(styleToUse->writingMode(), styleToUse->direction(), value);
     }
 
     // The following functions are used to implement collapsing margins.
@@ -315,7 +317,7 @@ public:
     virtual bool isSelfCollapsingBlock() const { return false; }
     virtual LayoutUnit collapsedMarginBefore() const { return marginBefore(); }
     virtual LayoutUnit collapsedMarginAfter() const { return marginAfter(); }
-    LayoutBoxExtent collapsedMarginBox() const { return LayoutBoxExtent(collapsedMarginBefore(), 0, collapsedMarginAfter(), 0); }
+    LayoutRectOutsets collapsedMarginBoxLogicalOutsets() const { return LayoutRectOutsets(collapsedMarginBefore(), 0, collapsedMarginAfter(), 0); }
 
     virtual void absoluteRects(Vector<IntRect>&, const LayoutPoint& accumulatedOffset) const override;
     virtual void absoluteQuads(Vector<FloatQuad>&, bool* wasFixed) const override;
@@ -403,6 +405,10 @@ public:
     InlineBox* inlineBoxWrapper() const { return m_rareData ? m_rareData->m_inlineBoxWrapper : 0; }
     void setInlineBoxWrapper(InlineBox*);
     void deleteLineBoxWrapper();
+
+    void setSpannerPlaceholder(RenderMultiColumnSpannerPlaceholder&);
+    void clearSpannerPlaceholder();
+    virtual RenderMultiColumnSpannerPlaceholder* spannerPlaceholder() const final { return m_rareData ? m_rareData->m_spannerPlaceholder : 0; }
 
     virtual LayoutRect clippedOverflowRectForPaintInvalidation(const RenderLayerModelObject* paintInvalidationContainer, const PaintInvalidationState* = 0) const override;
     virtual void mapRectToPaintInvalidationBacking(const RenderLayerModelObject* paintInvalidationContainer, LayoutRect&, const PaintInvalidationState*) const override;
@@ -507,24 +513,6 @@ public:
     virtual void imageChanged(WrappedImagePtr, const IntRect* = 0) override;
 
     void logicalExtentAfterUpdatingLogicalWidth(const LayoutUnit& logicalTop, LogicalExtentComputedValues&);
-
-    // Called when a positioned object moves but doesn't necessarily change size.  A simplified layout is attempted
-    // that just updates the object's position. If the size does change, the object remains dirty.
-    bool tryLayoutDoingPositionedMovementOnly()
-    {
-        LayoutUnit oldWidth = logicalWidth();
-        LogicalExtentComputedValues computedValues;
-        logicalExtentAfterUpdatingLogicalWidth(logicalTop(), computedValues);
-        // If we shrink to fit our width may have changed, so we still need full layout.
-        if (oldWidth != computedValues.m_extent)
-            return false;
-        setLogicalWidth(computedValues.m_extent);
-        setLogicalLeft(computedValues.m_position);
-        setMarginStart(computedValues.m_margins.m_start);
-        setMarginEnd(computedValues.m_margins.m_end);
-        updateLogicalHeight();
-        return true;
-    }
 
     virtual PositionWithAffinity positionForPoint(const LayoutPoint&) override;
 
@@ -662,8 +650,8 @@ public:
 
     void setIntrinsicContentLogicalHeight(LayoutUnit intrinsicContentLogicalHeight) const { m_intrinsicContentLogicalHeight = intrinsicContentLogicalHeight; }
 protected:
+    virtual void willBeRemovedFromTree() override;
     virtual void willBeDestroyed() override;
-
 
     virtual void styleWillChange(StyleDifference, const RenderStyle& newStyle) override;
     virtual void styleDidChange(StyleDifference, const RenderStyle* oldStyle) override;
@@ -768,9 +756,9 @@ private:
 
     bool hasNonCompositedScrollbars() const;
 
-protected:
-    LayoutBoxExtent m_marginBox;
+    LayoutRectOutsets m_marginBoxOutsets;
 
+protected:
     // The preferred logical width of the element if it were to break its lines at every possible opportunity.
     LayoutUnit m_minPreferredLogicalWidth;
 
@@ -825,6 +813,21 @@ inline RenderBox* RenderBox::firstChildBox() const
 inline RenderBox* RenderBox::lastChildBox() const
 {
     return toRenderBox(slowLastChild());
+}
+
+inline RenderBox* RenderBox::previousSiblingMultiColumnBox() const
+{
+    ASSERT(isRenderMultiColumnSpannerPlaceholder() || isRenderMultiColumnSet());
+    RenderBox* previousBox = previousSiblingBox();
+    if (previousBox->isRenderFlowThread())
+        return 0;
+    return previousBox;
+}
+
+inline RenderBox* RenderBox::nextSiblingMultiColumnBox() const
+{
+    ASSERT(isRenderMultiColumnSpannerPlaceholder() || isRenderMultiColumnSet());
+    return nextSiblingBox();
 }
 
 inline void RenderBox::setInlineBoxWrapper(InlineBox* boxWrapper)

@@ -5,13 +5,19 @@
 #include "config.h"
 #include "platform/graphics/PicturePattern.h"
 
-#include "platform/graphics/Picture.h"
 #include "platform/graphics/skia/SkiaUtils.h"
+#include "third_party/skia/include/core/SkPicture.h"
 #include "third_party/skia/include/core/SkShader.h"
 
 namespace blink {
 
-PicturePattern::PicturePattern(PassRefPtr<Picture> picture, RepeatMode mode)
+PassRefPtr<PicturePattern> PicturePattern::create(PassRefPtr<const SkPicture> picture,
+    RepeatMode repeatMode)
+{
+    return adoptRef(new PicturePattern(picture, repeatMode));
+}
+
+PicturePattern::PicturePattern(PassRefPtr<const SkPicture> picture, RepeatMode mode)
     : Pattern(mode)
     , m_tilePicture(picture)
 {
@@ -28,10 +34,9 @@ PicturePattern::~PicturePattern()
 PassRefPtr<SkShader> PicturePattern::createShader()
 {
     SkMatrix localMatrix = affineTransformToSkMatrix(m_patternSpaceTransformation);
-    SkRect tileBounds = SkRect::MakeWH(m_tilePicture->bounds().width(),
-        m_tilePicture->bounds().height());
+    SkRect tileBounds = m_tilePicture->cullRect();
 
-    return adoptRef(SkShader::CreatePictureShader(m_tilePicture->skPicture().get(),
+    return adoptRef(SkShader::CreatePictureShader(m_tilePicture.get(),
         SkShader::kRepeat_TileMode, SkShader::kRepeat_TileMode, &localMatrix, &tileBounds));
 }
 

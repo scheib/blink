@@ -80,6 +80,7 @@ GraphicsLayer::GraphicsLayer(GraphicsLayerClient* client)
     , m_backgroundColor(Color::transparent)
     , m_opacity(1)
     , m_blendMode(WebBlendModeNormal)
+    , m_scrollBlocksOn(WebScrollBlocksOnNone)
     , m_hasTransformOrigin(false)
     , m_contentsOpaque(false)
     , m_shouldFlattenTransform(true)
@@ -256,6 +257,11 @@ void GraphicsLayer::setReplicatedByLayer(GraphicsLayer* layer)
 
 void GraphicsLayer::setOffsetFromRenderer(const IntSize& offset, ShouldSetNeedsDisplay shouldSetNeedsDisplay)
 {
+    setOffsetDoubleFromRenderer(offset);
+}
+
+void GraphicsLayer::setOffsetDoubleFromRenderer(const DoubleSize& offset, ShouldSetNeedsDisplay shouldSetNeedsDisplay)
+{
     if (offset == m_offsetFromRenderer)
         return;
 
@@ -274,20 +280,12 @@ void GraphicsLayer::paintGraphicsLayerContents(GraphicsContext& context, const I
         m_debugInfo.clearAnnotatedInvalidateRects();
     incrementPaintCount();
     m_client->paintContents(this, context, m_paintingPhase, clip);
-
+#ifndef NDEBUG
     if (m_displayItemList) {
         ASSERT(RuntimeEnabledFeatures::slimmingPaintEnabled());
-#ifndef NDEBUG
         context.fillRect(clip, Color(0xFF, 0, 0));
-#endif
-        // FIXME: This is incorrect for squashed layers.
-        // We should do proper translation in CompositedLayerMapping once transform paint item is implemented.
-        context.translate(-m_offsetFromRenderer.width(), -m_offsetFromRenderer.height());
-        const PaintList& paintList = m_displayItemList->paintList();
-        for (PaintList::const_iterator it = paintList.begin(); it != paintList.end(); ++it)
-            (*it)->replay(&context);
-        context.translate(m_offsetFromRenderer.width(), m_offsetFromRenderer.height());
     }
+#endif
 }
 
 void GraphicsLayer::updateChildList()
@@ -576,6 +574,17 @@ PassRefPtr<JSONObject> GraphicsLayer::layerTreeAsJSON(LayerTreeFlags flags, Rend
 
     if (m_blendMode != WebBlendModeNormal)
         json->setString("blendMode", compositeOperatorName(CompositeSourceOver, m_blendMode));
+
+    if ((flags & LayerTreeIncludesScrollBlocksOn) && m_scrollBlocksOn) {
+        RefPtr<JSONArray> scrollBlocksOnJSON = adoptRef(new JSONArray);
+        if (m_scrollBlocksOn & WebScrollBlocksOnStartTouch)
+            scrollBlocksOnJSON->pushString("StartTouch");
+        if (m_scrollBlocksOn & WebScrollBlocksOnWheelEvent)
+            scrollBlocksOnJSON->pushString("WheelEvent");
+        if (m_scrollBlocksOn & WebScrollBlocksOnScrollEvent)
+            scrollBlocksOnJSON->pushString("ScrollEvent");
+        json->setArray("scrollBlocksOn", scrollBlocksOnJSON);
+    }
 
     if (m_isRootForIsolatedGroup)
         json->setBoolean("isolate", m_isRootForIsolatedGroup);
@@ -879,7 +888,15 @@ void GraphicsLayer::setBlendMode(WebBlendMode blendMode)
     if (m_blendMode == blendMode)
         return;
     m_blendMode = blendMode;
-    platformLayer()->setBlendMode(WebBlendMode(blendMode));
+    platformLayer()->setBlendMode(blendMode);
+}
+
+void GraphicsLayer::setScrollBlocksOn(WebScrollBlocksOn scrollBlocksOn)
+{
+    if (m_scrollBlocksOn == scrollBlocksOn)
+        return;
+    m_scrollBlocksOn = scrollBlocksOn;
+    platformLayer()->setScrollBlocksOn(scrollBlocksOn);
 }
 
 void GraphicsLayer::setIsRootForIsolatedGroup(bool isolated)
@@ -905,6 +922,9 @@ void GraphicsLayer::setNeedsDisplay()
         addRepaintRect(FloatRect(FloatPoint(), m_size));
         for (size_t i = 0; i < m_linkHighlights.size(); ++i)
             m_linkHighlights[i]->invalidate();
+
+        if (RuntimeEnabledFeatures::slimmingPaintEnabled())
+            displayItemList()->invalidateAll();
     }
 }
 
@@ -1010,6 +1030,12 @@ void GraphicsLayer::setFilters(const FilterOperations& filters)
     m_layer->layer()->setFilters(*webFilters);
 }
 
+void GraphicsLayer::setFilterLevel(SkPaint::FilterLevel filterLevel)
+{
+    if (m_imageLayer)
+        m_imageLayer->setNearestNeighbor(filterLevel == SkPaint::kNone_FilterLevel);
+}
+
 void GraphicsLayer::setPaintingPhase(GraphicsLayerPaintingPhase phase)
 {
     if (m_paintingPhase == phase)
@@ -1077,7 +1103,7 @@ DisplayItemList* GraphicsLayer::displayItemList()
     if (!RuntimeEnabledFeatures::slimmingPaintEnabled())
         return 0;
     if (!m_displayItemList)
-        m_displayItemList = adoptPtr(new DisplayItemList());
+        m_displayItemList = DisplayItemList::create();
     return m_displayItemList.get();
 }
 

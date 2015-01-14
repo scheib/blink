@@ -46,12 +46,6 @@
 #include "wtf/OwnPtr.h"
 #include "wtf/PassOwnPtr.h"
 
-namespace WTF {
-
-class ArrayBufferContents;
-
-} // namespace WTF
-
 namespace blink {
 
 class Extensions3DUtil;
@@ -148,6 +142,7 @@ public:
     void setBufferClearNeeded(bool);
     bool bufferClearNeeded() const;
     void setIsHidden(bool);
+    void setFilterLevel(SkPaint::FilterLevel);
 
     WebLayer* platformLayer();
 
@@ -168,7 +163,10 @@ public:
     void setPackAlignment(GLint param);
 
     void paintRenderingResultsToCanvas(ImageBuffer*);
-    bool paintRenderingResultsToImageData(int&, int&, SourceDrawingBuffer, WTF::ArrayBufferContents&);
+    PassRefPtr<Uint8ClampedArray> paintRenderingResultsToImageData(int&, int&, SourceDrawingBuffer);
+
+    int sampleCount() const { return m_sampleCount; }
+    bool explicitResolveOfMultisampleData() const { return m_multisampleMode == ExplicitResolve; };
 
 protected: // For unittests
     DrawingBuffer(
@@ -292,6 +290,7 @@ private:
     int m_packAlignment;
     bool m_destructionInProgress;
     bool m_isHidden;
+    SkPaint::FilterLevel m_filterLevel;
 
     OwnPtr<WebExternalTextureLayer> m_layer;
 

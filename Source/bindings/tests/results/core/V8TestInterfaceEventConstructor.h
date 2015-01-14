@@ -21,14 +21,14 @@ namespace blink {
 class Dictionary;
 class V8TestInterfaceEventConstructor {
 public:
-    static bool hasInstance(v8::Handle<v8::Value>, v8::Isolate*);
-    static v8::Handle<v8::Object> findInstanceInPrototypeChain(v8::Handle<v8::Value>, v8::Isolate*);
-    static v8::Handle<v8::FunctionTemplate> domTemplate(v8::Isolate*);
-    static TestInterfaceEventConstructor* toImpl(v8::Handle<v8::Object> object)
+    static bool hasInstance(v8::Local<v8::Value>, v8::Isolate*);
+    static v8::Local<v8::Object> findInstanceInPrototypeChain(v8::Local<v8::Value>, v8::Isolate*);
+    static v8::Local<v8::FunctionTemplate> domTemplate(v8::Isolate*);
+    static TestInterfaceEventConstructor* toImpl(v8::Local<v8::Object> object)
     {
         return blink::toScriptWrappable(object)->toImpl<TestInterfaceEventConstructor>();
     }
-    static TestInterfaceEventConstructor* toImplWithTypeCheck(v8::Isolate*, v8::Handle<v8::Value>);
+    static TestInterfaceEventConstructor* toImplWithTypeCheck(v8::Isolate*, v8::Local<v8::Value>);
     static const WrapperTypeInfo wrapperTypeInfo;
     static void refObject(ScriptWrappable*);
     static void derefObject(ScriptWrappable*);
@@ -40,8 +40,8 @@ public:
     }
     static void constructorCallback(const v8::FunctionCallbackInfo<v8::Value>&);
     static const int internalFieldCount = v8DefaultWrapperInternalFieldCount + 0;
-    static void installConditionallyEnabledProperties(v8::Handle<v8::Object>, v8::Isolate*) { }
-    static void installConditionallyEnabledMethods(v8::Handle<v8::Object>, v8::Isolate*) { }
+    static void installConditionallyEnabledProperties(v8::Local<v8::Object>, v8::Isolate*) { }
+    static void installConditionallyEnabledMethods(v8::Local<v8::Object>, v8::Isolate*) { }
 };
 
 bool initializeTestInterfaceEventConstructor(TestInterfaceEventConstructorInit&, const Dictionary&, ExceptionState&, const v8::FunctionCallbackInfo<v8::Value>& info);

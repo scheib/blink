@@ -431,6 +431,8 @@ enum ETransformStyle3D {
     TransformStyle3DFlat, TransformStyle3DPreserve3D
 };
 
+enum MotionRotationType { MotionRotationAuto, MotionRotationFixed };
+
 enum EBackfaceVisibility {
     BackfaceVisibilityVisible, BackfaceVisibilityHidden
 };
@@ -502,17 +504,6 @@ inline TouchAction operator& (TouchAction a, TouchAction b) { return TouchAction
 inline TouchAction& operator&= (TouchAction& a, TouchAction b) { return a = a & b; }
 
 enum EIsolation { IsolationAuto, IsolationIsolate };
-
-enum ScrollBlocksOn {
-    ScrollBlocksOnNone = 0x0,
-    ScrollBlocksOnStartTouch = 0x1,
-    ScrollBlocksOnWheelEvent = 0x2,
-    ScrollBlocksOnScrollEvent = 0x4,
-};
-inline ScrollBlocksOn operator| (ScrollBlocksOn a, ScrollBlocksOn b) { return ScrollBlocksOn(int(a) | int(b)); }
-inline ScrollBlocksOn& operator|= (ScrollBlocksOn& a, ScrollBlocksOn b) { return a = a | b; }
-inline ScrollBlocksOn operator& (ScrollBlocksOn a, ScrollBlocksOn b) { return ScrollBlocksOn(int(a) & int(b)); }
-inline ScrollBlocksOn& operator&= (ScrollBlocksOn& a, ScrollBlocksOn b) { return a = a & b; }
 
 enum ItemPosition {
     ItemPositionAuto,

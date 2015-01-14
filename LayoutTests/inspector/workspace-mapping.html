@@ -7,25 +7,32 @@ function test()
 {
     var uiSourceCodes = {};
     var projectDelegates = {};
-    var projectStores = {};
+    var projectDelegates = {};
     function createUISourceCode(projectId, path)
     {
-        var projectStore = projectStores[projectId];
-        if (!projectStores[projectId]) {
-            projectStore = workspace.addProject(projectId, new MockProjectDelegate());
-            projectStores[projectId] = projectStore;
+        var projectDelegate = projectDelegates[projectId];
+        if (!projectDelegates[projectId]) {
+            projectDelegate = new MockProjectDelegate();
+            workspace.addProject(projectId, projectDelegate);
+            projectDelegates[projectId] = projectDelegate;
         }
 
         var parentPath = path.substring(0, path.lastIndexOf("/"));
         var name = path.substring(path.lastIndexOf("/") + 1);
         var fileDescriptor = new WebInspector.FileDescriptor(parentPath, name, path, path, WebInspector.resourceTypes.Script);
-        projectStore.addFile(fileDescriptor);
+        projectDelegate.dispatchEventToListeners(WebInspector.ProjectDelegate.Events.FileAdded, fileDescriptor);
     }
 
-    function MockProjectDelegate() {}
-    MockProjectDelegate.prototype.url = function() { return ""; }
-    MockProjectDelegate.prototype.displayName = function() {};
-    MockProjectDelegate.prototype.type = function() { return WebInspector.projectTypes.Network };
+    function MockProjectDelegate()
+    {
+        WebInspector.Object.call(this);
+    }
+    MockProjectDelegate.prototype = {
+        url: function() { return ""; },
+        displayName: function() {},
+        type: function() { return WebInspector.projectTypes.Network; },
+        __proto__: WebInspector.Object.prototype
+    }
 
     var fileSystemMapping = new WebInspector.FileSystemMapping();
     var fileSystemPath = "/var/www";
@@ -33,10 +40,11 @@ function test()
     fileSystemMapping.addFileSystem("/var/www");
     fileSystemMapping.addFileMapping("/var/www", "http://localhost/", "/localhost/");
     var workspace = new WebInspector.Workspace(fileSystemMapping);
+    var networkMapping = new WebInspector.NetworkMapping(workspace, fileSystemMapping);
 
     function dumpHasMappingForURL(url)
     {
-        var result = workspace.hasMappingForURL(url)
+        var result = networkMapping.hasMappingForURL(url)
         if (result)
             InspectorTest.addResult("    url " + url + " is mapped.");
         else
@@ -45,13 +53,13 @@ function test()
 
     function dumpUISourceCodeForURL(url)
     {
-        var uiSourceCode = workspace.uiSourceCodeForURL(url)
+        var uiSourceCode = networkMapping.uiSourceCodeForURL(url)
         InspectorTest.addResult("    url " + url + " is mapped to " + (uiSourceCode ? uiSourceCode.uri() : null));
     }
 
     function dumpURLForPath(fileSystemPath, filePath)
     {
-        var url = workspace.urlForPath(fileSystemPath, filePath)
+        var url = networkMapping.urlForPath(fileSystemPath, filePath)
         InspectorTest.addResult("    path " + fileSystemPath + " / " + filePath + " is mapped to " + (url ? url : null));
     }
     

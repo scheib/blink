@@ -5,7 +5,7 @@
 #include "config.h"
 #include "platform/graphics/paint/ClipDisplayItem.h"
 
-#include "platform/geometry/RoundedRect.h"
+#include "platform/geometry/FloatRoundedRect.h"
 #include "platform/graphics/GraphicsContext.h"
 #include "public/platform/WebDisplayItemList.h"
 #include "third_party/skia/include/core/SkScalar.h"
@@ -15,16 +15,16 @@ namespace blink {
 void ClipDisplayItem::replay(GraphicsContext* context)
 {
     context->save();
-    context->clip(m_clipRect);
-    for (RoundedRect roundedRect : m_roundedRectClips)
-        context->clipRoundedRect(roundedRect);
+    context->clipRect(m_clipRect, NotAntiAliased, m_operation);
+    for (FloatRoundedRect roundedRect : m_roundedRectClips)
+        context->clipRoundedRect(roundedRect, m_operation);
 }
 
 void ClipDisplayItem::appendToWebDisplayItemList(WebDisplayItemList* list) const
 {
     WebVector<SkRRect> webRoundedRects(m_roundedRectClips.size());
     for (size_t i = 0; i < m_roundedRectClips.size(); ++i) {
-        RoundedRect::Radii rectRadii = m_roundedRectClips[i].radii();
+        FloatRoundedRect::Radii rectRadii = m_roundedRectClips[i].radii();
         SkVector skRadii[4];
         skRadii[SkRRect::kUpperLeft_Corner].set(SkIntToScalar(rectRadii.topLeft().width()),
             SkIntToScalar(rectRadii.topLeft().height()));
@@ -38,6 +38,7 @@ void ClipDisplayItem::appendToWebDisplayItemList(WebDisplayItemList* list) const
         skRoundedRect.setRectRadii(m_roundedRectClips[i].rect(), skRadii);
         webRoundedRects[i] = skRoundedRect;
     }
+    // FIXME: needs to include the SkRegion::Op
     list->appendClipItem(m_clipRect, webRoundedRects);
 }
 
@@ -52,11 +53,11 @@ void EndClipDisplayItem::appendToWebDisplayItemList(WebDisplayItemList* list) co
 }
 
 #ifndef NDEBUG
-WTF::String ClipDisplayItem::asDebugString() const
+void ClipDisplayItem::dumpPropertiesAsDebugString(WTF::StringBuilder& stringBuilder) const
 {
-    return String::format("{%s, type: \"%s\", clipRect: [%d,%d,%d,%d]}",
-        clientDebugString().utf8().data(), typeAsDebugString(type()).utf8().data(),
-        m_clipRect.x(), m_clipRect.y(), m_clipRect.width(), m_clipRect.height());
+    DisplayItem::dumpPropertiesAsDebugString(stringBuilder);
+    stringBuilder.append(WTF::String::format(", clipRect: [%d,%d,%d,%d]",
+        m_clipRect.x(), m_clipRect.y(), m_clipRect.width(), m_clipRect.height()));
 }
 #endif
 

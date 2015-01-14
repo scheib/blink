@@ -37,17 +37,19 @@
 #include "core/frame/Settings.h"
 #include "core/html/HTMLDialogElement.h"
 #include "core/paint/BlockFlowPainter.h"
-#include "core/paint/DrawingRecorder.h"
+#include "core/paint/RenderDrawingRecorder.h"
 #include "core/rendering/HitTestLocation.h"
 #include "core/rendering/RenderFlowThread.h"
 #include "core/rendering/RenderLayer.h"
 #include "core/rendering/RenderMultiColumnFlowThread.h"
+#include "core/rendering/RenderMultiColumnSpannerPlaceholder.h"
 #include "core/rendering/RenderPagedFlowThread.h"
 #include "core/rendering/RenderText.h"
 #include "core/rendering/RenderView.h"
 #include "core/rendering/TextAutosizer.h"
 #include "core/rendering/line/LineWidth.h"
 #include "platform/geometry/TransformState.h"
+#include "platform/graphics/paint/ClipRecorderStack.h"
 #include "platform/text/BidiTextRun.h"
 
 namespace blink {
@@ -59,7 +61,7 @@ struct SameSizeAsMarginInfo {
     LayoutUnit margins[2];
 };
 
-COMPILE_ASSERT(sizeof(RenderBlockFlow::MarginValues) == sizeof(LayoutUnit[4]), MarginValues_should_stay_small);
+static_assert(sizeof(RenderBlockFlow::MarginValues) == sizeof(LayoutUnit[4]), "MarginValues should stay small");
 
 class MarginInfo {
     // Collapsing flags for whether we can collapse our margins with our children's margins.
@@ -164,7 +166,7 @@ void RenderBlockFlow::RenderBlockFlowRareData::trace(Visitor* visitor)
 RenderBlockFlow::RenderBlockFlow(ContainerNode* node)
     : RenderBlock(node)
 {
-    COMPILE_ASSERT(sizeof(MarginInfo) == sizeof(SameSizeAsMarginInfo), MarginInfo_should_stay_small);
+    static_assert(sizeof(MarginInfo) == sizeof(SameSizeAsMarginInfo), "MarginInfo should stay small");
     setChildrenInline(true);
 }
 
@@ -249,7 +251,7 @@ void RenderBlockFlow::checkForPaginationLogicalHeightChange(LayoutUnit& pageLogi
         // it's unknown, we need to prevent the pagination code from assuming page breaks everywhere
         // and thereby eating every top margin. It should be trivial to clean up and get rid of this
         // hack once the old multicol implementation is gone.
-        pageLogicalHeight = flowThread->isPageLogicalHeightKnown() ? LayoutUnit(1) : LayoutUnit(0);
+        pageLogicalHeight = flowThread->isPageLogicalHeightKnown() ? LayoutUnit(1) : LayoutUnit();
 
         pageLogicalHeightChanged = flowThread->pageLogicalSizeChanged();
     }
@@ -781,7 +783,7 @@ static inline LayoutUnit calculateMinimumPageHeight(RenderStyle* renderStyle, Ro
 {
     // We may require a certain minimum number of lines per page in order to satisfy
     // orphans and widows, and that may affect the minimum page height.
-    unsigned lineCount = std::max<unsigned>(renderStyle->hasAutoOrphans() ? 1 : renderStyle->orphans(), renderStyle->hasAutoWidows() ? 1 : renderStyle->widows());
+    unsigned lineCount = std::max<unsigned>(renderStyle->hasAutoOrphans() ? 1 : renderStyle->orphans(), renderStyle->widows());
     if (lineCount > 1) {
         RootInlineBox* line = lastLine;
         for (unsigned i = 1; i < lineCount && line->prevRootBox(); i++)
@@ -1057,6 +1059,11 @@ void RenderBlockFlow::layoutBlockChildren(bool relayoutChildren, SubtreeLayoutSc
             adjustFloatingBlock(marginInfo);
             continue;
         }
+        if (child->isColumnSpanAll()) {
+            // This is not the containing block of the spanner. The spanner's placeholder will lay
+            // it out in due course.
+            continue;
+        }
 
         // Lay out the child.
         layoutBlockChild(*child, marginInfo, previousFloatLogicalBottom);
@@ -1269,7 +1276,7 @@ LayoutUnit RenderBlockFlow::collapseMargins(RenderBox& child, MarginInfo& margin
             // If we are at the before side of the block and we collapse, ignore the computed margin
             // and just add the child margin to the container height. This will correctly position
             // the child inside the container.
-            LayoutUnit separateMargin = !marginInfo.canCollapseWithMarginBefore() ? marginInfo.margin() : LayoutUnit(0);
+            LayoutUnit separateMargin = !marginInfo.canCollapseWithMarginBefore() ? marginInfo.margin() : LayoutUnit();
             setLogicalHeight(logicalHeight() + separateMargin + marginBeforeForChild(child));
             logicalTop = logicalHeight();
         } else if (!marginInfo.discardMargin() && (!marginInfo.atBeforeSideOfBlock()
@@ -1863,7 +1870,7 @@ LayoutUnit RenderBlockFlow::getClearDelta(RenderBox* child, LayoutUnit logicalTo
 {
     // There is no need to compute clearance if we have no floats.
     if (!containsFloats())
-        return 0;
+        return LayoutUnit();
 
     // At least one float is present. We need to perform the clearance computation.
     bool clearSet = child->style()->clear() != CNONE;
@@ -1969,6 +1976,16 @@ void RenderBlockFlow::styleDidChange(StyleDifference diff, const RenderStyle* ol
 
     if (diff.needsFullLayout() || !oldStyle)
         createOrDestroyMultiColumnFlowThreadIfNeeded(oldStyle);
+}
+
+void RenderBlockFlow::updateBlockChildDirtyBitsBeforeLayout(bool relayoutChildren, RenderBox& child)
+{
+    if (child.isRenderMultiColumnSpannerPlaceholder() && toRenderMultiColumnSpannerPlaceholder(child).rendererInFlowThread()->needsLayout()) {
+        // The containing block of a spanner is the multicol container (|this| block), but the spanner
+        // is laid out via its spanner set (|child|), so we need to make sure that we enter it.
+        child.setChildNeedsLayout(MarkOnlyThis);
+    }
+    RenderBlock::updateBlockChildDirtyBitsBeforeLayout(relayoutChildren, child);
 }
 
 void RenderBlockFlow::updateStaticInlinePositionForChild(RenderBox& child, LayoutUnit logicalTop)
@@ -2120,17 +2137,21 @@ void RenderBlockFlow::paintSelection(const PaintInfo& paintInfo, const LayoutPoi
 
 void RenderBlockFlow::clipOutFloatingObjects(const RenderBlock* rootBlock, const PaintInfo* paintInfo, const LayoutPoint& rootBlockPhysicalPosition, const LayoutSize& offsetFromRootBlock) const
 {
-    if (m_floatingObjects) {
-        const FloatingObjectSet& floatingObjectSet = m_floatingObjects->set();
-        FloatingObjectSetIterator end = floatingObjectSet.end();
-        for (FloatingObjectSetIterator it = floatingObjectSet.begin(); it != end; ++it) {
-            FloatingObject* floatingObject = it->get();
-            LayoutRect floatBox(LayoutPoint(offsetFromRootBlock), floatingObject->renderer()->size());
-            floatBox.move(positionForFloatIncludingMargin(floatingObject));
-            rootBlock->flipForWritingMode(floatBox);
-            floatBox.move(rootBlockPhysicalPosition.x(), rootBlockPhysicalPosition.y());
-            paintInfo->context->clipOut(pixelSnappedIntRect(floatBox));
-        }
+    if (!m_floatingObjects)
+        return;
+
+    const FloatingObjectSet& floatingObjectSet = m_floatingObjects->set();
+    FloatingObjectSetIterator end = floatingObjectSet.end();
+    for (FloatingObjectSetIterator it = floatingObjectSet.begin(); it != end; ++it) {
+        FloatingObject* floatingObject = it->get();
+        LayoutRect floatBox(LayoutPoint(offsetFromRootBlock), floatingObject->renderer()->size());
+        floatBox.move(positionForFloatIncludingMargin(floatingObject));
+        rootBlock->flipForWritingMode(floatBox);
+        floatBox.move(rootBlockPhysicalPosition.x(), rootBlockPhysicalPosition.y());
+
+        ASSERT(paintInfo->context->clipRecorderStack());
+        paintInfo->context->clipRecorderStack()->addClipRecorder(adoptPtr(new ClipRecorder(
+            displayItemClient(), paintInfo->context, paintInfo->displayItemTypeForClipping(), floatBox, SkRegion::kDifference_Op)));
     }
 }
 
@@ -2359,7 +2380,7 @@ void RenderBlockFlow::removeFloatingObjectsBelow(FloatingObject* lastFloat, int 
     }
 }
 
-bool RenderBlockFlow::positionNewFloats()
+bool RenderBlockFlow::positionNewFloats(LineWidth* width)
 {
     if (!m_floatingObjects)
         return false;
@@ -2466,6 +2487,9 @@ bool RenderBlockFlow::positionNewFloats()
 
         if (ShapeOutsideInfo* shapeOutside = childBox->shapeOutsideInfo())
             shapeOutside->setReferenceBoxLogicalSize(logicalSizeForChild(*childBox));
+
+        if (width)
+            width->shrinkAvailableWidthForNewFloatIfNeeded(floatingObject);
     }
     return true;
 }
@@ -2581,7 +2605,7 @@ void RenderBlockFlow::addOverhangingFloats(RenderBlockFlow* child, bool makeChil
 LayoutUnit RenderBlockFlow::lowestFloatLogicalBottom(FloatingObject::Type floatType) const
 {
     if (!m_floatingObjects)
-        return 0;
+        return LayoutUnit();
 
     return m_floatingObjects->lowestFloatLogicalBottom(floatType);
 }
@@ -2695,7 +2719,10 @@ static void clipOutPositionedObjects(const PaintInfo& paintInfo, const LayoutPoi
     TrackedRendererListHashSet::const_iterator end = positionedObjects->end();
     for (TrackedRendererListHashSet::const_iterator it = positionedObjects->begin(); it != end; ++it) {
         RenderBox* r = *it;
-        paintInfo.context->clipOut(IntRect(flooredIntPoint(r->location() + offset), flooredIntSize(r->size())));
+        ASSERT(paintInfo.context->clipRecorderStack());
+        paintInfo.context->clipRecorderStack()->addClipRecorder(adoptPtr(new ClipRecorder(
+            r->displayItemClient(), paintInfo.context, paintInfo.displayItemTypeForClipping(),
+            IntRect(flooredIntPoint(r->location() + offset), flooredIntSize(r->size())), SkRegion::kDifference_Op)));
     }
 }
 
@@ -2821,8 +2848,9 @@ LayoutRect RenderBlockFlow::blockSelectionGap(const RenderBlock* rootBlock, cons
     LayoutRect gapRect = rootBlock->logicalRectToPhysicalRect(rootBlockPhysicalPosition, LayoutRect(logicalLeft, logicalTop, logicalWidth, logicalHeight));
     if (paintInfo) {
         IntRect selectionGapRect = alignSelectionRectToDevicePixels(gapRect);
-        DrawingRecorder recorder(paintInfo->context, this, paintInfo->phase, selectionGapRect);
-        paintInfo->context->fillRect(selectionGapRect, selectionBackgroundColor());
+        RenderDrawingRecorder recorder(paintInfo->context, *this, paintInfo->phase, selectionGapRect);
+        if (!recorder.canUseCachedDrawing())
+            paintInfo->context->fillRect(selectionGapRect, selectionBackgroundColor());
     }
     return gapRect;
 }
@@ -2904,8 +2932,9 @@ LayoutRect RenderBlockFlow::logicalLeftSelectionGap(const RenderBlock* rootBlock
     LayoutRect gapRect = rootBlock->logicalRectToPhysicalRect(rootBlockPhysicalPosition, LayoutRect(rootBlockLogicalLeft, rootBlockLogicalTop, rootBlockLogicalWidth, logicalHeight));
     if (paintInfo) {
         IntRect selectionGapRect = alignSelectionRectToDevicePixels(gapRect);
-        DrawingRecorder recorder(paintInfo->context, this, paintInfo->phase, selectionGapRect);
-        paintInfo->context->fillRect(selectionGapRect, selObj->selectionBackgroundColor());
+        RenderDrawingRecorder recorder(paintInfo->context, *this, paintInfo->phase, selectionGapRect);
+        if (!recorder.canUseCachedDrawing())
+            paintInfo->context->fillRect(selectionGapRect, selObj->selectionBackgroundColor());
     }
     return gapRect;
 }
@@ -2923,8 +2952,9 @@ LayoutRect RenderBlockFlow::logicalRightSelectionGap(const RenderBlock* rootBloc
     LayoutRect gapRect = rootBlock->logicalRectToPhysicalRect(rootBlockPhysicalPosition, LayoutRect(rootBlockLogicalLeft, rootBlockLogicalTop, rootBlockLogicalWidth, logicalHeight));
     if (paintInfo) {
         IntRect selectionGapRect = alignSelectionRectToDevicePixels(gapRect);
-        DrawingRecorder recorder(paintInfo->context, this, paintInfo->phase, selectionGapRect);
-        paintInfo->context->fillRect(selectionGapRect, selObj->selectionBackgroundColor());
+        RenderDrawingRecorder recorder(paintInfo->context, *this, paintInfo->phase, selectionGapRect);
+        if (!recorder.canUseCachedDrawing())
+            paintInfo->context->fillRect(selectionGapRect, selObj->selectionBackgroundColor());
     }
     return gapRect;
 }

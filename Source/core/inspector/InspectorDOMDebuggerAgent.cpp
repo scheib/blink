@@ -66,6 +66,7 @@ static const char timerFiredEventName[] = "timerFired";
 static const char newPromiseEventName[] = "newPromise";
 static const char promiseResolvedEventName[] = "promiseResolved";
 static const char promiseRejectedEventName[] = "promiseRejected";
+static const char scriptFirstStatementEventName[] = "scriptFirstStatement";
 static const char windowCloseEventName[] = "close";
 static const char webglErrorFiredEventName[] = "webglErrorFired";
 static const char webglWarningFiredEventName[] = "webglWarningFired";
@@ -135,7 +136,7 @@ void InspectorDOMDebuggerAgent::domAgentWasDisabled()
 
 void InspectorDOMDebuggerAgent::disable()
 {
-    m_instrumentingAgents->setInspectorDOMDebuggerAgent(0);
+    m_instrumentingAgents->setInspectorDOMDebuggerAgent(nullptr);
     clear();
 }
 
@@ -146,7 +147,7 @@ void InspectorDOMDebuggerAgent::clearFrontend()
 
 void InspectorDOMDebuggerAgent::discardAgent()
 {
-    m_debuggerAgent->setListener(0);
+    m_debuggerAgent->setListener(nullptr);
     m_debuggerAgent = nullptr;
 }
 
@@ -504,6 +505,11 @@ void InspectorDOMDebuggerAgent::willHandleEvent(EventTarget* target, Event* even
     pauseOnNativeEventIfNeeded(preparePauseOnNativeEventData(event->type(), &targetName), false);
 }
 
+void InspectorDOMDebuggerAgent::willEvaluateScript(LocalFrame*, const String& url, int)
+{
+    pauseOnNativeEventIfNeeded(preparePauseOnNativeEventData(scriptFirstStatementEventName, 0), false);
+}
+
 void InspectorDOMDebuggerAgent::willCloseWindow()
 {
     pauseOnNativeEventIfNeeded(preparePauseOnNativeEventData(windowCloseEventName, 0), true);
@@ -563,9 +569,9 @@ void InspectorDOMDebuggerAgent::willSendXMLHttpRequest(const String& url)
         breakpointURL = "";
     else {
         RefPtr<JSONObject> xhrBreakpoints = m_state->getObject(DOMDebuggerAgentState::xhrBreakpoints);
-        for (JSONObject::iterator it = xhrBreakpoints->begin(); it != xhrBreakpoints->end(); ++it) {
-            if (url.contains(it->key)) {
-                breakpointURL = it->key;
+        for (auto& breakpoint : *xhrBreakpoints) {
+            if (url.contains(breakpoint.key)) {
+                breakpointURL = breakpoint.key;
                 break;
             }
         }

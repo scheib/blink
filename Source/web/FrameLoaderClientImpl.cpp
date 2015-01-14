@@ -50,6 +50,7 @@
 #include "core/page/Page.h"
 #include "core/page/WindowFeatures.h"
 #include "core/rendering/HitTestResult.h"
+#include "core/storage/DOMWindowStorageController.h"
 #include "modules/device_light/DeviceLightController.h"
 #include "modules/device_orientation/DeviceMotionController.h"
 #include "modules/device_orientation/DeviceOrientationController.h"
@@ -128,6 +129,7 @@ void FrameLoaderClientImpl::dispatchDidClearWindowObjectInMainWorld()
             NavigatorGamepad::from(*document);
             if (RuntimeEnabledFeatures::serviceWorkerEnabled())
                 NavigatorServiceWorker::from(*document);
+            DOMWindowStorageController::from(*document);
         }
     }
 }
@@ -393,10 +395,10 @@ void FrameLoaderClientImpl::dispatchWillClose()
         m_webFrame->client()->willClose(m_webFrame);
 }
 
-void FrameLoaderClientImpl::dispatchDidStartProvisionalLoad(bool isTransitionNavigation)
+void FrameLoaderClientImpl::dispatchDidStartProvisionalLoad(bool isTransitionNavigation, double triggeringEventTime)
 {
     if (m_webFrame->client())
-        m_webFrame->client()->didStartProvisionalLoad(m_webFrame, isTransitionNavigation);
+        m_webFrame->client()->didStartProvisionalLoad(m_webFrame, isTransitionNavigation, triggeringEventTime);
 }
 
 void FrameLoaderClientImpl::dispatchDidReceiveTitle(const String& title)
@@ -671,9 +673,10 @@ void FrameLoaderClientImpl::transitionToCommittedForNewPage()
 PassRefPtrWillBeRawPtr<LocalFrame> FrameLoaderClientImpl::createFrame(
     const KURL& url,
     const AtomicString& name,
-    HTMLFrameOwnerElement* ownerElement)
+    HTMLFrameOwnerElement* ownerElement,
+    ContentSecurityPolicyDisposition shouldCheckContentSecurityPolicy)
 {
-    FrameLoadRequest frameRequest(m_webFrame->frame()->document(), url, name);
+    FrameLoadRequest frameRequest(m_webFrame->frame()->document(), url, name, shouldCheckContentSecurityPolicy);
     return m_webFrame->createChildFrame(frameRequest, ownerElement);
 }
 
@@ -848,9 +851,6 @@ void FrameLoaderClientImpl::dispatchWillStartUsingPeerConnectionHandler(WebRTCPe
 
 void FrameLoaderClientImpl::didRequestAutocomplete(HTMLFormElement* form)
 {
-    // FIXME: remove.
-    if (m_webFrame->viewImpl() && m_webFrame->viewImpl()->autofillClient())
-        m_webFrame->viewImpl()->autofillClient()->didRequestAutocomplete(WebFormElement(form));
     if (m_webFrame->autofillClient())
         m_webFrame->autofillClient()->didRequestAutocomplete(WebFormElement(form));
 }

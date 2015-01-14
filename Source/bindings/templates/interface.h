@@ -20,7 +20,7 @@ class Dictionary;
 {% if named_constructor %}
 class {{v8_class}}Constructor {
 public:
-    static v8::Handle<v8::FunctionTemplate> domTemplate(v8::Isolate*);
+    static v8::Local<v8::FunctionTemplate> domTemplate(v8::Isolate*);
     static const WrapperTypeInfo wrapperTypeInfo;
 };
 
@@ -42,18 +42,18 @@ public:
     };
 
     {% endif %}
-    static bool hasInstance(v8::Handle<v8::Value>, v8::Isolate*);
+    static bool hasInstance(v8::Local<v8::Value>, v8::Isolate*);
     {% if is_array_buffer_or_view %}
-    static {{cpp_class}}* toImpl(v8::Handle<v8::Object> object);
+    static {{cpp_class}}* toImpl(v8::Local<v8::Object> object);
     {% else %}
-    static v8::Handle<v8::Object> findInstanceInPrototypeChain(v8::Handle<v8::Value>, v8::Isolate*);
-    static v8::Handle<v8::FunctionTemplate> domTemplate(v8::Isolate*);
-    static {{cpp_class}}* toImpl(v8::Handle<v8::Object> object)
+    static v8::Local<v8::Object> findInstanceInPrototypeChain(v8::Local<v8::Value>, v8::Isolate*);
+    static v8::Local<v8::FunctionTemplate> domTemplate(v8::Isolate*);
+    static {{cpp_class}}* toImpl(v8::Local<v8::Object> object)
     {
         return blink::toScriptWrappable(object)->toImpl<{{cpp_class}}>();
     }
     {% endif %}
-    static {{cpp_class}}* toImplWithTypeCheck(v8::Isolate*, v8::Handle<v8::Value>);
+    static {{cpp_class}}* toImplWithTypeCheck(v8::Isolate*, v8::Local<v8::Value>);
     {% if has_partial_interface %}
     static WrapperTypeInfo wrapperTypeInfo;
     {% else %}
@@ -75,10 +75,10 @@ public:
     static void visitDOMWrapper(v8::Isolate*, ScriptWrappable*, const v8::Persistent<v8::Object>&);
     {% endif %}
     {% if is_active_dom_object %}
-    static ActiveDOMObject* toActiveDOMObject(v8::Handle<v8::Object>);
+    static ActiveDOMObject* toActiveDOMObject(v8::Local<v8::Object>);
     {% endif %}
     {% if interface_name == 'Window' %}
-    static v8::Handle<v8::ObjectTemplate> getShadowObjectTemplate(v8::Isolate*);
+    static v8::Local<v8::ObjectTemplate> getShadowObjectTemplate(v8::Isolate*);
     {% endif %}
     {% for method in methods %}
     {% if method.is_custom %}
@@ -116,17 +116,17 @@ public:
     static void indexedPropertyDeleterCustom(uint32_t, const v8::PropertyCallbackInfo<v8::Boolean>&);
     {% endif %}
     {% if named_property_getter and named_property_getter.is_custom %}
-    static void namedPropertyGetterCustom(v8::Local<v8::String>, const v8::PropertyCallbackInfo<v8::Value>&);
+    static void namedPropertyGetterCustom(v8::Local<v8::Name>, const v8::PropertyCallbackInfo<v8::Value>&);
     {% endif %}
     {% if named_property_setter and named_property_setter.is_custom %}
-    static void namedPropertySetterCustom(v8::Local<v8::String>, v8::Local<v8::Value>, const v8::PropertyCallbackInfo<v8::Value>&);
+    static void namedPropertySetterCustom(v8::Local<v8::Name>, v8::Local<v8::Value>, const v8::PropertyCallbackInfo<v8::Value>&);
     {% endif %}
     {% if named_property_getter and
           named_property_getter.is_custom_property_query %}
-    static void namedPropertyQueryCustom(v8::Local<v8::String>, const v8::PropertyCallbackInfo<v8::Integer>&);
+    static void namedPropertyQueryCustom(v8::Local<v8::Name>, const v8::PropertyCallbackInfo<v8::Integer>&);
     {% endif %}
     {% if named_property_deleter and named_property_deleter.is_custom %}
-    static void namedPropertyDeleterCustom(v8::Local<v8::String>, const v8::PropertyCallbackInfo<v8::Boolean>&);
+    static void namedPropertyDeleterCustom(v8::Local<v8::Name>, const v8::PropertyCallbackInfo<v8::Boolean>&);
     {% endif %}
     {% if named_property_getter and
           named_property_getter.is_custom_property_enumerator %}
@@ -154,15 +154,15 @@ public:
     static bool namedSecurityCheckCustom(v8::Local<v8::Object> host, v8::Local<v8::Value> key, v8::AccessType, v8::Local<v8::Value> data);
     static bool indexedSecurityCheckCustom(v8::Local<v8::Object> host, uint32_t index, v8::AccessType, v8::Local<v8::Value> data);
     {% endif %}
-    static void installConditionallyEnabledProperties(v8::Handle<v8::Object>, v8::Isolate*){% if has_conditional_attributes %};
+    static void installConditionallyEnabledProperties(v8::Local<v8::Object>, v8::Isolate*){% if has_conditional_attributes %};
     {% else %} { }
     {% endif %}
-    static void installConditionallyEnabledMethods(v8::Handle<v8::Object>, v8::Isolate*){% if conditionally_enabled_methods %};
+    static void installConditionallyEnabledMethods(v8::Local<v8::Object>, v8::Isolate*){% if conditionally_enabled_methods %};
     {% else %} { }
     {% endif %}
     {% if has_partial_interface %}
     static void updateWrapperTypeInfo(InstallTemplateFunction, InstallConditionallyEnabledMethodsFunction);
-    static void install{{v8_class}}Template(v8::Handle<v8::FunctionTemplate>, v8::Isolate*);
+    static void install{{v8_class}}Template(v8::Local<v8::FunctionTemplate>, v8::Isolate*);
     {% for method in methods if method.overloads and method.overloads.has_partial_overloads %}
     static void register{{method.name | blink_capitalize}}MethodForPartialInterface(void (*)(const v8::FunctionCallbackInfo<v8::Value>&));
     {% endfor %}

@@ -4,8 +4,9 @@
 
 #include "config.h"
 
-#include "core/paint/DrawingRecorder.h"
 #include "core/paint/LayerClipRecorder.h"
+#include "core/paint/LayerPainter.h"
+#include "core/paint/RenderDrawingRecorder.h"
 #include "core/rendering/RenderView.h"
 #include "core/rendering/RenderingTestHelper.h"
 #include "core/rendering/compositing/RenderLayerCompositor.h"
@@ -46,12 +47,24 @@ public:
 
     virtual void replay(GraphicsContext*) override final { ASSERT_NOT_REACHED(); }
     virtual void appendToWebDisplayItemList(WebDisplayItemList*) const override final { ASSERT_NOT_REACHED(); }
+#ifndef NDEBUG
+    virtual const char* name() const override final { return "Test"; }
+#endif
 };
+
+#ifndef NDEBUG
+#define TRACE_DISPLAY_ITEMS(expected, actual) \
+    String trace = "Expected: " + (expected).asDebugString() + " Actual: " + (actual).asDebugString(); \
+    SCOPED_TRACE(trace.utf8().data());
+#else
+#define TRACE_DISPLAY_ITEMS(expected, actual)
+#endif
 
 #define EXPECT_DISPLAY_LIST(actual, expectedSize, ...) { \
     EXPECT_EQ((size_t)expectedSize, actual.size()); \
     const TestDisplayItem expected[] = { __VA_ARGS__ }; \
     for (size_t index = 0; index < expectedSize; index++) { \
+        TRACE_DISPLAY_ITEMS(expected[index], *actual[index]); \
         EXPECT_EQ(expected[index].client(), actual[index]->client()); \
         EXPECT_EQ(expected[index].type(), actual[index]->type()); \
     } \
@@ -59,7 +72,9 @@ public:
 
 void drawRect(GraphicsContext* context, RenderObject* renderer, PaintPhase phase, const FloatRect& bound)
 {
-    DrawingRecorder drawingRecorder(context, renderer, phase, bound);
+    RenderDrawingRecorder drawingRecorder(context, *renderer, phase, bound);
+    if (drawingRecorder.canUseCachedDrawing())
+        return;
     IntRect rect(0, 0, 10, 10);
     context->drawRect(rect);
 }
@@ -398,6 +413,75 @@ TEST_F(ViewDisplayListTest, ViewDisplayListTest_UpdateClip)
         TestDisplayItem(secondRenderer, DisplayItem::ClipLayerForeground),
         TestDisplayItem(secondRenderer, DisplayItem::DrawingPaintPhaseBlockBackground),
         TestDisplayItem(secondRenderer, DisplayItem::EndClip));
+}
+
+TEST_F(ViewDisplayListTest, CachedDisplayItems)
+{
+    setBodyInnerHTML("<div id='first'><div id='second'></div></div>");
+    RenderLayerModelObject* firstRenderer = toRenderLayerModelObject(document().body()->firstChild()->renderer());
+    RenderLayerModelObject* secondRenderer = toRenderLayerModelObject(document().body()->firstChild()->firstChild()->renderer());
+    GraphicsContext context(nullptr, &rootDisplayItemList());
+
+    drawRect(&context, firstRenderer, PaintPhaseBlockBackground, FloatRect(100, 100, 150, 150));
+    drawRect(&context, secondRenderer, PaintPhaseBlockBackground, FloatRect(100, 100, 150, 150));
+
+    EXPECT_DISPLAY_LIST(rootDisplayItemList().paintList(), 2,
+        TestDisplayItem(firstRenderer, DisplayItem::DrawingPaintPhaseBlockBackground),
+        TestDisplayItem(secondRenderer, DisplayItem::DrawingPaintPhaseBlockBackground));
+    EXPECT_TRUE(rootDisplayItemList().clientCacheIsValid(firstRenderer->displayItemClient()));
+    EXPECT_TRUE(rootDisplayItemList().clientCacheIsValid(secondRenderer->displayItemClient()));
+    DisplayItem* firstDisplayItem = rootDisplayItemList().paintList()[0].get();
+    DisplayItem* secondDisplayItem = rootDisplayItemList().paintList()[1].get();
+
+    rootDisplayItemList().invalidate(firstRenderer->displayItemClient());
+    EXPECT_FALSE(rootDisplayItemList().clientCacheIsValid(firstRenderer->displayItemClient()));
+    EXPECT_TRUE(rootDisplayItemList().clientCacheIsValid(secondRenderer->displayItemClient()));
+
+    drawRect(&context, firstRenderer, PaintPhaseBlockBackground, FloatRect(100, 100, 150, 150));
+    drawRect(&context, secondRenderer, PaintPhaseBlockBackground, FloatRect(100, 100, 150, 150));
+
+    EXPECT_DISPLAY_LIST(rootDisplayItemList().paintList(), 2,
+        TestDisplayItem(firstRenderer, DisplayItem::DrawingPaintPhaseBlockBackground),
+        TestDisplayItem(secondRenderer, DisplayItem::DrawingPaintPhaseBlockBackground));
+    // The first display item should be updated.
+    EXPECT_NE(firstDisplayItem, rootDisplayItemList().paintList()[0].get());
+    // The second display item should be cached.
+    EXPECT_EQ(secondDisplayItem, rootDisplayItemList().paintList()[1].get());
+    EXPECT_TRUE(rootDisplayItemList().clientCacheIsValid(firstRenderer->displayItemClient()));
+    EXPECT_TRUE(rootDisplayItemList().clientCacheIsValid(secondRenderer->displayItemClient()));
+
+    rootDisplayItemList().invalidateAll();
+    EXPECT_FALSE(rootDisplayItemList().clientCacheIsValid(firstRenderer->displayItemClient()));
+    EXPECT_FALSE(rootDisplayItemList().clientCacheIsValid(secondRenderer->displayItemClient()));
+}
+
+TEST_F(ViewDisplayListTest, FullDocumentPaintingWithCaret)
+{
+    setBodyInnerHTML("<div id='div' contentEditable='true'>XYZ</div>");
+    RenderView* renderView = document().renderView();
+    RenderLayer* rootLayer = renderView->layer();
+    RenderObject* htmlRenderer = document().documentElement()->renderer();
+    Element* div = toElement(document().body()->firstChild());
+    RenderObject* divRenderer = document().body()->firstChild()->renderer();
+    RenderObject* textRenderer = div->firstChild()->renderer();
+
+    SkCanvas canvas(800, 600);
+    GraphicsContext context(&canvas, &rootDisplayItemList());
+    LayerPaintingInfo paintingInfo(rootLayer, LayoutRect(0, 0, 800, 600), PaintBehaviorNormal, LayoutSize());
+    LayerPainter(*rootLayer).paintLayerContents(&context, paintingInfo, PaintLayerPaintingCompositingAllPhases);
+
+    EXPECT_DISPLAY_LIST(rootDisplayItemList().paintList(), 2,
+        TestDisplayItem(htmlRenderer, DisplayItem::DrawingPaintPhaseBlockBackground),
+        TestDisplayItem(textRenderer, DisplayItem::DrawingPaintPhaseForeground));
+
+    div->focus();
+    document().view()->updateLayoutAndStyleForPainting();
+    LayerPainter(*rootLayer).paintLayerContents(&context, paintingInfo, PaintLayerPaintingCompositingAllPhases);
+
+    EXPECT_DISPLAY_LIST(rootDisplayItemList().paintList(), 3,
+        TestDisplayItem(htmlRenderer, DisplayItem::DrawingPaintPhaseBlockBackground),
+        TestDisplayItem(textRenderer, DisplayItem::DrawingPaintPhaseForeground),
+        TestDisplayItem(divRenderer, DisplayItem::DrawingPaintPhaseCaret));
 }
 
 } // anonymous namespace

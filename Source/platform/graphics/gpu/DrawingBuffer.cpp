@@ -29,6 +29,7 @@
  */
 
 #include "config.h"
+
 #include "platform/graphics/gpu/DrawingBuffer.h"
 
 #include "platform/RuntimeEnabledFeatures.h"
@@ -42,7 +43,6 @@
 #include "public/platform/WebExternalTextureLayer.h"
 #include "public/platform/WebGraphicsContext3D.h"
 #include "public/platform/WebGraphicsContext3DProvider.h"
-#include "wtf/ArrayBufferContents.h"
 #include <algorithm>
 #ifndef NDEBUG
 #include "wtf/RefCountedLeakCounter.h"
@@ -157,6 +157,7 @@ DrawingBuffer::DrawingBuffer(PassOwnPtr<WebGraphicsContext3D> context,
     , m_packAlignment(4)
     , m_destructionInProgress(false)
     , m_isHidden(false)
+    , m_filterLevel(SkPaint::kLow_FilterLevel)
     , m_contextEvictionManager(contextEvictionManager)
 {
     // Used by browser tests to detect the use of a DrawingBuffer.
@@ -209,6 +210,15 @@ void DrawingBuffer::setIsHidden(bool hidden)
     m_isHidden = hidden;
     if (m_isHidden)
         freeRecycledMailboxes();
+}
+
+void DrawingBuffer::setFilterLevel(SkPaint::FilterLevel filterLevel)
+{
+    if (m_filterLevel != filterLevel) {
+        m_filterLevel = filterLevel;
+        if (m_layer)
+            m_layer->setNearestNeighbor(filterLevel == SkPaint::kNone_FilterLevel);
+    }
 }
 
 void DrawingBuffer::freeRecycledMailboxes()
@@ -531,6 +541,7 @@ WebLayer* DrawingBuffer::platformLayer()
         m_layer->setOpaque(!m_actualAttributes.alpha);
         m_layer->setBlendBackgroundColor(m_actualAttributes.alpha);
         m_layer->setPremultipliedAlpha(m_actualAttributes.premultipliedAlpha);
+        m_layer->setNearestNeighbor(m_filterLevel == SkPaint::kNone_FilterLevel);
         GraphicsLayer::registerContentsLayer(m_layer->layer());
     }
 
@@ -890,10 +901,10 @@ void DrawingBuffer::paintRenderingResultsToCanvas(ImageBuffer* imageBuffer)
     paintFramebufferToCanvas(framebuffer(), size().width(), size().height(), !m_actualAttributes.premultipliedAlpha, imageBuffer);
 }
 
-bool DrawingBuffer::paintRenderingResultsToImageData(int& width, int& height, SourceDrawingBuffer sourceBuffer, WTF::ArrayBufferContents& contents)
+PassRefPtr<Uint8ClampedArray> DrawingBuffer::paintRenderingResultsToImageData(int& width, int& height, SourceDrawingBuffer sourceBuffer)
 {
     if (m_actualAttributes.premultipliedAlpha)
-        return false;
+        return nullptr;
 
     width = size().width();
     height = size().height();
@@ -902,9 +913,9 @@ bool DrawingBuffer::paintRenderingResultsToImageData(int& width, int& height, So
     dataSize *= width;
     dataSize *= height;
     if (dataSize.hasOverflowed())
-        return false;
+        return nullptr;
 
-    WTF::ArrayBufferContents pixels(width * height, 4, WTF::ArrayBufferContents::DontInitialize);
+    RefPtr<Uint8ClampedArray> pixels = Uint8ClampedArray::createUninitialized(width * height * 4);
 
     GLint fbo = 0;
     if (sourceBuffer == FrontBuffer && m_frontColorBuffer.texInfo.textureId) {
@@ -915,8 +926,8 @@ bool DrawingBuffer::paintRenderingResultsToImageData(int& width, int& height, So
         m_context->bindFramebuffer(GL_FRAMEBUFFER, framebuffer());
     }
 
-    readBackFramebuffer(static_cast<unsigned char*>(pixels.data()), width, height, ReadbackRGBA, WebGLImageConversion::AlphaDoNothing);
-    flipVertically(static_cast<uint8_t*>(pixels.data()), width, height);
+    readBackFramebuffer(pixels->data(), width, height, ReadbackRGBA, WebGLImageConversion::AlphaDoNothing);
+    flipVertically(pixels->data(), width, height);
 
     if (fbo) {
         m_context->framebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, 0, 0);
@@ -929,8 +940,7 @@ bool DrawingBuffer::paintRenderingResultsToImageData(int& width, int& height, So
         bind();
     }
 
-    pixels.transfer(contents);
-    return true;
+    return pixels.release();
 }
 
 void DrawingBuffer::paintFramebufferToCanvas(int framebuffer, int width, int height, bool premultiplyAlpha, ImageBuffer* imageBuffer)

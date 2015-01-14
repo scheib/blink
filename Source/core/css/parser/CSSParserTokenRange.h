@@ -10,7 +10,7 @@
 
 namespace blink {
 
-class CSSParserToken;
+extern const CSSParserToken& staticEOFToken;
 
 // A CSSParserTokenRange is an iterator over a subrange of a vector of CSSParserTokens.
 // Accessing outside of the range will return an endless stream of EOF tokens.
@@ -32,19 +32,39 @@ public:
     const CSSParserToken& peek(unsigned offset = 0) const
     {
         if (m_first + offset >= m_last)
-            return staticEOF();
+            return staticEOFToken;
         return *(m_first + offset);
     }
 
     const CSSParserToken& consume()
     {
         if (m_first == m_last)
-            return staticEOF();
+            return staticEOFToken;
         return *m_first++;
     }
 
+    const CSSParserToken& consumeIncludingComments()
+    {
+        const CSSParserToken& result = consume();
+        while (peek().type() == CommentToken)
+            ++m_first;
+        return result;
+    }
+
+    const CSSParserToken& consumeIncludingWhitespaceAndComments()
+    {
+        const CSSParserToken& result = consume();
+        consumeWhitespaceAndComments();
+        return result;
+    }
+
+    // The returned range doesn't include the brackets
+    CSSParserTokenRange consumeBlock();
+
     void consumeComponentValue();
     void consumeWhitespaceAndComments();
+
+    static void initStaticEOFToken();
 
 private:
     CSSParserTokenRange(const CSSParserToken* first, const CSSParserToken* last)
@@ -52,11 +72,6 @@ private:
     , m_last(last)
     { }
 
-    static const CSSParserToken& staticEOF()
-    {
-        DEFINE_STATIC_LOCAL(CSSParserToken, eof, (EOFToken));
-        return eof;
-    }
     const CSSParserToken* m_first;
     const CSSParserToken* m_last;
 };

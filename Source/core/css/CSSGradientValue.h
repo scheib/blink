@@ -35,7 +35,6 @@ namespace blink {
 
 class FloatPoint;
 class Gradient;
-class TextLinkColors;
 
 enum CSSGradientType {
     CSSDeprecatedLinearGradient,
@@ -94,6 +93,8 @@ public:
     void addStop(const CSSGradientColorStop& stop) { m_stops.append(stop); }
 
     unsigned stopCount() const { return m_stops.size(); }
+
+    void appendCSSTextForDeprecatedColorStops(StringBuilder&) const;
 
     void sortStopsIfNeeded();
 

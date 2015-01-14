@@ -71,17 +71,19 @@ static FloatPoint convertHitPointToWindow(const Widget* widget, FloatPoint point
     float scale = 1;
     IntSize offset;
     IntPoint pinchViewport;
+    FloatSize overscrollOffset;
     if (widget) {
         FrameView* rootView = toFrameView(widget->root());
         if (rootView) {
             scale = rootView->inputEventsScaleFactor();
             offset = rootView->inputEventsOffsetForEmulation();
             pinchViewport = flooredIntPoint(rootView->page()->frameHost().pinchViewport().visibleRect().location());
+            overscrollOffset = rootView->elasticOverscroll();
         }
     }
     return FloatPoint(
-        (point.x() - offset.width()) / scale + pinchViewport.x(),
-        (point.y() - offset.height()) / scale + pinchViewport.y());
+        (point.x() - offset.width()) / scale + pinchViewport.x() + overscrollOffset.width(),
+        (point.y() - offset.height()) / scale + pinchViewport.y() + overscrollOffset.height());
 }
 
 static int toWebEventModifiers(unsigned platformModifiers)
@@ -196,6 +198,7 @@ PlatformWheelEventBuilder::PlatformWheelEventBuilder(Widget* widget, const WebMo
     m_modifiers = toPlatformMouseEventModifiers(e.modifiers);
 
     m_hasPreciseScrollingDeltas = e.hasPreciseScrollingDeltas;
+    m_canScroll = e.canScroll;
 #if OS(MACOSX)
     m_phase = static_cast<PlatformWheelEventPhase>(e.phase);
     m_momentumPhase = static_cast<PlatformWheelEventPhase>(e.momentumPhase);
@@ -641,6 +644,7 @@ WebMouseWheelEventBuilder::WebMouseWheelEventBuilder(const Widget* widget, const
     wheelTicksX = event.ticksX();
     wheelTicksY = event.ticksY();
     scrollByPage = event.deltaMode() == WheelEvent::DOM_DELTA_PAGE;
+    canScroll = event.canScroll();
 }
 
 WebKeyboardEventBuilder::WebKeyboardEventBuilder(const KeyboardEvent& event)

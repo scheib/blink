@@ -39,6 +39,12 @@
 #include "platform/TraceEvent.h"
 #include "third_party/snappy/src/snappy.h"
 
+#if defined(WTF_OS_WIN)
+#include <malloc.h>
+#else
+#include <alloca.h>
+#endif
+
 namespace blink {
 
 namespace {
@@ -135,23 +141,6 @@ v8::Local<v8::Script> compileAndConsumeOrProduce(ScriptResource* resource, unsig
         : compileAndProduceCache(resource, tag, produceOptions, compressed, cacheType, isolate, code, origin);
 }
 
-// Final compile call for a streamed compilation. Most decisions have already
-// been made, but we need to write back data into the cache.
-v8::Local<v8::Script> postStreamCompile(ScriptResource* resource, ScriptStreamer* streamer, v8::Isolate* isolate, v8::Handle<v8::String> code, v8::ScriptOrigin origin)
-{
-    v8::Local<v8::Script> script = v8::ScriptCompiler::Compile(isolate, streamer->source(), code, origin);
-
-    // Whether to produce the cached data or not is decided when the
-    // streamer is started. Here we only need to get the data out.
-    const v8::ScriptCompiler::CachedData* newCachedData = streamer->source()->GetCachedData();
-    if (newCachedData) {
-        resource->clearCachedMetadata();
-        resource->setCachedMetadata(streamer->cachedDataType(), reinterpret_cast<const char*>(newCachedData->data), newCachedData->length, Resource::CacheLocally);
-    }
-
-    return script;
-}
-
 enum CacheTagKind {
     CacheTagParser = 0,
     CacheTagCode = 1,
@@ -162,12 +151,65 @@ enum CacheTagKind {
 
 static const int kCacheTagKindSize = 2;
 
-unsigned cacheTag(CacheTagKind kind)
+unsigned cacheTag(CacheTagKind kind, Resource* resource)
 {
-    COMPILE_ASSERT((1 << kCacheTagKindSize) >= CacheTagLast, Cache_tag_Last_must_be_large_enough);
+    static_assert((1 << kCacheTagKindSize) >= CacheTagLast, "CacheTagLast must be large enough");
 
     static unsigned v8CacheDataVersion = v8::ScriptCompiler::CachedDataVersionTag() << kCacheTagKindSize;
-    return v8CacheDataVersion | kind;
+
+    // A script can be (successfully) interpreted with different encodings,
+    // depending on the page it appears in. The cache doesn't know anything
+    // about encodings, but the cached data is specific to one encoding. If we
+    // later load the script from the cache and interpret it with a different
+    // encoding, the cached data is not valid for that encoding.
+    return (v8CacheDataVersion | kind) + StringHash::hash(resource->encoding());
+}
+
+// Final compile call for a streamed compilation. Most decisions have already
+// been made, but we need to write back data into the cache.
+v8::Local<v8::Script> postStreamCompile(ScriptResource* resource, ScriptStreamer* streamer, v8::Isolate* isolate, v8::Handle<v8::String> code, v8::ScriptOrigin origin)
+{
+    v8::Local<v8::Script> script = v8::ScriptCompiler::Compile(isolate, streamer->source(), code, origin);
+
+    // Whether to produce the cached data or not is decided when the
+    // streamer is started. Here we only need to get the data out.
+    const v8::ScriptCompiler::CachedData* newCachedData = streamer->source()->GetCachedData();
+    if (newCachedData) {
+        // Sanity check: when we associate cached data with the Resource, the
+        // encoding (which is also stored in the cache) must match the
+        // Streamer's view. For debugging purposes: If this is not true, produce
+        // a crash. FIXME: Remove debugging code after investigating why this
+        // happens.
+        v8::ScriptCompiler::StreamedSource::Encoding encoding;
+        if (!ScriptStreamer::convertEncoding(resource->encoding().ascii().data(), &encoding)
+            || streamer->encoding() != encoding) {
+            // For debugging, write the resource URL, the current encoding and
+            // the previous encoding on stack so that it can be read from the
+            // crash dump.
+            size_t urlLength = resource->url().string().ascii().length();
+            size_t encodingLength = resource->encoding().ascii().length();
+            char* ptr = reinterpret_cast<char*>(alloca(urlLength + encodingLength + 1));
+            memcpy(ptr, resource->url().string().ascii().data(), urlLength);
+            memcpy(ptr + urlLength, resource->encoding().ascii().data(), encodingLength);
+            *(ptr + urlLength + encodingLength) = static_cast<char>(streamer->encoding());
+            RELEASE_ASSERT_NOT_REACHED();
+        }
+
+        resource->clearCachedMetadata();
+        v8::ScriptCompiler::CompileOptions options = streamer->compileOptions();
+        switch (options) {
+        case v8::ScriptCompiler::kProduceParserCache:
+            resource->setCachedMetadata(cacheTag(CacheTagParser, resource), reinterpret_cast<const char*>(newCachedData->data), newCachedData->length, Resource::CacheLocally);
+            break;
+        case v8::ScriptCompiler::kProduceCodeCache:
+            resource->setCachedMetadata(cacheTag(CacheTagCode, resource), reinterpret_cast<const char*>(newCachedData->data), newCachedData->length, Resource::SendToPlatform);
+            break;
+        default:
+            break;
+        }
+    }
+
+    return script;
 }
 
 typedef Function<v8::Local<v8::Script>(v8::Isolate*, v8::Handle<v8::String>, v8::ScriptOrigin)> CompileFn;
@@ -189,7 +231,7 @@ PassOwnPtr<CompileFn> bind(const A&... args)
 PassOwnPtr<CompileFn> selectCompileFunction(V8CacheOptions cacheOptions, ScriptResource* resource, v8::Handle<v8::String> code)
 {
     static const int minimalCodeLength = 1024;
-    static const int mediumCodeLength = 30000;
+    static const int mediumCodeLength = 300000;
 
     if (cacheOptions == V8CacheOptionsNone
         || !resource
@@ -204,22 +246,22 @@ PassOwnPtr<CompileFn> selectCompileFunction(V8CacheOptions cacheOptions, ScriptR
     case V8CacheOptionsDefault:
     case V8CacheOptionsParseMemory:
         // Use parser-cache; in-memory only.
-        return bind(compileAndConsumeOrProduce, resource, cacheTag(CacheTagParser), v8::ScriptCompiler::kConsumeParserCache, v8::ScriptCompiler::kProduceParserCache, false, Resource::CacheLocally);
+        return bind(compileAndConsumeOrProduce, resource, cacheTag(CacheTagParser, resource), v8::ScriptCompiler::kConsumeParserCache, v8::ScriptCompiler::kProduceParserCache, false, Resource::CacheLocally);
         break;
 
     case V8CacheOptionsParse:
         // Use parser-cache.
-        return bind(compileAndConsumeOrProduce, resource, cacheTag(CacheTagParser), v8::ScriptCompiler::kConsumeParserCache, v8::ScriptCompiler::kProduceParserCache, false, Resource::SendToPlatform);
+        return bind(compileAndConsumeOrProduce, resource, cacheTag(CacheTagParser, resource), v8::ScriptCompiler::kConsumeParserCache, v8::ScriptCompiler::kProduceParserCache, false, Resource::SendToPlatform);
         break;
 
     case V8CacheOptionsCode:
         // Always use code caching.
-        return bind(compileAndConsumeOrProduce, resource, cacheTag(CacheTagCode), v8::ScriptCompiler::kConsumeCodeCache, v8::ScriptCompiler::kProduceCodeCache, false, Resource::SendToPlatform);
+        return bind(compileAndConsumeOrProduce, resource, cacheTag(CacheTagCode, resource), v8::ScriptCompiler::kConsumeCodeCache, v8::ScriptCompiler::kProduceCodeCache, false, Resource::SendToPlatform);
         break;
 
     case V8CacheOptionsCodeCompressed:
         // Always use code caching. Compress depending on cacheOptions.
-        return bind(compileAndConsumeOrProduce, resource, cacheTag(CacheTagCodeCompressed), v8::ScriptCompiler::kConsumeCodeCache, v8::ScriptCompiler::kProduceCodeCache, true, Resource::SendToPlatform);
+        return bind(compileAndConsumeOrProduce, resource, cacheTag(CacheTagCodeCompressed, resource), v8::ScriptCompiler::kConsumeCodeCache, v8::ScriptCompiler::kProduceCodeCache, true, Resource::SendToPlatform);
         break;
 
     case V8CacheOptionsHeuristics:
@@ -231,13 +273,15 @@ PassOwnPtr<CompileFn> selectCompileFunction(V8CacheOptions cacheOptions, ScriptR
 
         // Either code or parser caching, depending on code size and what we
         // already have in the cache.
-        if (resource->cachedMetadata(cacheTag(codeTag)))
-            return bind(compileAndConsumeCache, resource, cacheTag(codeTag), v8::ScriptCompiler::kConsumeCodeCache, compress);
+        unsigned codeCacheTag = cacheTag(codeTag, resource);
+        if (resource->cachedMetadata(codeCacheTag))
+            return bind(compileAndConsumeCache, resource, codeCacheTag, v8::ScriptCompiler::kConsumeCodeCache, compress);
         if (code->Length() < mediumCodeLength)
-            return bind(compileAndProduceCache, resource, cacheTag(codeTag), v8::ScriptCompiler::kProduceCodeCache, compress, Resource::SendToPlatform);
-        if (resource->cachedMetadata(cacheTag(CacheTagParser)))
-            return bind(compileAndConsumeCache, resource, cacheTag(CacheTagParser), v8::ScriptCompiler::kConsumeParserCache, false);
-        return bind(compileAndProduceCache, resource, cacheTag(CacheTagParser), v8::ScriptCompiler::kProduceParserCache, false, Resource::SendToPlatform);
+            return bind(compileAndProduceCache, resource, codeCacheTag, v8::ScriptCompiler::kProduceCodeCache, compress, Resource::SendToPlatform);
+        unsigned parserCacheTag = cacheTag(CacheTagParser, resource);
+        if (resource->cachedMetadata(parserCacheTag))
+            return bind(compileAndConsumeCache, resource, parserCacheTag, v8::ScriptCompiler::kConsumeParserCache, false);
+        return bind(compileAndProduceCache, resource, parserCacheTag, v8::ScriptCompiler::kProduceParserCache, false, Resource::SendToPlatform);
         break;
     }
 
@@ -418,14 +462,14 @@ v8::Local<v8::Object> V8ScriptRunner::instantiateObjectInDocument(v8::Isolate* i
     return result;
 }
 
-unsigned V8ScriptRunner::tagForParserCache()
+unsigned V8ScriptRunner::tagForParserCache(Resource* resource)
 {
-    return cacheTag(CacheTagParser);
+    return cacheTag(CacheTagParser, resource);
 }
 
-unsigned V8ScriptRunner::tagForCodeCache()
+unsigned V8ScriptRunner::tagForCodeCache(Resource* resource)
 {
-    return cacheTag(CacheTagCode);
+    return cacheTag(CacheTagCode, resource);
 }
 
 } // namespace blink

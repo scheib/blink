@@ -176,7 +176,7 @@ InspectorTest.dump = function(value, customFormatters, prefix, prefixWithName)
     }
     if (value === null)
         InspectorTest.addResult(prefixWithName + "null");
-    else if (value instanceof Array)
+    else if (value && value.constructor && value.constructor.name === "Array")
         InspectorTest.addArray(value, customFormatters, prefix, prefixWithName);
     else if (typeof value === "object")
         InspectorTest.addObject(value, customFormatters, prefix, prefixWithName);
@@ -184,6 +184,65 @@ InspectorTest.dump = function(value, customFormatters, prefix, prefixWithName)
         InspectorTest.addResult(prefixWithName + "\"" + value + "\"");
     else
         InspectorTest.addResult(prefixWithName + value);
+}
+
+InspectorTest.dumpDataGrid = function(dataGrid)
+{
+    InspectorTest.addResult(InspectorTest.dumpDataGridIntoString(dataGrid));
+}
+
+InspectorTest.dumpDataGridIntoString = function(dataGrid)
+{
+    var tableElement = dataGrid.element;
+    var textRows = [];
+    var textWidths = [];
+    var rows = tableElement.getElementsByTagName("tr");
+    for (var i = 0, row; row = rows[i]; ++i) {
+        if (!row.offsetHeight || !row.textContent)
+            continue;
+        var textCols = [];
+        var cols = row.getElementsByTagName("td");
+        for (var j = 0, col; col = cols[j]; ++j) {
+            if (!col.offsetHeight)
+                continue;
+            var index = textCols.length;
+            var content = col.textContent || (col.firstChild && col.firstChild.title) || "";
+            var text = padding(col) + content;
+            textWidths[index] = Math.max(textWidths[index] || 0, text.length);
+            textCols[index] = text;
+        }
+        if (textCols.length)
+            textRows.push(textCols);
+    }
+
+    function padding(target)
+    {
+        var cell = target.enclosingNodeOrSelfWithNodeName("td");
+        if (!cell.classList.contains("disclosure"))
+            return "";
+        var node = dataGrid.dataGridNodeFromNode(target);
+        var spaces = (node ? node.depth : 0) * 2;
+        return Array(spaces + 1).join(" ");
+    }
+
+    function alignText(text, width)
+    {
+        var spaces = width - text.length;
+        return text + Array(spaces + 1).join(" ");;
+    }
+
+    var output = [];
+    for (var i = 0; i < textRows.length; ++i) {
+        var line = "";
+        for (var j = 0; j < textRows[i].length; ++j) {
+            if (j)
+                line += " | ";
+            line += alignText(textRows[i][j], textWidths[j]);
+        }
+        line += "|";
+        output.push(line);
+    }
+    return output.join("\n");
 }
 
 InspectorTest.assertGreaterOrEqual = function(a, b, message)
@@ -213,7 +272,7 @@ InspectorTest._innerReloadPage = function(hardReload, callback, scriptToEvaluate
     InspectorTest._pageLoadedCallback = InspectorTest.safeWrap(callback);
 
     if (WebInspector.panels.network)
-        WebInspector.panels.network._networkLogView._reset();
+        WebInspector.panels.network._networkLogView.reset();
     PageAgent.reload(hardReload, scriptToEvaluateOnLoad, scriptPreprocessor);
 }
 
@@ -672,7 +731,7 @@ function runTest(enableWatchDogWhileDebugging)
         }
 
         InspectorTest = {};
-    
+
         for (var i = 0; i < initializationFunctions.length; ++i) {
             try {
                 initializationFunctions[i]();
@@ -703,6 +762,8 @@ function runTest(enableWatchDogWhileDebugging)
 
         if (testPath.indexOf("layers/") !== -1)
             Runtime.experiments.setEnabled("layersPanel", true);
+        if (testPath.indexOf("shadow-host-display-modes") !== -1)
+            Runtime.experiments.setEnabled("composedShadowDOM", true);
 
         // 2. Show initial panel based on test path.
         var initialPanelByFolder = {

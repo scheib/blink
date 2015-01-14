@@ -31,7 +31,7 @@
 #include "config.h"
 #include "web/ServiceWorkerGlobalScopeClientImpl.h"
 
-#include "modules/serviceworkers/Response.h"
+#include "modules/fetch/Response.h"
 #include "public/platform/WebServiceWorkerResponse.h"
 #include "public/platform/WebURL.h"
 #include "public/web/WebServiceWorkerContextClient.h"
@@ -98,9 +98,19 @@ void ServiceWorkerGlobalScopeClientImpl::didHandleSyncEvent(int syncEventID)
     m_client.didHandleSyncEvent(syncEventID);
 }
 
+void ServiceWorkerGlobalScopeClientImpl::didHandleCrossOriginConnectEvent(int connectEventID, bool acceptConnect)
+{
+    m_client.didHandleCrossOriginConnectEvent(connectEventID, acceptConnect);
+}
+
 void ServiceWorkerGlobalScopeClientImpl::postMessageToClient(int clientID, const WebString& message, PassOwnPtr<WebMessagePortChannelArray> webChannels)
 {
     m_client.postMessageToClient(clientID, message, webChannels.leakPtr());
+}
+
+void ServiceWorkerGlobalScopeClientImpl::postMessageToCrossOriginClient(const WebCrossOriginServiceWorkerClient& client, const WebString& message, PassOwnPtr<WebMessagePortChannelArray> webChannels)
+{
+    m_client.postMessageToCrossOriginClient(client, message, webChannels.leakPtr());
 }
 
 void ServiceWorkerGlobalScopeClientImpl::skipWaiting(WebServiceWorkerSkipWaitingCallbacks* callbacks)

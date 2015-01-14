@@ -193,7 +193,7 @@ shouldBe("nonNumericPolicy('createCSSRuleList().item(x)')", "'any type allowed (
 
 // CSSStyleDeclaration
 
-shouldBe("nonNumericPolicy('createCSSStyleDeclaration().item(x)')", "'any type allowed'");
+shouldBe("nonNumericPolicy('createCSSStyleDeclaration().item(x)')", "'any type allowed (but not omitted)'");
 
 // CSSStyleSheet
 
@@ -205,12 +205,12 @@ shouldBe("nonNumericPolicy('createCSSStyleSheet().removeRule(x)')", "'any type a
 // Document
 
 shouldBe("nonNumericPolicy('document.elementFromPoint(x, 0)')", "'any type allowed'");
-shouldBe("nonNumericPolicy('document.elementFromPoint(0, x)')", "'any type allowed'");
+shouldBe("nonNumericPolicy('document.elementFromPoint(0, x)')", "'any type allowed (but not omitted)'");
 
 // Element
 
-shouldBe("nonNumericPolicy('document.body.scrollLeft = x')", "'mixed'");
-shouldBe("nonNumericPolicy('document.body.scrollTop = x')", "'mixed'");
+shouldBe("nonNumericPolicy('document.body.scrollLeft = x')", "'any type allowed'");
+shouldBe("nonNumericPolicy('document.body.scrollTop = x')", "'any type allowed'");
 
 // History
 
@@ -298,7 +298,7 @@ shouldBe("nonNumericPolicy('getSelection().setBaseAndExtent(document, x, documen
 shouldBe("nonNumericPolicy('getSelection().setBaseAndExtent(document, 0, document, x)')", "'any type allowed'");
 shouldBe("nonNumericPolicy('getSelection().collapse(document, x)')", "'any type allowed'");
 shouldBe("nonNumericPolicy('getSelection().extend(document, x)')", "'any type allowed'");
-shouldBe("nonNumericPolicy('getSelection().getRangeAt(x)')", "'any type allowed'");
+shouldBe("nonNumericPolicy('getSelection().getRangeAt(x)')", "'any type allowed (but not omitted)'");
 
 // SQLResultSetRowList
 

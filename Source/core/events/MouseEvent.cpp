@@ -30,21 +30,6 @@
 
 namespace blink {
 
-MouseEventInit::MouseEventInit()
-    : screenX(0)
-    , screenY(0)
-    , clientX(0)
-    , clientY(0)
-    , ctrlKey(false)
-    , altKey(false)
-    , shiftKey(false)
-    , metaKey(false)
-    , button(0)
-    , buttons(0)
-    , relatedTarget(nullptr)
-{
-}
-
 PassRefPtrWillBeRawPtr<MouseEvent> MouseEvent::create(const AtomicString& type, const MouseEventInit& initializer)
 {
     return adoptRefWillBeNoop(new MouseEvent(type, initializer));
@@ -68,7 +53,7 @@ PassRefPtrWillBeRawPtr<MouseEvent> MouseEvent::create(const AtomicString& eventT
 }
 
 PassRefPtrWillBeRawPtr<MouseEvent> MouseEvent::create(const AtomicString& type, bool canBubble, bool cancelable, PassRefPtrWillBeRawPtr<AbstractView> view,
-    int detail, int screenX, int screenY, int pageX, int pageY,
+    int detail, int screenX, int screenY, int windowX, int windowY,
     int movementX, int movementY,
     bool ctrlKey, bool altKey, bool shiftKey, bool metaKey,
     unsigned short button, unsigned short buttons,
@@ -76,7 +61,7 @@ PassRefPtrWillBeRawPtr<MouseEvent> MouseEvent::create(const AtomicString& type, 
     double uiCreateTime)
 {
     return adoptRefWillBeNoop(new MouseEvent(type, canBubble, cancelable, view,
-        detail, screenX, screenY, pageX, pageY,
+        detail, screenX, screenY, windowX, windowY,
         movementX, movementY,
         ctrlKey, altKey, shiftKey, metaKey, button, buttons, relatedTarget, dataTransfer, isSimulated, syntheticEventType, uiCreateTime));
 }
@@ -89,16 +74,16 @@ MouseEvent::MouseEvent()
 }
 
 MouseEvent::MouseEvent(const AtomicString& eventType, bool canBubble, bool cancelable, PassRefPtrWillBeRawPtr<AbstractView> view,
-    int detail, int screenX, int screenY, int pageX, int pageY,
+    int detail, int screenX, int screenY, int windowX, int windowY,
     int movementX, int movementY,
     bool ctrlKey, bool altKey, bool shiftKey, bool metaKey,
     unsigned short button, unsigned short buttons, PassRefPtrWillBeRawPtr<EventTarget> relatedTarget,
     PassRefPtrWillBeRawPtr<DataTransfer> dataTransfer, bool isSimulated, PlatformMouseEvent::SyntheticEventType syntheticEventType,
     double uiCreateTime)
     : MouseRelatedEvent(eventType, canBubble, cancelable, view, detail, IntPoint(screenX, screenY),
-                        IntPoint(pageX, pageY),
-                        IntPoint(movementX, movementY),
-                        ctrlKey, altKey, shiftKey, metaKey, isSimulated)
+        IntPoint(windowX, windowY),
+        IntPoint(movementX, movementY),
+        ctrlKey, altKey, shiftKey, metaKey, isSimulated)
     , m_button(button == (unsigned short)-1 ? 0 : button)
     , m_buttons(buttons)
     , m_buttonDown(button != (unsigned short)-1)
@@ -110,17 +95,17 @@ MouseEvent::MouseEvent(const AtomicString& eventType, bool canBubble, bool cance
 }
 
 MouseEvent::MouseEvent(const AtomicString& eventType, const MouseEventInit& initializer)
-    : MouseRelatedEvent(eventType, initializer.bubbles, initializer.cancelable, initializer.view, initializer.detail, IntPoint(initializer.screenX, initializer.screenY),
+    : MouseRelatedEvent(eventType, initializer.bubbles(), initializer.cancelable(), initializer.view(), initializer.detail(), IntPoint(initializer.screenX(), initializer.screenY()),
         IntPoint(0 /* pageX */, 0 /* pageY */),
         IntPoint(0 /* movementX */, 0 /* movementY */),
-        initializer.ctrlKey, initializer.altKey, initializer.shiftKey, initializer.metaKey, false /* isSimulated */)
-    , m_button(initializer.button == (unsigned short)-1 ? 0 : initializer.button)
-    , m_buttons(initializer.buttons)
-    , m_buttonDown(initializer.button != (unsigned short)-1)
-    , m_relatedTarget(initializer.relatedTarget)
+        initializer.ctrlKey(), initializer.altKey(), initializer.shiftKey(), initializer.metaKey(), false /* isSimulated */)
+    , m_button(initializer.button() == (unsigned short)-1 ? 0 : initializer.button())
+    , m_buttons(initializer.buttons())
+    , m_buttonDown(initializer.button() != (unsigned short)-1)
+    , m_relatedTarget(initializer.relatedTarget())
     , m_dataTransfer(nullptr)
 {
-    initCoordinates(IntPoint(initializer.clientX, initializer.clientY));
+    initCoordinates(IntPoint(initializer.clientX(), initializer.clientY()));
 }
 
 MouseEvent::~MouseEvent()

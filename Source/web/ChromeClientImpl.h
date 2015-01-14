@@ -92,7 +92,7 @@ public:
     virtual void setMenubarVisible(bool) override;
     virtual bool menubarVisible() override;
     virtual void setResizable(bool) override;
-    virtual bool shouldReportDetailedMessageForSource(const WTF::String&) override;
+    virtual bool shouldReportDetailedMessageForSource(LocalFrame&, const WTF::String&) override;
     virtual void addMessageToConsole(
         LocalFrame*, MessageSource, MessageLevel,
         const WTF::String& message, unsigned lineNumber,
@@ -109,8 +109,7 @@ public:
     virtual void setStatusbarText(const WTF::String& message) override;
     virtual bool tabsToLinks() override;
     virtual IntRect windowResizerRect() const override;
-    virtual void invalidateContentsAndRootView(const IntRect&) override;
-    virtual void invalidateContentsForSlowScroll(const IntRect&) override;
+    virtual void invalidateRect(const IntRect&) override;
     virtual void scheduleAnimation() override;
     virtual void scheduleAnimationForFrame(LocalFrame* localRoot) override;
     virtual IntRect rootViewToScreen(const IntRect&) const override;
@@ -152,7 +151,7 @@ public:
     void setNewWindowNavigationPolicy(WebNavigationPolicy);
 
     virtual bool hasOpenedPopup() const override;
-    virtual PassRefPtrWillBeRawPtr<PopupMenu> createPopupMenu(LocalFrame&, PopupMenuClient*) const override;
+    virtual PassRefPtrWillBeRawPtr<PopupMenu> createPopupMenu(LocalFrame&, PopupMenuClient*) override;
     PagePopup* openPagePopup(PagePopupClient*, const IntRect&);
     void closePagePopup(PagePopup*);
     virtual DOMWindow* pagePopupWindowForTesting() const override;
@@ -162,17 +161,22 @@ public:
     virtual bool requestPointerLock() override;
     virtual void requestPointerUnlock() override;
 
+    virtual bool shouldDisableDesktopWorkarounds() override;
+
     // AutofillClient pass throughs:
-    virtual void didAssociateFormControls(const WillBeHeapVector<RefPtrWillBeMember<Element> >&, LocalFrame*) override;
+    virtual void didAssociateFormControls(const WillBeHeapVector<RefPtrWillBeMember<Element>>&, LocalFrame*) override;
     virtual void handleKeyboardEventOnTextField(HTMLInputElement&, KeyboardEvent&) override;
     virtual void didChangeValueInTextField(HTMLFormControlElement&) override;
     virtual void didEndEditingOnTextField(HTMLInputElement&) override;
     virtual void openTextDataListChooser(HTMLInputElement&) override;
+    virtual void textFieldDataListChanged(HTMLInputElement&) override;
 
     virtual void didCancelCompositionOnSelectionChange() override;
     virtual void willSetInputMethodState() override;
     virtual void didUpdateTextOfFocusedElementByNonUserInput() override;
     virtual void showImeIfNeeded() override;
+
+    virtual void registerViewportLayers() const override;
 
 private:
     virtual bool isChromeClientImpl() const override { return true; }

@@ -95,7 +95,7 @@ PassRefPtrWillBeRawPtr<Node> Text::mergeNextSiblingNodesIfPossible()
         nextText->updateTextRenderer(0, 0);
 
         document().incDOMTreeVersion();
-        didModifyData(oldTextData);
+        didModifyData(oldTextData, CharacterData::UpdateFromNonParser);
         nextText->remove(IGNORE_EXCEPTION);
     }
 
@@ -116,7 +116,7 @@ PassRefPtrWillBeRawPtr<Text> Text::splitText(unsigned offset, ExceptionState& ex
     RefPtrWillBeRawPtr<Text> newText = cloneWithData(oldStr.substring(offset));
     setDataWithoutUpdate(oldStr.substring(0, offset));
 
-    didModifyData(oldStr);
+    didModifyData(oldStr, CharacterData::UpdateFromNonParser);
 
     if (parentNode())
         parentNode()->insertBefore(newText.get(), nextSibling(), exceptionState);
@@ -237,6 +237,23 @@ PassRefPtrWillBeRawPtr<Node> Text::cloneNode(bool /*deep*/)
     return cloneWithData(data());
 }
 
+static inline bool canHaveWhitespaceChildren(const RenderObject& parent)
+{
+    // <button> should allow whitespace even though RenderFlexibleBox doesn't.
+    if (parent.isRenderButton())
+        return true;
+
+    if (parent.isTable() || parent.isTableRow() || parent.isTableSection()
+        || parent.isRenderTableCol() || parent.isFrameSet()
+        || parent.isFlexibleBox() || parent.isRenderGrid()
+        || parent.isSVGRoot()
+        || parent.isSVGContainer()
+        || parent.isSVGImage()
+        || parent.isSVGShape())
+        return false;
+    return true;
+}
+
 bool Text::textRendererIsNeeded(const RenderStyle& style, const RenderObject& parent)
 {
     if (!parent.canHaveChildren())
@@ -254,7 +271,7 @@ bool Text::textRendererIsNeeded(const RenderStyle& style, const RenderObject& pa
     if (!containsOnlyWhitespace())
         return true;
 
-    if (!parent.canHaveWhitespaceChildren())
+    if (!canHaveWhitespaceChildren(parent))
         return false;
 
     if (style.preserveNewline()) // pre/pre-wrap/pre-line always make renderers.

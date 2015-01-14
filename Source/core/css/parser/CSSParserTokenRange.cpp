@@ -5,16 +5,43 @@
 #include "config.h"
 #include "core/css/parser/CSSParserTokenRange.h"
 
+#include "wtf/StaticConstructors.h"
+
 namespace blink {
+
+DEFINE_GLOBAL(CSSParserToken, staticEOFToken);
+
+void CSSParserTokenRange::initStaticEOFToken()
+{
+    new ((void*)&staticEOFToken) CSSParserToken(EOFToken);
+}
 
 CSSParserTokenRange CSSParserTokenRange::makeSubRange(const CSSParserToken* first, const CSSParserToken* last)
 {
-    if (first == &staticEOF())
+    if (first == &staticEOFToken)
         first = m_last;
-    if (last == &staticEOF())
+    if (last == &staticEOFToken)
         last = m_last;
     ASSERT(first <= last);
     return CSSParserTokenRange(first, last);
+}
+
+CSSParserTokenRange CSSParserTokenRange::consumeBlock()
+{
+    ASSERT(peek().blockType() == CSSParserToken::BlockStart);
+    const CSSParserToken* start = &peek() + 1;
+    unsigned nestingLevel = 0;
+    do {
+        const CSSParserToken& token = consume();
+        if (token.blockType() == CSSParserToken::BlockStart)
+            nestingLevel++;
+        else if (token.blockType() == CSSParserToken::BlockEnd)
+            nestingLevel--;
+    } while (nestingLevel && m_first < m_last);
+
+    if (nestingLevel)
+        return makeSubRange(start, m_first); // Ended at EOF
+    return makeSubRange(start, m_first - 1);
 }
 
 void CSSParserTokenRange::consumeComponentValue()
@@ -34,7 +61,7 @@ void CSSParserTokenRange::consumeComponentValue()
 void CSSParserTokenRange::consumeWhitespaceAndComments()
 {
     while (peek().type() == WhitespaceToken || peek().type() == CommentToken)
-        consume();
+        ++m_first;
 }
 
 } // namespace blink

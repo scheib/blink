@@ -287,7 +287,7 @@ const SimpleFontData* SimpleFontData::fontDataForCharacter(UChar32) const
 Glyph SimpleFontData::glyphForCharacter(UChar32 character) const
 {
     // As GlyphPage::size is power of 2 so shifting is valid
-    GlyphPageTreeNodeBase* node = GlyphPageTreeNode::getRootChild(this, character >> GlyphPage::sizeBits);
+    GlyphPageTreeNode* node = GlyphPageTreeNode::getNormalRootChild(this, character >> GlyphPage::sizeBits);
     return node->page() ? node->page()->glyphAt(character & 0xFF) : 0;
 }
 
@@ -467,10 +467,14 @@ bool SimpleFontData::fillGlyphPage(GlyphPage* pageToFill, unsigned offset, unsig
         return false;
     }
 
-    SkAutoSTMalloc<GlyphPage::size, uint16_t> glyphStorage(length);
-
-    uint16_t* glyphs = glyphStorage.get();
     SkTypeface* typeface = platformData().typeface();
+    if (!typeface) {
+        WTF_LOG_ERROR("fillGlyphPage called on an empty Skia typeface.");
+        return false;
+    }
+
+    SkAutoSTMalloc<GlyphPage::size, uint16_t> glyphStorage(length);
+    uint16_t* glyphs = glyphStorage.get();
     typeface->charsToGlyphs(buffer, SkTypeface::kUTF16_Encoding, glyphs, length);
 
     bool haveGlyphs = false;

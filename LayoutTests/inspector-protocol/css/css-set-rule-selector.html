@@ -1,7 +1,7 @@
 <html>
 <head>
 <script type="text/javascript" src="../../http/tests/inspector-protocol/inspector-protocol-test.js"></script>
-<script type="text/javascript" src="css-protocol-test.js"></script>
+<script type="text/javascript" src="../../http/tests/inspector-protocol/css-protocol-test.js"></script>
 <script type="text/javascript">
 function test()
 {
@@ -94,6 +94,22 @@ function test()
                     selector: ".EDITED-2"
                 }, InspectorTest.undoAndNext(next));
             }
+        },
+
+        function testInvalidSelectorText(next)
+        {
+            verifyProtocolError({
+                range: firstSelectorRange,
+                selector: "123"
+            }, next);
+        },
+
+        function testSelectorTextWithUnclosedComment(next)
+        {
+            verifyProtocolError({
+                range: firstSelectorRange,
+                selector: "body /*"
+            }, next);
         },
 
         function testEditSubSelector(next)

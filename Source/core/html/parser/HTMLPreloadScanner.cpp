@@ -90,6 +90,8 @@ static String initiatorFor(const StringImpl* tagImpl)
         return linkTag.localName();
     if (match(tagImpl, scriptTag))
         return scriptTag.localName();
+    if (match(tagImpl, videoTag))
+        return videoTag.localName();
     ASSERT_NOT_REACHED();
     return emptyString();
 }
@@ -117,13 +119,13 @@ public:
     {
         if (match(m_tagImpl, imgTag)
             || match(m_tagImpl, sourceTag)) {
-            if (RuntimeEnabledFeatures::pictureSizesEnabled())
-                m_sourceSize = SizesAttributeParser(m_mediaValues, String()).length();
+            m_sourceSize = SizesAttributeParser(m_mediaValues, String()).length();
             return;
         }
         if ( !match(m_tagImpl, inputTag)
             && !match(m_tagImpl, linkTag)
-            && !match(m_tagImpl, scriptTag))
+            && !match(m_tagImpl, scriptTag)
+            && !match(m_tagImpl, videoTag))
             m_tagImpl = 0;
     }
 
@@ -202,7 +204,7 @@ private:
             m_srcsetAttributeValue = attributeValue;
             m_srcsetImageCandidate = bestFitSourceForSrcsetAttribute(m_mediaValues->devicePixelRatio(), m_sourceSize, attributeValue);
             setUrlToLoad(bestFitSourceForImageAttributes(m_mediaValues->devicePixelRatio(), m_sourceSize, m_imgSrcUrl, m_srcsetImageCandidate), AllowURLReplacement);
-        } else if (RuntimeEnabledFeatures::pictureSizesEnabled() && match(attributeName, sizesAttr) && !m_sourceSizeSet) {
+        } else if (match(attributeName, sizesAttr) && !m_sourceSizeSet) {
             m_sourceSize = SizesAttributeParser(m_mediaValues, attributeValue).length();
             m_sourceSizeSet = true;
             if (!m_srcsetImageCandidate.isEmpty()) {
@@ -257,6 +259,13 @@ private:
     }
 
     template<typename NameType>
+    void processVideoAttribute(const NameType& attributeName, const String& attributeValue)
+    {
+        if (match(attributeName, posterAttr))
+            setUrlToLoad(attributeValue, DisallowURLReplacement);
+    }
+
+    template<typename NameType>
     void processAttribute(const NameType& attributeName, const String& attributeValue)
     {
         if (match(attributeName, charsetAttr))
@@ -272,6 +281,8 @@ private:
             processInputAttribute(attributeName, attributeValue);
         else if (match(m_tagImpl, sourceTag))
             processSourceAttribute(attributeName, attributeValue);
+        else if (match(m_tagImpl, videoTag))
+            processVideoAttribute(attributeName, attributeValue);
     }
 
     static bool relAttributeIsStyleSheet(const String& attributeValue)
@@ -295,7 +306,7 @@ private:
     const String& charset() const
     {
         // FIXME: Its not clear that this if is needed, the loader probably ignores charset for image requests anyway.
-        if (match(m_tagImpl, imgTag))
+        if (match(m_tagImpl, imgTag) || match(m_tagImpl, videoTag))
             return emptyString();
         return m_charset;
     }
@@ -304,7 +315,7 @@ private:
     {
         if (match(m_tagImpl, scriptTag))
             return Resource::Script;
-        if (match(m_tagImpl, imgTag) || (match(m_tagImpl, inputTag) && m_inputIsImage))
+        if (match(m_tagImpl, imgTag) || match(m_tagImpl, videoTag) || (match(m_tagImpl, inputTag) && m_inputIsImage))
             return Resource::Image;
         if (match(m_tagImpl, linkTag) && m_linkIsStyleSheet)
             return Resource::CSSStyleSheet;

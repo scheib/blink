@@ -34,14 +34,16 @@
 
 namespace blink {
 
+class AXObjectCacheImpl;
 class AXTableCell;
 
 class AXTable : public AXRenderObject {
 
 protected:
-    explicit AXTable(RenderObject*);
+    AXTable(RenderObject*, AXObjectCacheImpl*);
+
 public:
-    static PassRefPtr<AXTable> create(RenderObject*);
+    static PassRefPtr<AXTable> create(RenderObject*, AXObjectCacheImpl*);
     virtual ~AXTable();
 
     virtual void init() override final;
@@ -71,6 +73,7 @@ public:
     AXTableCell* cellForColumnAndRow(unsigned column, unsigned row);
 
     void columnHeaders(AccessibilityChildrenVector&);
+    void rowHeaders(AccessibilityChildrenVector&);
 
     // an object that contains, as children, all the objects that act as headers
     AXObject* headerContainer();

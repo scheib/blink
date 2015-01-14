@@ -101,7 +101,7 @@ public:
     HTMLOptionElement* item(unsigned index);
 
     void scrollToSelection();
-    void scrollTo(int listIndex);
+    void scrollToIndex(int listIndex);
 
     void listBoxSelectItem(int listIndex, bool allowMultiplySelections, bool shift, bool fireOnChangeNow = true);
 
@@ -117,6 +117,7 @@ public:
 
     // For use in the implementation of HTMLOptionElement.
     void optionSelectionStateChanged(HTMLOptionElement*, bool optionIsSelected);
+    void optionInserted(const HTMLOptionElement&, bool optionIsSelected);
     void optionRemoved(const HTMLOptionElement&);
     bool anonymousIndexedSetter(unsigned, PassRefPtrWillBeRawPtr<HTMLOptionElement>, ExceptionState&);
 

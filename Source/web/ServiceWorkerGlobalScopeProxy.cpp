@@ -39,18 +39,23 @@
 #include "core/events/MessageEvent.h"
 #include "core/inspector/ConsoleMessage.h"
 #include "core/workers/WorkerGlobalScope.h"
+#include "modules/fetch/Headers.h"
 #include "modules/geofencing/CircularGeofencingRegion.h"
 #include "modules/geofencing/GeofencingEvent.h"
+#include "modules/navigatorconnect/AcceptConnectionObserver.h"
+#include "modules/navigatorconnect/CrossOriginConnectEvent.h"
+#include "modules/navigatorconnect/CrossOriginServiceWorkerClient.h"
+#include "modules/notifications/Notification.h"
 #include "modules/notifications/NotificationEvent.h"
 #include "modules/push_messaging/PushEvent.h"
 #include "modules/push_messaging/PushMessageData.h"
 #include "modules/serviceworkers/ExtendableEvent.h"
 #include "modules/serviceworkers/FetchEvent.h"
-#include "modules/serviceworkers/Headers.h"
 #include "modules/serviceworkers/InstallEvent.h"
 #include "modules/serviceworkers/ServiceWorkerGlobalScope.h"
 #include "modules/serviceworkers/WaitUntilObserver.h"
 #include "platform/RuntimeEnabledFeatures.h"
+#include "public/platform/WebCrossOriginServiceWorkerClient.h"
 #include "public/platform/WebNotificationData.h"
 #include "public/platform/WebServiceWorkerEventResult.h"
 #include "public/platform/WebServiceWorkerRequest.h"
@@ -108,7 +113,7 @@ void ServiceWorkerGlobalScopeProxy::dispatchInstallEvent(int eventID)
 {
     ASSERT(m_workerGlobalScope);
     WaitUntilObserver* observer = WaitUntilObserver::create(m_workerGlobalScope, WaitUntilObserver::Install, eventID);
-    RefPtrWillBeRawPtr<Event> event(InstallEvent::create(EventTypeNames::install, EventInit(), observer));
+    RefPtrWillBeRawPtr<Event> event(InstallEvent::create(EventTypeNames::install, InstallEventInit(), observer));
     m_workerGlobalScope->dispatchExtendableEvent(event.release(), observer);
 }
 
@@ -125,8 +130,8 @@ void ServiceWorkerGlobalScopeProxy::dispatchNotificationClickEvent(int eventID, 
 {
     ASSERT(m_workerGlobalScope);
     WaitUntilObserver* observer = WaitUntilObserver::create(m_workerGlobalScope, WaitUntilObserver::NotificationClick, eventID);
-    // FIXME: Initialize a Notification object based on |notificationID| and |data|.
     NotificationEventInit eventInit;
+    eventInit.setNotification(Notification::create(m_workerGlobalScope, notificationID, data));
     RefPtrWillBeRawPtr<Event> event(NotificationEvent::create(EventTypeNames::notificationclick, eventInit, observer));
     m_workerGlobalScope->dispatchExtendableEvent(event.release(), observer);
 }
@@ -147,7 +152,27 @@ void ServiceWorkerGlobalScopeProxy::dispatchSyncEvent(int eventID)
     ServiceWorkerGlobalScopeClient::from(m_workerGlobalScope)->didHandleSyncEvent(eventID);
 }
 
-void ServiceWorkerGlobalScopeProxy::reportException(const String& errorMessage, int lineNumber, int columnNumber, const String& sourceURL)
+void ServiceWorkerGlobalScopeProxy::dispatchCrossOriginConnectEvent(int eventID, const WebCrossOriginServiceWorkerClient& webClient)
+{
+    ASSERT(m_workerGlobalScope);
+    AcceptConnectionObserver* observer = AcceptConnectionObserver::create(m_workerGlobalScope, eventID);
+    CrossOriginServiceWorkerClient* client = CrossOriginServiceWorkerClient::create(webClient);
+    m_workerGlobalScope->dispatchEvent(CrossOriginConnectEvent::create(observer, client));
+    observer->didDispatchEvent();
+}
+
+void ServiceWorkerGlobalScopeProxy::dispatchCrossOriginMessageEvent(const WebCrossOriginServiceWorkerClient& webClient, const WebString& message, const WebMessagePortChannelArray& webChannels)
+{
+    ASSERT(m_workerGlobalScope);
+    OwnPtrWillBeRawPtr<MessagePortArray> ports = MessagePort::toMessagePortArray(m_workerGlobalScope, webChannels);
+    WebSerializedScriptValue value = WebSerializedScriptValue::fromString(message);
+    // FIXME: Have proper source for this MessageEvent.
+    RefPtrWillBeRawPtr<MessageEvent> event = MessageEvent::create(ports.release(), value, webClient.origin.string());
+    event->setType(EventTypeNames::crossoriginmessage);
+    m_workerGlobalScope->dispatchEvent(event);
+}
+
+void ServiceWorkerGlobalScopeProxy::reportException(const String& errorMessage, int lineNumber, int columnNumber, const String& sourceURL, int)
 {
     m_client.reportException(errorMessage, lineNumber, columnNumber, sourceURL);
 }

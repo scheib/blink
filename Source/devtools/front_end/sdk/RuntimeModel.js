@@ -45,6 +45,14 @@ WebInspector.RuntimeModel = function(target)
      * @type {!Object.<number, !WebInspector.ExecutionContext>}
      */
     this._executionContextById = {};
+
+    if (!Runtime.experiments.isEnabled("customObjectFormatters"))
+        return;
+
+    if (WebInspector.settings.enableCustomFormatters.get())
+        this._agent.setCustomObjectFormatterEnabled(true);
+
+    WebInspector.settings.enableCustomFormatters.addChangeListener(this._enableCustomFormattersStateChanged.bind(this));
 }
 
 WebInspector.RuntimeModel.Events = {
@@ -105,7 +113,7 @@ WebInspector.RuntimeModel.prototype = {
     createRemoteObject: function(payload)
     {
         console.assert(typeof payload === "object", "Remote object payload should only be an object");
-        return new WebInspector.RemoteObjectImpl(this.target(), payload.objectId, payload.type, payload.subtype, payload.value, payload.description, payload.preview);
+        return new WebInspector.RemoteObjectImpl(this.target(), payload.objectId, payload.type, payload.subtype, payload.value, payload.description, payload.preview, payload.customPreview);
     },
 
     /**
@@ -135,6 +143,15 @@ WebInspector.RuntimeModel.prototype = {
     createRemotePropertyFromPrimitiveValue: function(name, value)
     {
         return new WebInspector.RemoteObjectProperty(name, this.createRemoteObjectFromPrimitiveValue(value));
+    },
+
+    /**
+     * @param {!WebInspector.Event} event
+     */
+    _enableCustomFormattersStateChanged: function(event)
+    {
+        var enabled = /** @type {boolean} */ (event.data);
+        this._agent.setCustomObjectFormatterEnabled(enabled);
     },
 
     __proto__: WebInspector.SDKModel.prototype
@@ -327,18 +344,18 @@ WebInspector.ExecutionContext.prototype = {
             }
 
             /**
-             * @param {string} primitiveType
+             * @param {string=} type
              * @suppressReceiverCheck
              * @this {WebInspector.ExecutionContext}
              */
-            function getCompletions(primitiveType)
+            function getCompletions(type)
             {
                 var object;
-                if (primitiveType === "string")
+                if (type === "string")
                     object = new String("");
-                else if (primitiveType === "number")
+                else if (type === "number")
                     object = new Number(0);
-                else if (primitiveType === "boolean")
+                else if (type === "boolean")
                     object = new Boolean(false);
                 else
                     object = this;
@@ -346,6 +363,8 @@ WebInspector.ExecutionContext.prototype = {
                 var resultSet = {};
                 for (var o = object; o; o = o.__proto__) {
                     try {
+                        if (type === "array" && o === object && ArrayBuffer.isView(o) && o.length > 9999)
+                            continue;
                         var names = Object.getOwnPropertyNames(o);
                         for (var i = 0; i < names.length; ++i)
                             resultSet[names[i]] = true;
@@ -356,7 +375,7 @@ WebInspector.ExecutionContext.prototype = {
             }
 
             if (result.type === "object" || result.type === "function")
-                result.callFunctionJSON(getCompletions, undefined, receivedPropertyNames.bind(this));
+                result.callFunctionJSON(getCompletions, [WebInspector.RemoteObject.toCallArgument(result.subtype)], receivedPropertyNames.bind(this));
             else if (result.type === "string" || result.type === "number" || result.type === "boolean")
                 this.evaluate("(" + getCompletions + ")(\"" + result.type + "\")", "completion", false, true, true, false, receivedPropertyNamesFromEval.bind(this));
         }

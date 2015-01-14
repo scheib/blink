@@ -19,9 +19,9 @@ namespace blink {
 
 class V8ArrayBufferView {
 public:
-    static bool hasInstance(v8::Handle<v8::Value>, v8::Isolate*);
-    static TestArrayBufferView* toImpl(v8::Handle<v8::Object> object);
-    static TestArrayBufferView* toImplWithTypeCheck(v8::Isolate*, v8::Handle<v8::Value>);
+    static bool hasInstance(v8::Local<v8::Value>, v8::Isolate*);
+    static TestArrayBufferView* toImpl(v8::Local<v8::Object> object);
+    static TestArrayBufferView* toImplWithTypeCheck(v8::Isolate*, v8::Local<v8::Value>);
     static const WrapperTypeInfo wrapperTypeInfo;
     static void refObject(ScriptWrappable*);
     static void derefObject(ScriptWrappable*);
@@ -29,8 +29,8 @@ public:
     {
     }
     static const int internalFieldCount = v8DefaultWrapperInternalFieldCount + 0;
-    static void installConditionallyEnabledProperties(v8::Handle<v8::Object>, v8::Isolate*) { }
-    static void installConditionallyEnabledMethods(v8::Handle<v8::Object>, v8::Isolate*) { }
+    static void installConditionallyEnabledProperties(v8::Local<v8::Object>, v8::Isolate*) { }
+    static void installConditionallyEnabledMethods(v8::Local<v8::Object>, v8::Isolate*) { }
 };
 
 } // namespace blink

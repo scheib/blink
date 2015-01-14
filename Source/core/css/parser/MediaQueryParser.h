@@ -32,7 +32,7 @@ public:
     MediaQueryData();
     void clear();
     bool addExpression();
-    void addParserValue(CSSParserTokenType, const CSSParserToken&);
+    bool tryAddParserValue(CSSParserTokenType, const CSSParserToken&);
     void setMediaType(const String&);
     PassOwnPtrWillBeRawPtr<MediaQuery> takeMediaQuery();
 
@@ -50,6 +50,7 @@ class MediaQueryParser {
     STACK_ALLOCATED();
 public:
     static PassRefPtrWillBeRawPtr<MediaQuerySet> parseMediaQuerySet(const String&);
+    static PassRefPtrWillBeRawPtr<MediaQuerySet> parseMediaQuerySet(CSSParserTokenRange);
     static PassRefPtrWillBeRawPtr<MediaQuerySet> parseMediaCondition(CSSParserTokenRange);
 
 private:

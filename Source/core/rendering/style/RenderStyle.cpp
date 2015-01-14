@@ -31,6 +31,7 @@
 #include "core/rendering/style/BorderEdge.h"
 #include "core/rendering/style/ContentData.h"
 #include "core/rendering/style/DataEquivalency.h"
+#include "core/rendering/style/PathStyleMotionPath.h"
 #include "core/rendering/style/QuotesData.h"
 #include "core/rendering/style/RenderStyleConstants.h"
 #include "core/rendering/style/ShadowList.h"
@@ -50,7 +51,7 @@ struct SameSizeAsBorderValue {
     unsigned m_width;
 };
 
-COMPILE_ASSERT(sizeof(BorderValue) == sizeof(SameSizeAsBorderValue), BorderValue_should_not_grow);
+static_assert(sizeof(BorderValue) == sizeof(SameSizeAsBorderValue), "BorderValue should stay small");
 
 struct SameSizeAsRenderStyle : public RefCounted<SameSizeAsRenderStyle> {
     void* dataRefs[7];
@@ -66,7 +67,7 @@ struct SameSizeAsRenderStyle : public RefCounted<SameSizeAsRenderStyle> {
     } noninherited_flags;
 };
 
-COMPILE_ASSERT(sizeof(RenderStyle) == sizeof(SameSizeAsRenderStyle), RenderStyle_should_stay_small);
+static_assert(sizeof(RenderStyle) == sizeof(SameSizeAsRenderStyle), "RenderStyle should stay small");
 
 inline RenderStyle* defaultStyle()
 {
@@ -109,8 +110,8 @@ ALWAYS_INLINE RenderStyle::RenderStyle()
     , m_svgStyle(defaultStyle()->m_svgStyle)
 {
     setBitDefaults(); // Would it be faster to copy this from the default style?
-    COMPILE_ASSERT((sizeof(InheritedFlags) <= 8), InheritedFlags_does_not_grow);
-    COMPILE_ASSERT((sizeof(NonInheritedFlags) <= 8), NonInheritedFlags_does_not_grow);
+    static_assert((sizeof(InheritedFlags) <= 8), "InheritedFlags should not grow");
+    static_assert((sizeof(NonInheritedFlags) <= 8), "NonInheritedFlags should not grow");
 }
 
 ALWAYS_INLINE RenderStyle::RenderStyle(DefaultStyleTag)
@@ -186,13 +187,13 @@ StyleRecalcChange RenderStyle::stylePropagationDiff(const RenderStyle* oldStyle,
         || oldStyle->alignItems() != newStyle->alignItems())
         return Reattach;
 
-    if (*oldStyle == *newStyle)
-        return diffPseudoStyles(oldStyle, newStyle);
-
     if (oldStyle->inheritedNotEqual(newStyle)
         || oldStyle->hasExplicitlyInheritedProperties()
         || newStyle->hasExplicitlyInheritedProperties())
         return Inherit;
+
+    if (*oldStyle == *newStyle)
+        return diffPseudoStyles(oldStyle, newStyle);
 
     return NoInherit;
 }
@@ -339,9 +340,10 @@ void RenderStyle::removeCachedPseudoStyle(PseudoId pid)
 bool RenderStyle::inheritedNotEqual(const RenderStyle* other) const
 {
     return inherited_flags != other->inherited_flags
-           || inherited != other->inherited
-           || m_svgStyle->inheritedNotEqual(other->m_svgStyle.get())
-           || rareInheritedData != other->rareInheritedData;
+        || inherited != other->inherited
+        || font().loadingCustomFonts() != other->font().loadingCustomFonts()
+        || m_svgStyle->inheritedNotEqual(other->m_svgStyle.get())
+        || rareInheritedData != other->rareInheritedData;
 }
 
 bool RenderStyle::inheritedDataShared(const RenderStyle* other) const
@@ -824,13 +826,16 @@ bool RenderStyle::hasWillChangeCompositingHint() const
     return false;
 }
 
-inline bool requireTransformOrigin(const Vector<RefPtr<TransformOperation> >& transformOperations, RenderStyle::ApplyTransformOrigin applyOrigin)
+inline bool requireTransformOrigin(const Vector<RefPtr<TransformOperation> >& transformOperations, RenderStyle::ApplyTransformOrigin applyOrigin, RenderStyle::ApplyMotionPath applyMotionPath)
 {
     // transform-origin brackets the transform with translate operations.
     // Optimize for the case where the only transform is a translation, since the transform-origin is irrelevant
     // in that case.
     if (applyOrigin != RenderStyle::IncludeTransformOrigin)
         return false;
+
+    if (applyMotionPath == RenderStyle::IncludeMotionPath)
+        return true;
 
     unsigned size = transformOperations.size();
     for (unsigned i = 0; i < size; ++i) {
@@ -846,15 +851,17 @@ inline bool requireTransformOrigin(const Vector<RefPtr<TransformOperation> >& tr
     return false;
 }
 
-void RenderStyle::applyTransform(TransformationMatrix& transform, const LayoutSize& borderBoxSize, ApplyTransformOrigin applyOrigin) const
+void RenderStyle::applyTransform(TransformationMatrix& transform, const LayoutSize& borderBoxSize, ApplyTransformOrigin applyOrigin, ApplyMotionPath applyMotionPath) const
 {
-    applyTransform(transform, FloatRect(FloatPoint(), FloatSize(borderBoxSize)), applyOrigin);
+    applyTransform(transform, FloatRect(FloatPoint(), FloatSize(borderBoxSize)), applyOrigin, applyMotionPath);
 }
 
-void RenderStyle::applyTransform(TransformationMatrix& transform, const FloatRect& boundingBox, ApplyTransformOrigin applyOrigin) const
+void RenderStyle::applyTransform(TransformationMatrix& transform, const FloatRect& boundingBox, ApplyTransformOrigin applyOrigin, ApplyMotionPath applyMotionPath) const
 {
+    if (!hasMotionPath())
+        applyMotionPath = ExcludeMotionPath;
     const Vector<RefPtr<TransformOperation> >& transformOperations = rareNonInheritedData->m_transform->m_operations.operations();
-    bool applyTransformOrigin = requireTransformOrigin(transformOperations, applyOrigin);
+    bool applyTransformOrigin = requireTransformOrigin(transformOperations, applyOrigin, applyMotionPath);
 
     float offsetX = transformOriginX().type() == Percent ? boundingBox.x() : 0;
     float offsetY = transformOriginY().type() == Percent ? boundingBox.y() : 0;
@@ -864,6 +871,9 @@ void RenderStyle::applyTransform(TransformationMatrix& transform, const FloatRec
             floatValueForLength(transformOriginY(), boundingBox.height()) + offsetY,
             transformOriginZ());
     }
+
+    if (applyMotionPath == RenderStyle::IncludeMotionPath)
+        applyMotionPathTransform(transform);
 
     unsigned size = transformOperations.size();
     for (unsigned i = 0; i < size; ++i)
@@ -876,6 +886,25 @@ void RenderStyle::applyTransform(TransformationMatrix& transform, const FloatRec
     }
 }
 
+void RenderStyle::applyMotionPathTransform(TransformationMatrix& transform) const
+{
+    const StyleMotionData& motionData = rareNonInheritedData->m_transform->m_motion;
+    ASSERT(motionData.m_path && motionData.m_path->isPathStyleMotionPath());
+    const PathStyleMotionPath& motionPath = toPathStyleMotionPath(*motionData.m_path);
+    float pathLength = motionPath.length();
+    float length = clampTo<float>(floatValueForLength(motionData.m_position, pathLength), 0, pathLength);
+
+    FloatPoint point;
+    float angle;
+    if (!motionPath.path().pointAndNormalAtLength(length, point, angle))
+        return;
+    if (motionData.m_rotationType == MotionRotationFixed)
+        angle = 0;
+
+    transform.translate(point.x(), point.y());
+    transform.rotate(angle + motionData.m_rotation);
+}
+
 void RenderStyle::setTextShadow(PassRefPtr<ShadowList> s)
 {
     rareInheritedData.access()->textShadow = s;
@@ -886,9 +915,9 @@ void RenderStyle::setBoxShadow(PassRefPtr<ShadowList> s)
     rareNonInheritedData.access()->m_boxShadow = s;
 }
 
-static RoundedRect::Radii calcRadiiFor(const BorderData& border, IntSize size)
+static FloatRoundedRect::Radii calcRadiiFor(const BorderData& border, LayoutSize size)
 {
-    return RoundedRect::Radii(
+    return FloatRoundedRect::Radii(
         IntSize(valueForLength(border.topLeft().width(), size.width()),
             valueForLength(border.topLeft().height(), size.height())),
         IntSize(valueForLength(border.topRight().width(), size.width()),
@@ -916,19 +945,18 @@ short RenderStyle::verticalBorderSpacing() const { return inherited->vertical_bo
 void RenderStyle::setHorizontalBorderSpacing(short v) { SET_VAR(inherited, horizontal_border_spacing, v); }
 void RenderStyle::setVerticalBorderSpacing(short v) { SET_VAR(inherited, vertical_border_spacing, v); }
 
-RoundedRect RenderStyle::getRoundedBorderFor(const LayoutRect& borderRect, bool includeLogicalLeftEdge, bool includeLogicalRightEdge) const
+FloatRoundedRect RenderStyle::getRoundedBorderFor(const LayoutRect& borderRect, bool includeLogicalLeftEdge, bool includeLogicalRightEdge) const
 {
-    IntRect snappedBorderRect(pixelSnappedIntRect(borderRect));
-    RoundedRect roundedRect(snappedBorderRect);
+    FloatRoundedRect roundedRect(pixelSnappedIntRect(borderRect));
     if (hasBorderRadius()) {
-        RoundedRect::Radii radii = calcRadiiFor(surround->border, snappedBorderRect.size());
-        radii.scale(calcBorderRadiiConstraintScaleFor(borderRect, radii));
+        FloatRoundedRect::Radii radii = calcRadiiFor(surround->border, borderRect.size());
+        radii.scale(calcBorderRadiiConstraintScaleFor(roundedRect.rect(), radii));
         roundedRect.includeLogicalEdges(radii, isHorizontalWritingMode(), includeLogicalLeftEdge, includeLogicalRightEdge);
     }
     return roundedRect;
 }
 
-RoundedRect RenderStyle::getRoundedInnerBorderFor(const LayoutRect& borderRect, bool includeLogicalLeftEdge, bool includeLogicalRightEdge) const
+FloatRoundedRect RenderStyle::getRoundedInnerBorderFor(const LayoutRect& borderRect, bool includeLogicalLeftEdge, bool includeLogicalRightEdge) const
 {
     bool horizontal = isHorizontalWritingMode();
 
@@ -940,7 +968,7 @@ RoundedRect RenderStyle::getRoundedInnerBorderFor(const LayoutRect& borderRect, 
     return getRoundedInnerBorderFor(borderRect, topWidth, bottomWidth, leftWidth, rightWidth, includeLogicalLeftEdge, includeLogicalRightEdge);
 }
 
-RoundedRect RenderStyle::getRoundedInnerBorderFor(const LayoutRect& borderRect,
+FloatRoundedRect RenderStyle::getRoundedInnerBorderFor(const LayoutRect& borderRect,
     int topWidth, int bottomWidth, int leftWidth, int rightWidth, bool includeLogicalLeftEdge, bool includeLogicalRightEdge) const
 {
     LayoutRect innerRect(borderRect.x() + leftWidth,
@@ -948,10 +976,10 @@ RoundedRect RenderStyle::getRoundedInnerBorderFor(const LayoutRect& borderRect,
                borderRect.width() - leftWidth - rightWidth,
                borderRect.height() - topWidth - bottomWidth);
 
-    RoundedRect roundedRect(pixelSnappedIntRect(innerRect));
+    FloatRoundedRect roundedRect(pixelSnappedIntRect(innerRect));
 
     if (hasBorderRadius()) {
-        RoundedRect::Radii radii = getRoundedBorderFor(borderRect).radii();
+        FloatRoundedRect::Radii radii = getRoundedBorderFor(borderRect).radii();
         radii.shrink(topWidth, bottomWidth, leftWidth, rightWidth);
         roundedRect.includeLogicalEdges(radii, isHorizontalWritingMode(), includeLogicalLeftEdge, includeLogicalRightEdge);
     }
@@ -1239,61 +1267,6 @@ void RenderStyle::clearMultiCol()
     rareNonInheritedData.access()->m_multiCol.init();
 }
 
-void RenderStyle::getShadowExtent(const ShadowList* shadowList, LayoutUnit &top, LayoutUnit &right, LayoutUnit &bottom, LayoutUnit &left) const
-{
-    top = 0;
-    right = 0;
-    bottom = 0;
-    left = 0;
-
-    size_t shadowCount = shadowList ? shadowList->shadows().size() : 0;
-    for (size_t i = 0; i < shadowCount; ++i) {
-        const ShadowData& shadow = shadowList->shadows()[i];
-        if (shadow.style() == Inset)
-            continue;
-        float blurAndSpread = shadow.blur() + shadow.spread();
-
-        top = std::min<LayoutUnit>(top, shadow.y() - blurAndSpread);
-        right = std::max<LayoutUnit>(right, shadow.x() + blurAndSpread);
-        bottom = std::max<LayoutUnit>(bottom, shadow.y() + blurAndSpread);
-        left = std::min<LayoutUnit>(left, shadow.x() - blurAndSpread);
-    }
-}
-
-void RenderStyle::getShadowHorizontalExtent(const ShadowList* shadowList, LayoutUnit &left, LayoutUnit &right) const
-{
-    left = 0;
-    right = 0;
-
-    size_t shadowCount = shadowList ? shadowList->shadows().size() : 0;
-    for (size_t i = 0; i < shadowCount; ++i) {
-        const ShadowData& shadow = shadowList->shadows()[i];
-        if (shadow.style() == Inset)
-            continue;
-        float blurAndSpread = shadow.blur() + shadow.spread();
-
-        left = std::min<LayoutUnit>(left, shadow.x() - blurAndSpread);
-        right = std::max<LayoutUnit>(right, shadow.x() + blurAndSpread);
-    }
-}
-
-void RenderStyle::getShadowVerticalExtent(const ShadowList* shadowList, LayoutUnit &top, LayoutUnit &bottom) const
-{
-    top = 0;
-    bottom = 0;
-
-    size_t shadowCount = shadowList ? shadowList->shadows().size() : 0;
-    for (size_t i = 0; i < shadowCount; ++i) {
-        const ShadowData& shadow = shadowList->shadows()[i];
-        if (shadow.style() == Inset)
-            continue;
-        float blurAndSpread = shadow.blur() + shadow.spread();
-
-        top = std::min<LayoutUnit>(top, shadow.y() - blurAndSpread);
-        bottom = std::max<LayoutUnit>(bottom, shadow.y() + blurAndSpread);
-    }
-}
-
 StyleColor RenderStyle::decorationColorIncludingFallback(bool visitedLink) const
 {
     StyleColor styleColor = visitedLink ? visitedLinkTextDecorationColor() : textDecorationColor();
@@ -1525,6 +1498,17 @@ void RenderStyle::setMarginEnd(const Length& margin)
     }
 }
 
+void RenderStyle::setMotionPath(PassRefPtr<StyleMotionPath> path)
+{
+    ASSERT(path);
+    rareNonInheritedData.access()->m_transform.access()->m_motion.m_path = path;
+}
+
+void RenderStyle::resetMotionPath()
+{
+    rareNonInheritedData.access()->m_transform.access()->m_motion.m_path = nullptr;
+}
+
 TextEmphasisMark RenderStyle::textEmphasisMark() const
 {
     TextEmphasisMark mark = static_cast<TextEmphasisMark>(rareInheritedData->textEmphasisMark);
@@ -1550,12 +1534,13 @@ const FilterOperations& RenderStyle::initialFilter()
 }
 #endif
 
-LayoutBoxExtent RenderStyle::imageOutsets(const NinePieceImage& image) const
+LayoutRectOutsets RenderStyle::imageOutsets(const NinePieceImage& image) const
 {
-    return LayoutBoxExtent(NinePieceImage::computeOutset(image.outset().top(), borderTopWidth()),
-                           NinePieceImage::computeOutset(image.outset().right(), borderRightWidth()),
-                           NinePieceImage::computeOutset(image.outset().bottom(), borderBottomWidth()),
-                           NinePieceImage::computeOutset(image.outset().left(), borderLeftWidth()));
+    return LayoutRectOutsets(
+        NinePieceImage::computeOutset(image.outset().top(), borderTopWidth()),
+        NinePieceImage::computeOutset(image.outset().right(), borderRightWidth()),
+        NinePieceImage::computeOutset(image.outset().bottom(), borderBottomWidth()),
+        NinePieceImage::computeOutset(image.outset().left(), borderLeftWidth()));
 }
 
 void RenderStyle::setBorderImageSource(PassRefPtr<StyleImage> image)

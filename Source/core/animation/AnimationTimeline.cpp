@@ -67,6 +67,7 @@ AnimationTimeline::AnimationTimeline(Document* document, PassOwnPtrWillBeRawPtr<
     , m_documentCurrentTimeSnapshot(0)
     , m_zeroTimeOffset(0)
     , m_playbackRate(1)
+    , m_lastCurrentTimeInternal(0)
 {
     if (!timing)
         m_timing = adoptPtrWillBeNoop(new AnimationTimelineTiming(this));
@@ -106,7 +107,7 @@ WillBeHeapVector<RefPtrWillBeMember<AnimationPlayer>> AnimationTimeline::getAnim
 {
     WillBeHeapVector<RefPtrWillBeMember<AnimationPlayer>> animationPlayers;
     for (const auto& player : m_players) {
-        if (player->source() && player->source()->isCurrent())
+        if (player->source() && (player->source()->isCurrent() || player->source()->isInEffect()))
             animationPlayers.append(player);
     }
     std::sort(animationPlayers.begin(), animationPlayers.end(), compareAnimationPlayers);
@@ -121,6 +122,8 @@ void AnimationTimeline::wake()
 void AnimationTimeline::serviceAnimations(TimingUpdateReason reason)
 {
     TRACE_EVENT0("blink", "AnimationTimeline::serviceAnimations");
+
+    m_lastCurrentTimeInternal = currentTimeInternal();
 
     m_timing->cancelWake();
 
@@ -222,6 +225,8 @@ void AnimationTimeline::setCurrentTime(double currentTime)
 void AnimationTimeline::setCurrentTimeInternal(double currentTime)
 {
     m_zeroTimeOffset = document()->animationClock().currentTime() - m_zeroTime - currentTime;
+    for (const auto& player : m_players)
+        player->setOutdated();
 }
 
 double AnimationTimeline::effectiveTime()
@@ -244,6 +249,11 @@ bool AnimationTimeline::hasOutdatedAnimationPlayer() const
             return true;
     }
     return false;
+}
+
+bool AnimationTimeline::needsAnimationTimingUpdate()
+{
+    return m_playersNeedingUpdate.size() && currentTimeInternal() != m_lastCurrentTimeInternal;
 }
 
 void AnimationTimeline::setOutdatedAnimationPlayer(AnimationPlayer* player)

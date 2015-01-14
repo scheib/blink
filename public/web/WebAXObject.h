@@ -114,6 +114,7 @@ public:
 
     BLINK_EXPORT WebString accessKey() const;
     BLINK_EXPORT WebAXObject ariaActiveDescendant() const;
+    BLINK_EXPORT WebString ariaAutoComplete() const;
     BLINK_EXPORT bool ariaControls(WebVector<WebAXObject>& controlsElements) const;
     BLINK_EXPORT bool ariaDescribedby(WebVector<WebAXObject>& describedbyElements) const;
     BLINK_EXPORT bool ariaFlowTo(WebVector<WebAXObject>& flowToElements) const;
@@ -124,12 +125,16 @@ public:
     BLINK_EXPORT bool canvasHasFallbackContent() const;
     BLINK_EXPORT WebPoint clickPoint() const;
     BLINK_EXPORT void colorValue(int& r, int& g, int& b) const;
+    BLINK_EXPORT WebAXInvalidState invalidState() const;
+    // Only used when invalidState() returns WebAXInvalidStateOther.
+    BLINK_EXPORT WebString ariaInvalidValue() const;
     BLINK_EXPORT double estimatedLoadingProgress() const;
     BLINK_EXPORT WebString helpText() const;
     BLINK_EXPORT int headingLevel() const;
     BLINK_EXPORT int hierarchicalLevel() const;
     BLINK_EXPORT WebAXObject hitTest(const WebPoint&) const;
     BLINK_EXPORT WebString keyboardShortcut() const;
+    BLINK_EXPORT WebString placeholder() const;
     BLINK_EXPORT WebAXRole role() const;
     BLINK_EXPORT unsigned selectionEnd() const;
     BLINK_EXPORT unsigned selectionEndLineNumber() const;
@@ -189,6 +194,8 @@ public:
     BLINK_EXPORT WebAXObject headerContainerObject() const;
     BLINK_EXPORT WebAXObject rowAtIndex(unsigned rowIndex) const;
     BLINK_EXPORT WebAXObject columnAtIndex(unsigned columnIndex) const;
+    BLINK_EXPORT void rowHeaders(WebVector<WebAXObject>&) const;
+    BLINK_EXPORT void columnHeaders(WebVector<WebAXObject>&) const;
 
     // For a table row
     BLINK_EXPORT unsigned rowIndex() const;

@@ -166,8 +166,8 @@ static RenderBoxModelObject* nextContinuation(RenderObject* renderer)
     return 0;
 }
 
-AXRenderObject::AXRenderObject(RenderObject* renderer)
-    : AXNodeObject(renderer->node())
+AXRenderObject::AXRenderObject(RenderObject* renderer, AXObjectCacheImpl* axObjectCache)
+    : AXNodeObject(renderer->node(), axObjectCache)
     , m_renderer(renderer)
     , m_cachedElementRectDirty(true)
 {
@@ -176,9 +176,9 @@ AXRenderObject::AXRenderObject(RenderObject* renderer)
 #endif
 }
 
-PassRefPtr<AXRenderObject> AXRenderObject::create(RenderObject* renderer)
+PassRefPtr<AXRenderObject> AXRenderObject::create(RenderObject* renderer, AXObjectCacheImpl* axObjectCache)
 {
-    return adoptRef(new AXRenderObject(renderer));
+    return adoptRef(new AXRenderObject(renderer, axObjectCache));
 }
 
 AXRenderObject::~AXRenderObject()
@@ -253,6 +253,17 @@ ScrollableArea* AXRenderObject::getScrollableAreaIfScrollable() const
     return box->scrollableArea();
 }
 
+static bool isImageOrAltText(RenderBoxModelObject* box, Node* node)
+{
+    if (box && box->isImage())
+        return true;
+    if (isHTMLImageElement(node))
+        return true;
+    if (isHTMLInputElement(node) && toHTMLInputElement(node)->hasFallbackContent())
+        return true;
+    return false;
+}
+
 AccessibilityRole AXRenderObject::determineAccessibilityRole()
 {
     if (!m_renderer)
@@ -268,11 +279,13 @@ AccessibilityRole AXRenderObject::determineAccessibilityRole()
         return ListItemRole;
     if (m_renderer->isListMarker())
         return ListMarkerRole;
+    if (m_renderer->isBR())
+        return LineBreakRole;
     if (isHTMLLegendElement(node))
         return LegendRole;
     if (m_renderer->isText())
         return StaticTextRole;
-    if (cssBox && cssBox->isImage()) {
+    if (cssBox && isImageOrAltText(cssBox, node)) {
         if (node && node->isLink())
             return ImageMapRole;
         if (isHTMLInputElement(node))
@@ -572,6 +585,9 @@ bool AXRenderObject::computeAccessibilityIsIgnored() const
     AXObject* controlObject = correspondingControlForLabelElement();
     if (controlObject && !controlObject->exposesTitleUIElement() && controlObject->isCheckboxOrRadio())
         return true;
+
+    if (m_renderer->isBR())
+        return false;
 
     // NOTE: BRs always have text boxes now, so the text box check here can be removed
     if (m_renderer->isText()) {
@@ -1136,6 +1152,9 @@ const AtomicString& AXRenderObject::liveRegionRelevant() const
 
 bool AXRenderObject::liveRegionAtomic() const
 {
+    // ARIA role status should have implicit aria-atomic value of true.
+    if (getAttribute(aria_atomicAttr).isEmpty() && roleValue() == StatusRole)
+        return true;
     return elementAttributeValue(aria_atomicAttr);
 }
 
@@ -1317,7 +1336,7 @@ AXObject* AXRenderObject::accessibilityHitTest(const IntPoint& point) const
     if (!obj)
         return 0;
 
-    AXObject* result = toAXObjectCacheImpl(obj->document().axObjectCache())->getOrCreate(obj);
+    AXObject* result = axObjectCache()->getOrCreate(obj);
     result->updateChildrenIfNecessary();
 
     // Allow the element to perform any hit-testing it might need to do to reach non-render children.
@@ -1642,7 +1661,7 @@ void AXRenderObject::setSelectedTextRange(const PlainTextRange& range)
 {
     if (isNativeTextControl() && m_renderer->isTextControl()) {
         HTMLTextFormControlElement* textControl = toRenderTextControl(m_renderer)->textFormControlElement();
-        textControl->setSelectionRange(range.start, range.start + range.length);
+        textControl->setSelectionRange(range.start, range.start + range.length, SelectionHasNoDirection, NotDispatchSelectEvent);
         return;
     }
 

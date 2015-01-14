@@ -67,6 +67,7 @@ class RenderFlowThread;
 class RenderGeometryMap;
 class RenderLayer;
 class RenderLayerModelObject;
+class RenderMultiColumnSpannerPlaceholder;
 class RenderView;
 class TransformState;
 
@@ -357,7 +358,7 @@ public:
     bool isRenderIFrame() const { return isOfType(RenderObjectRenderIFrame); }
     bool isRenderImage() const { return isOfType(RenderObjectRenderImage); }
     bool isRenderMultiColumnSet() const { return isOfType(RenderObjectRenderMultiColumnSet); }
-    bool isRenderMultiColumnSpannerSet() const { return isOfType(RenderObjectRenderMultiColumnSpannerSet); }
+    bool isRenderMultiColumnSpannerPlaceholder() const { return isOfType(RenderObjectRenderMultiColumnSpannerPlaceholder); }
     bool isRenderRegion() const { return isOfType(RenderObjectRenderRegion); }
     bool isRenderScrollbarPart() const { return isOfType(RenderObjectRenderScrollbarPart); }
     bool isRenderTableCol() const { return isOfType(RenderObjectRenderTableCol); }
@@ -502,13 +503,6 @@ public:
     // rest of the rendering tree will move to a similar model.
     virtual bool nodeAtFloatPoint(const HitTestRequest&, HitTestResult&, const FloatPoint& pointInParent, HitTestAction);
 
-    virtual bool canHaveWhitespaceChildren() const
-    {
-        if (isTable() || isTableRow() || isTableSection() || isRenderTableCol() || isFrameSet() || isFlexibleBox() || isRenderGrid())
-            return false;
-        return true;
-    }
-
     bool isAnonymous() const { return m_bitfields.isAnonymous(); }
     bool isAnonymousBlock() const
     {
@@ -639,6 +633,9 @@ public:
 
     Document& document() const { return m_node->document(); }
     LocalFrame* frame() const { return document().frame(); }
+
+    virtual RenderMultiColumnSpannerPlaceholder* spannerPlaceholder() const { return 0; }
+    bool isColumnSpanAll() const { return style()->columnSpan() == ColumnSpanAll && spannerPlaceholder(); }
 
     // Returns the object containing this one. Can be different from parent for positioned elements.
     // If paintInvalidationContainer and paintInvalidationContainerSkipped are not null, on return *paintInvalidationContainerSkipped
@@ -852,10 +849,10 @@ public:
     // as the local coordinate space of |paintInvalidationContainer| in the presence of layer squashing.
     // If |paintInvalidationContainer| is 0, invalidate paints via the view.
     // FIXME: |paintInvalidationContainer| should never be 0. See crbug.com/363699.
-    void invalidatePaintUsingContainer(const RenderLayerModelObject* paintInvalidationContainer, const LayoutRect&, PaintInvalidationReason);
+    void invalidatePaintUsingContainer(const RenderLayerModelObject* paintInvalidationContainer, const LayoutRect&, PaintInvalidationReason) const;
 
     // Invalidate the paint of a specific subrectangle within a given object. The rect |r| is in the object's coordinate space.
-    void invalidatePaintRectangle(const LayoutRect&);
+    void invalidatePaintRectangle(const LayoutRect&) const;
 
     void invalidateSelectionIfNeeded(const RenderLayerModelObject&, PaintInvalidationReason);
 
@@ -869,7 +866,7 @@ public:
 
     // Returns the rect that should have paint invalidated whenever this object changes. The rect is in the view's
     // coordinate space. This method deals with outlines and overflow.
-    LayoutRect absoluteClippedOverflowRect() const;
+    virtual LayoutRect absoluteClippedOverflowRect() const;
     virtual LayoutRect clippedOverflowRectForPaintInvalidation(const RenderLayerModelObject* paintInvalidationContainer, const PaintInvalidationState* = 0) const;
     virtual LayoutRect rectWithOutlineForPaintInvalidation(const RenderLayerModelObject* paintInvalidationContainer, LayoutUnit outlineWidth, const PaintInvalidationState* = 0) const;
 
@@ -1053,8 +1050,6 @@ public:
         return layoutDidGetCalledSinceLastFrame() || mayNeedPaintInvalidation() || shouldDoFullPaintInvalidation() || shouldInvalidateSelection();
     }
 
-    bool needsPaint() const { return m_bitfields.needsPaint(); }
-
     virtual bool supportsPaintInvalidationStateCachedOffsets() const { return !hasColumns() && !hasTransformRelatedProperty() && !hasReflection() && !style()->isFlippedBlocksWritingMode(); }
 
     void setNeedsOverflowRecalcAfterStyleChange();
@@ -1092,7 +1087,7 @@ protected:
         RenderObjectRenderImage,
         RenderObjectRenderInline,
         RenderObjectRenderMultiColumnSet,
-        RenderObjectRenderMultiColumnSpannerSet,
+        RenderObjectRenderMultiColumnSpannerPlaceholder,
         RenderObjectRenderPart,
         RenderObjectRenderRegion,
         RenderObjectRenderScrollbarPart,
@@ -1187,9 +1182,6 @@ protected:
     virtual void invalidatePaintOfSubtreesIfNeeded(const PaintInvalidationState& childPaintInvalidationState);
     virtual PaintInvalidationReason invalidatePaintIfNeeded(const PaintInvalidationState&, const RenderLayerModelObject& paintInvalidationContainer);
 
-    void setNeedsPaint() { m_bitfields.setNeedsPaint(true); }
-    void clearNeedsPaint() { m_bitfields.setNeedsPaint(false); }
-
 private:
     void setLayoutDidGetCalledSinceLastFrame()
     {
@@ -1280,7 +1272,6 @@ private:
             , m_floating(false)
             , m_selfNeedsOverflowRecalcAfterStyleChange(false)
             , m_childNeedsOverflowRecalcAfterStyleChange(false)
-            , m_needsPaint(false)
             , m_isAnonymous(!node)
             , m_isText(false)
             , m_isBox(false)
@@ -1308,7 +1299,7 @@ private:
         {
         }
 
-        // 32 bits have been used in the first word, and 15 in the second.
+        // 32 bits have been used in the first word, and 14 in the second.
         ADD_BOOLEAN_BITFIELD(selfNeedsLayout, SelfNeedsLayout);
         ADD_BOOLEAN_BITFIELD(shouldInvalidateOverflowForPaint, ShouldInvalidateOverflowForPaint);
         ADD_BOOLEAN_BITFIELD(mayNeedPaintInvalidation, MayNeedPaintInvalidation);
@@ -1322,7 +1313,6 @@ private:
         ADD_BOOLEAN_BITFIELD(floating, Floating);
         ADD_BOOLEAN_BITFIELD(selfNeedsOverflowRecalcAfterStyleChange, SelfNeedsOverflowRecalcAfterStyleChange);
         ADD_BOOLEAN_BITFIELD(childNeedsOverflowRecalcAfterStyleChange, ChildNeedsOverflowRecalcAfterStyleChange);
-        ADD_BOOLEAN_BITFIELD(needsPaint, NeedsPaint);
 
         ADD_BOOLEAN_BITFIELD(isAnonymous, IsAnonymous);
         ADD_BOOLEAN_BITFIELD(isText, IsText);

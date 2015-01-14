@@ -11,6 +11,7 @@
 namespace blink {
 
 class Event;
+class RemoteDOMWindow;
 class RemoteFrameClient;
 class RemoteFrameView;
 
@@ -23,10 +24,13 @@ public:
     // Frame overrides:
     void trace(Visitor*) override;
     virtual bool isRemoteFrame() const override { return true; }
-    virtual DOMWindow* domWindow() const override { return 0; }
+    virtual DOMWindow* domWindow() const override;
     virtual void navigate(Document& originDocument, const KURL&, bool lockBackForwardList) override;
+    virtual void reload(ReloadPolicy, ClientRedirectPolicy) override;
     virtual void detach() override;
     virtual RemoteSecurityContext* securityContext() const override;
+    bool checkLoadComplete() override;
+    void printNavigationErrorMessage(const Frame&, const char* reason) { }
 
     // FIXME: Remove this method once we have input routing in the browser
     // process. See http://crbug.com/339659.
@@ -45,6 +49,7 @@ private:
 
     RefPtrWillBeMember<RemoteFrameView> m_view;
     RefPtr<RemoteSecurityContext> m_securityContext;
+    RefPtrWillBeMember<RemoteDOMWindow> m_domWindow;
 };
 
 inline RemoteFrameView* RemoteFrame::view() const

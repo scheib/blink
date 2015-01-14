@@ -389,7 +389,14 @@ void Fullscreen::exitFullscreen()
     // Only exit out of full screen window mode if there are no remaining elements in the
     // full screen stack.
     if (!newTop) {
-        host->chrome().client().exitFullScreenForElement(m_fullScreenElement.get());
+        // FIXME: if the frame exiting fullscreen is not the frame that entered
+        // fullscreen (but a parent frame for example), m_fullScreenElement
+        // might be null. We want to pass an element that is part of the
+        // document so we will pass the documentElement in that case.
+        // This should be fix by exiting fullscreen for a frame instead of an
+        // element, see https://crbug.com/441259
+        host->chrome().client().exitFullScreenForElement(
+            m_fullScreenElement ? m_fullScreenElement.get() : document()->documentElement());
         return;
     }
 
@@ -433,9 +440,7 @@ void Fullscreen::didEnterFullScreenForElement(Element* element)
 
     m_fullScreenElement->setContainsFullScreenElementOnAncestorsCrossingFrameBoundaries(true);
 
-    // FIXME: This should not call updateStyleIfNeeded.
     document()->setNeedsStyleRecalc(SubtreeStyleChange, StyleChangeReasonForTracing::create(StyleChangeReason::FullScreen));
-    document()->updateRenderTreeIfNeeded();
 
     m_fullScreenElement->didBecomeFullscreenElement();
 
@@ -601,6 +606,7 @@ void Fullscreen::trace(Visitor* visitor)
     visitor->trace(m_fullScreenRenderer);
     visitor->trace(m_eventQueue);
     DocumentSupplement::trace(visitor);
+    DocumentLifecycleObserver::trace(visitor);
 }
 
 } // namespace blink

@@ -62,6 +62,7 @@ public:
     bool isClipPathOperation() const { return type() == TypeClipPathOperation; }
     bool isColor() const { return type() == TypeColor; }
     bool isDouble() const { return type() == TypeDouble; }
+    bool isDoubleAndBool() const { return type() == TypeDoubleAndBool; }
     bool isFilterOperations() const { return type() == TypeFilterOperations; }
     bool isImage() const { return type() == TypeImage; }
     bool isLength() const { return type() == TypeLength; }
@@ -94,6 +95,7 @@ protected:
         TypeClipPathOperation,
         TypeColor,
         TypeDouble,
+        TypeDoubleAndBool,
         TypeFilterOperations,
         TypeImage,
         TypeLength,
@@ -133,8 +135,6 @@ private:
 
 #define DEFINE_ANIMATABLE_VALUE_TYPE_CASTS(thisType, predicate) \
     DEFINE_TYPE_CASTS(thisType, AnimatableValue, value, value->predicate, value.predicate)
-
-WILL_BE_EAGERLY_TRACED(AnimatableValue);
 
 } // namespace blink
 

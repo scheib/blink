@@ -53,6 +53,12 @@ void ContentDecryptionModuleResultPromise::complete()
     reject(InvalidStateError, "Unexpected completion.");
 }
 
+void ContentDecryptionModuleResultPromise::completeWithContentDecryptionModule(WebContentDecryptionModule* cdm)
+{
+    ASSERT_NOT_REACHED();
+    reject(InvalidStateError, "Unexpected completion.");
+}
+
 void ContentDecryptionModuleResultPromise::completeWithSession(WebContentDecryptionModuleResult::SessionStatus status)
 {
     ASSERT_NOT_REACHED();
@@ -61,7 +67,10 @@ void ContentDecryptionModuleResultPromise::completeWithSession(WebContentDecrypt
 
 void ContentDecryptionModuleResultPromise::completeWithError(WebContentDecryptionModuleException exceptionCode, unsigned long systemCode, const WebString& errorMessage)
 {
-    reject(WebCdmExceptionToExceptionCode(exceptionCode), errorMessage);
+    // The error string is in the format of: OriginalMessage (systemCode)
+    String errorString = errorMessage;
+    errorString.append(" (" + String::number(systemCode) + ")");
+    reject(WebCdmExceptionToExceptionCode(exceptionCode), errorString);
 }
 
 ScriptPromise ContentDecryptionModuleResultPromise::promise()
@@ -82,6 +91,7 @@ ExecutionContext* ContentDecryptionModuleResultPromise::executionContext() const
 
 void ContentDecryptionModuleResultPromise::trace(Visitor* visitor)
 {
+    visitor->trace(m_resolver);
     ContentDecryptionModuleResult::trace(visitor);
 }
 

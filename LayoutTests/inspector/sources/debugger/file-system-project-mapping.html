@@ -74,7 +74,7 @@ function test()
         createWorkspaceWithTarget(callback, useRealTarget);
         function callback(target)
         {
-            manager = InspectorTest.createIsolatedFileSystemManager(InspectorTest.testWorkspace, InspectorTest.testFileSystemMapping);
+            manager = InspectorTest.createIsolatedFileSystemManager(InspectorTest.testWorkspace);
             var entry = InspectorTest.testDebuggerWorkspaceBinding._targetToData.get(target);
             resourceScriptMapping = entry._resourceMapping;
             defaultScriptMapping = entry._defaultMapping;
@@ -91,8 +91,10 @@ function test()
             {
                 var uiSourceCodes = InspectorTest.testWorkspace.project(fileSystemProjectId).uiSourceCodes();
                 InspectorTest.addResult("UISourceCode uri to url mappings:");
-                for (var i = 0; i < uiSourceCodes.length; ++i)
-                    InspectorTest.addResult("    " + uiSourceCodes[i].uri() + " -> " + uiSourceCodes[i].url);
+                for (var i = 0; i < uiSourceCodes.length; ++i) {
+                    var networkURL = InspectorTest.testNetworkMapping.networkURL(uiSourceCodes[i]);
+                    InspectorTest.addResult("    " + uiSourceCodes[i].uri() + " -> " + networkURL);
+                }
             }
 
             var fileSystemPath = "/var/www";
@@ -117,7 +119,7 @@ function test()
                 networkUISourceCode = InspectorTest.testWorkspace.uiSourceCode("http://localhost", "html/foo.js");
                 InspectorTest.override(WebInspector.SourcesPanel.prototype, "_suggestReload", function() { });
                 InspectorTest.addResult("Adding mapping between network and file system resources.");
-                InspectorTest.testWorkspace.addMapping(networkUISourceCode, uiSourceCode, manager.fileSystemWorkspaceBinding);
+                InspectorTest.testNetworkMapping.addMapping(networkUISourceCode, uiSourceCode, manager.fileSystemWorkspaceBinding);
                 setting = InspectorTest.testFileSystemMapping._fileSystemMappingSetting;
                 InspectorTest.addResult("Emulate reloading inspector.");
                 createObjects(step2);
@@ -133,7 +135,7 @@ function test()
                 dumpFileSystemUISourceCodesMappings();
                 InspectorTest.addResult("Removing mapping between network and file system resources.");
                 uiSourceCode = InspectorTest.testWorkspace.uiSourceCode(fileSystemProjectId, "html/foo.js");
-                InspectorTest.testWorkspace.removeMapping(uiSourceCode);
+                InspectorTest.testNetworkMapping.removeMapping(uiSourceCode);
 
                 InspectorTest.addResult("Emulate reloading inspector.");
                 createObjects(step3);
@@ -146,7 +148,8 @@ function test()
                 manager.addFiles(fileSystemPath, files);
                 dumpFileSystemUISourceCodesMappings();
 
-                InspectorTest.testFileSystemMapping.removeMappingForURL(networkUISourceCode.url);
+                var networkURL = InspectorTest.testNetworkMapping.networkURL(networkUISourceCode);
+                InspectorTest.testFileSystemMapping.removeMappingForURL(networkURL);
                 next();
             }
         },
@@ -292,7 +295,7 @@ function test()
             
             function didShowScriptSource(sourceFrame)
             {
-                var scriptURL = sourceFrame._uiSourceCode.url;
+                var scriptURL = InspectorTest.testNetworkMapping.networkURL(sourceFrame._uiSourceCode);
 
                 var fileContent = "function f()\n{\n    return 0;\n}\n";
                 var fileSystemPath = "/var/www";
@@ -370,7 +373,7 @@ function test()
                 InspectorTest.addResult("Adding file system.");
                 manager.addMockFileSystem(fileSystemPath);
                 InspectorTest.addResult("Adding exclusion pattern and excluded folder.");
-                InspectorTest.testFileSystemMapping.addExcludedFolder(fileSystemPath, "/html/");
+                InspectorTest.testExcludedFolderManager.addExcludedFolder(fileSystemPath, "/html/");
                 InspectorTest.waitForWorkspaceUISourceCodeAddedEvent(uiSourceCodeAdded, 2);
                 manager.addFiles(fileSystemPath, files);
                 dumpWorkspaceUISourceCodes();
@@ -378,6 +381,7 @@ function test()
                 InspectorTest.waitForWorkspaceUISourceCodeRemovedEvent(uiSourceCodeRemoved);
                 InspectorTest.testWorkspace.uiSourceCodes()[0].project().excludeFolder("/html2/");
                 dumpWorkspaceUISourceCodes();
+                InspectorTest.testExcludedFolderManager.removeExcludedFolder(fileSystemPath, "/html/");
                 next();
             }
         },
@@ -450,14 +454,15 @@ function test()
             function renameNextFile()
             {
                 var uiSourceCode = uiSourceCodes[index];
-                oldURL = uiSourceCode.url;
+                oldURL = InspectorTest.testNetworkMapping.networkURL(uiSourceCode);
                 uiSourceCodes[index].rename("newName.js", fileRenamed);
             }
 
             function fileRenamed()
             {
                 var uiSourceCode = uiSourceCodes[index];
-                InspectorTest.addResult("    uiSourceCode URL change after renaming: " + oldURL + " -> " + uiSourceCode.url);
+                var networkURL = InspectorTest.testNetworkMapping.networkURL(uiSourceCode);
+                InspectorTest.addResult("    uiSourceCode URL change after renaming: " + oldURL + " -> " + networkURL);
                 ++index;
                 if (index < uiSourceCodes.length)
                     renameNextFile();

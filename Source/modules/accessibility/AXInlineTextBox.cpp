@@ -30,6 +30,7 @@
 #include "modules/accessibility/AXInlineTextBox.h"
 
 #include "core/dom/Range.h"
+#include "core/rendering/FloatToLayoutUnit.h"
 #include "core/rendering/RenderText.h"
 #include "modules/accessibility/AXObjectCacheImpl.h"
 #include "platform/LayoutUnit.h"
@@ -39,11 +40,10 @@ namespace blink {
 
 using namespace HTMLNames;
 
-AXInlineTextBox::AXInlineTextBox(PassRefPtr<AbstractInlineTextBox> inlineTextBox)
-    : m_inlineTextBox(inlineTextBox)
+AXInlineTextBox::AXInlineTextBox(PassRefPtr<AbstractInlineTextBox> inlineTextBox, AXObjectCacheImpl* axObjectCache)
+    : AXObject(axObjectCache)
+    , m_inlineTextBox(inlineTextBox)
 {
-    RenderText* renderText = m_inlineTextBox->renderText();
-    m_axObjectCache = toAXObjectCacheImpl(renderText->document().axObjectCache());
 }
 
 AXInlineTextBox::~AXInlineTextBox()
@@ -52,9 +52,9 @@ AXInlineTextBox::~AXInlineTextBox()
         m_axObjectCache->remove(m_inlineTextBox.get());
 }
 
-PassRefPtr<AXInlineTextBox> AXInlineTextBox::create(PassRefPtr<AbstractInlineTextBox> inlineTextBox)
+PassRefPtr<AXInlineTextBox> AXInlineTextBox::create(PassRefPtr<AbstractInlineTextBox> inlineTextBox, AXObjectCacheImpl* axObjectCache)
 {
-    return adoptRef(new AXInlineTextBox(inlineTextBox));
+    return adoptRef(new AXInlineTextBox(inlineTextBox, axObjectCache));
 }
 
 void AXInlineTextBox::init()
@@ -90,15 +90,15 @@ void AXInlineTextBox::textCharacterOffsets(Vector<int>& offsets) const
         return;
 
     unsigned len = m_inlineTextBox->len();
-    Vector<float> widths;
+    Vector<FloatWillBeLayoutUnit> widths;
     m_inlineTextBox->characterWidths(widths);
     ASSERT(widths.size() == len);
     offsets.resize(len);
 
-    float widthSoFar = 0;
+    FloatWillBeLayoutUnit widthSoFar = 0;
     for (unsigned i = 0; i < len; i++) {
         widthSoFar += widths[i];
-        offsets[i] = lroundf(widthSoFar);
+        offsets[i] = widthSoFar.round();
     }
 }
 

@@ -124,11 +124,8 @@ PassRefPtrWillBeRawPtr<DOMStringList> Location::ancestorOrigins() const
     RefPtrWillBeRawPtr<DOMStringList> origins = DOMStringList::create();
     if (!m_frame)
         return origins.release();
-    // FIXME: We do not yet have access to remote frame's origin.
-    for (Frame* frame = m_frame->tree().parent(); frame; frame = frame->tree().parent()) {
-        if (frame->isLocalFrame())
-            origins->append(toLocalFrame(frame)->document()->securityOrigin()->toString());
-    }
+    for (Frame* frame = m_frame->tree().parent(); frame; frame = frame->tree().parent())
+        origins->append(frame->securityContext()->securityOrigin()->toString());
     return origins.release();
 }
 
@@ -245,18 +242,18 @@ void Location::reload(LocalDOMWindow* callingWindow)
         return;
     if (protocolIsJavaScript(m_frame->document()->url()))
         return;
-    m_frame->navigationScheduler().scheduleReload();
+    m_frame->reload(NormalReload, ClientRedirect);
 }
 
 void Location::setLocation(const String& url, LocalDOMWindow* callingWindow, LocalDOMWindow* enteredWindow)
 {
     ASSERT(m_frame);
-    LocalFrame* frame = m_frame->loader().findFrameForNavigation(nullAtom, callingWindow->document());
-    if (!frame)
+    Frame* frame = m_frame->findFrameForNavigation(nullAtom, *callingWindow->frame());
+    if (!frame || !frame->isLocalFrame())
         return;
     // FIXME: setLocation() probably belongs on DOMWindow, since you can trigger
     // navigations across different origins.
-    frame->localDOMWindow()->setLocation(url, callingWindow, enteredWindow);
+    toLocalFrame(frame)->localDOMWindow()->setLocation(url, callingWindow, enteredWindow);
 }
 
 } // namespace blink

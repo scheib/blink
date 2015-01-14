@@ -61,8 +61,7 @@ public:
     ChromeClient& client() { return *m_client; }
 
     // HostWindow methods.
-    virtual void invalidateContentsAndRootView(const IntRect&) override;
-    virtual void invalidateContentsForSlowScroll(const IntRect&) override;
+    virtual void invalidateRect(const IntRect&) override;
     virtual IntRect rootViewToScreen(const IntRect&) const override;
     virtual blink::WebScreenInfo screenInfo() const override;
 
@@ -127,10 +126,12 @@ public:
     void dispatchViewportPropertiesDidChange(const ViewportDescription&) const;
 
     bool hasOpenedPopup() const;
-    PassRefPtrWillBeRawPtr<PopupMenu> createPopupMenu(LocalFrame&, PopupMenuClient*) const;
+    PassRefPtrWillBeRawPtr<PopupMenu> createPopupMenu(LocalFrame&, PopupMenuClient*);
 
     void registerPopupOpeningObserver(PopupOpeningObserver*);
     void unregisterPopupOpeningObserver(PopupOpeningObserver*);
+
+    void registerViewportLayers() const;
 
     void willBeDestroyed();
 

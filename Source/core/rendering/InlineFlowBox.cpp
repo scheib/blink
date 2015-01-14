@@ -36,6 +36,7 @@
 #include "core/rendering/RenderRubyText.h"
 #include "core/rendering/RenderView.h"
 #include "core/rendering/RootInlineBox.h"
+#include "core/rendering/style/ShadowList.h"
 #include "platform/fonts/Font.h"
 #include "platform/graphics/GraphicsContextStateSaver.h"
 
@@ -48,7 +49,7 @@ struct SameSizeAsInlineFlowBox : public InlineBox {
     uint32_t bitfields : 23;
 };
 
-COMPILE_ASSERT(sizeof(InlineFlowBox) == sizeof(SameSizeAsInlineFlowBox), InlineFlowBox_should_stay_small);
+static_assert(sizeof(InlineFlowBox) == sizeof(SameSizeAsInlineFlowBox), "InlineFlowBox should stay small");
 
 #if ENABLE(ASSERT)
 
@@ -384,7 +385,7 @@ FloatWillBeLayoutUnit InlineFlowBox::placeBoxRangeInInlineDirection(InlineBox* f
         if (curr->renderer().isText()) {
             InlineTextBox* text = toInlineTextBox(curr);
             RenderText& rt = text->renderer();
-            FloatWillBeLayoutUnit space = 0;
+            FloatWillBeLayoutUnit space;
             if (rt.textLength()) {
                 if (needsWordSpacing && isSpaceOrNewline(rt.characterAt(text->start())))
                     space = rt.style(isFirstLineStyle())->font().fontDescription().wordSpacing();
@@ -753,7 +754,7 @@ void InlineFlowBox::computeMaxLogicalTop(FloatWillBeLayoutUnit& maxLogicalTop) c
             continue;
 
         maxLogicalTop = std::max<FloatWillBeLayoutUnit>(maxLogicalTop, curr->y());
-        FloatWillBeLayoutUnit localMaxLogicalTop = 0;
+        FloatWillBeLayoutUnit localMaxLogicalTop;
         if (curr->isInlineFlowBox())
             toInlineFlowBox(curr)->computeMaxLogicalTop(localMaxLogicalTop);
         maxLogicalTop = std::max<FloatWillBeLayoutUnit>(maxLogicalTop, localMaxLogicalTop);
@@ -783,30 +784,19 @@ inline void InlineFlowBox::addBoxShadowVisualOverflow(LayoutRect& logicalVisualO
         return;
 
     RenderStyle* style = renderer().style(isFirstLineStyle());
-    if (!style->boxShadow())
+    WritingMode writingMode = style->writingMode();
+    ShadowList* boxShadow = style->boxShadow();
+    if (!boxShadow)
         return;
 
-    LayoutUnit boxShadowLogicalTop;
-    LayoutUnit boxShadowLogicalBottom;
-    style->getBoxShadowBlockDirectionExtent(boxShadowLogicalTop, boxShadowLogicalBottom);
-
+    LayoutRectOutsets outsets(boxShadow->rectOutsetsIncludingOriginal());
     // Similar to how glyph overflow works, if our lines are flipped, then it's actually the opposite shadow that applies, since
     // the line is "upside down" in terms of block coordinates.
-    LayoutUnit shadowLogicalTop = style->isFlippedLinesWritingMode() ? -boxShadowLogicalBottom : boxShadowLogicalTop;
-    LayoutUnit shadowLogicalBottom = style->isFlippedLinesWritingMode() ? -boxShadowLogicalTop : boxShadowLogicalBottom;
+    LayoutRectOutsets logicalOutsets(outsets.logicalOutsetsWithFlippedLines(writingMode));
 
-    LayoutUnit logicalTopVisualOverflow = std::min(pixelSnappedLogicalTop() + shadowLogicalTop, logicalVisualOverflow.y());
-    LayoutUnit logicalBottomVisualOverflow = std::max(pixelSnappedLogicalBottom() + shadowLogicalBottom, logicalVisualOverflow.maxY());
-
-    LayoutUnit boxShadowLogicalLeft;
-    LayoutUnit boxShadowLogicalRight;
-    style->getBoxShadowInlineDirectionExtent(boxShadowLogicalLeft, boxShadowLogicalRight);
-
-    LayoutUnit logicalLeftVisualOverflow = std::min(pixelSnappedLogicalLeft() + boxShadowLogicalLeft, logicalVisualOverflow.x());
-    LayoutUnit logicalRightVisualOverflow = std::max(pixelSnappedLogicalRight() + boxShadowLogicalRight, logicalVisualOverflow.maxX());
-
-    logicalVisualOverflow = LayoutRect(logicalLeftVisualOverflow, logicalTopVisualOverflow,
-                                       logicalRightVisualOverflow - logicalLeftVisualOverflow, logicalBottomVisualOverflow - logicalTopVisualOverflow);
+    LayoutRect shadowBounds(logicalFrameRect().toLayoutRect());
+    shadowBounds.expand(logicalOutsets);
+    logicalVisualOverflow.unite(shadowBounds);
 }
 
 inline void InlineFlowBox::addBorderOutsetVisualOverflow(LayoutRect& logicalVisualOverflow)
@@ -819,29 +809,18 @@ inline void InlineFlowBox::addBorderOutsetVisualOverflow(LayoutRect& logicalVisu
     if (!style->hasBorderImageOutsets())
         return;
 
-    LayoutBoxExtent borderOutsets = style->borderImageOutsets();
-
-    LayoutUnit borderOutsetLogicalTop = borderOutsets.logicalTop(style->writingMode());
-    LayoutUnit borderOutsetLogicalBottom = borderOutsets.logicalBottom(style->writingMode());
-    LayoutUnit borderOutsetLogicalLeft = borderOutsets.logicalLeft(style->writingMode());
-    LayoutUnit borderOutsetLogicalRight = borderOutsets.logicalRight(style->writingMode());
-
     // Similar to how glyph overflow works, if our lines are flipped, then it's actually the opposite border that applies, since
     // the line is "upside down" in terms of block coordinates. vertical-rl and horizontal-bt are the flipped line modes.
-    LayoutUnit outsetLogicalTop = style->isFlippedLinesWritingMode() ? borderOutsetLogicalBottom : borderOutsetLogicalTop;
-    LayoutUnit outsetLogicalBottom = style->isFlippedLinesWritingMode() ? borderOutsetLogicalTop : borderOutsetLogicalBottom;
+    LayoutRectOutsets logicalOutsets = style->borderImageOutsets().logicalOutsetsWithFlippedLines(style->writingMode());
 
-    LayoutUnit logicalTopVisualOverflow = std::min(pixelSnappedLogicalTop() - outsetLogicalTop, logicalVisualOverflow.y());
-    LayoutUnit logicalBottomVisualOverflow = std::max(pixelSnappedLogicalBottom() + outsetLogicalBottom, logicalVisualOverflow.maxY());
+    if (!includeLogicalLeftEdge())
+        logicalOutsets.setLeft(LayoutUnit());
+    if (!includeLogicalRightEdge())
+        logicalOutsets.setRight(LayoutUnit());
 
-    LayoutUnit outsetLogicalLeft = includeLogicalLeftEdge() ? borderOutsetLogicalLeft : LayoutUnit();
-    LayoutUnit outsetLogicalRight = includeLogicalRightEdge() ? borderOutsetLogicalRight : LayoutUnit();
-
-    LayoutUnit logicalLeftVisualOverflow = std::min(pixelSnappedLogicalLeft() - outsetLogicalLeft, logicalVisualOverflow.x());
-    LayoutUnit logicalRightVisualOverflow = std::max(pixelSnappedLogicalRight() + outsetLogicalRight, logicalVisualOverflow.maxX());
-
-    logicalVisualOverflow = LayoutRect(logicalLeftVisualOverflow, logicalTopVisualOverflow,
-                                       logicalRightVisualOverflow - logicalLeftVisualOverflow, logicalBottomVisualOverflow - logicalTopVisualOverflow);
+    LayoutRect borderOutsetBounds(logicalFrameRect().toLayoutRect());
+    borderOutsetBounds.expand(logicalOutsets);
+    logicalVisualOverflow.unite(borderOutsetBounds);
 }
 
 inline void InlineFlowBox::addOutlineVisualOverflow(LayoutRect& logicalVisualOverflow)
@@ -892,17 +871,19 @@ inline void InlineFlowBox::addTextBoxVisualOverflow(InlineTextBox* textBox, Glyp
     // applied to the right, so this is not an issue with left overflow.
     rightGlyphOverflow -= std::min(0, (int)style->font().fontDescription().letterSpacing());
 
-    LayoutUnit textShadowLogicalTop;
-    LayoutUnit textShadowLogicalBottom;
-    style->getTextShadowBlockDirectionExtent(textShadowLogicalTop, textShadowLogicalBottom);
+    LayoutRectOutsets textShadowLogicalOutsets;
+    if (ShadowList* textShadow = style->textShadow())
+        textShadowLogicalOutsets = LayoutRectOutsets(textShadow->rectOutsetsIncludingOriginal()).logicalOutsets(style->writingMode());
+
+    // FIXME: This code currently uses negative values for expansion of the top
+    // and left edges. This should be cleaned up.
+    LayoutUnit textShadowLogicalTop = -textShadowLogicalOutsets.top();
+    LayoutUnit textShadowLogicalBottom = textShadowLogicalOutsets.bottom();
+    LayoutUnit textShadowLogicalLeft = -textShadowLogicalOutsets.left();
+    LayoutUnit textShadowLogicalRight = textShadowLogicalOutsets.right();
 
     LayoutUnit childOverflowLogicalTop = std::min<LayoutUnit>(textShadowLogicalTop + topGlyphOverflow, topGlyphOverflow);
     LayoutUnit childOverflowLogicalBottom = std::max<LayoutUnit>(textShadowLogicalBottom + bottomGlyphOverflow, bottomGlyphOverflow);
-
-    LayoutUnit textShadowLogicalLeft;
-    LayoutUnit textShadowLogicalRight;
-    style->getTextShadowInlineDirectionExtent(textShadowLogicalLeft, textShadowLogicalRight);
-
     LayoutUnit childOverflowLogicalLeft = std::min<LayoutUnit>(textShadowLogicalLeft + leftGlyphOverflow, leftGlyphOverflow);
     LayoutUnit childOverflowLogicalRight = std::max<LayoutUnit>(textShadowLogicalRight + rightGlyphOverflow, rightGlyphOverflow);
 
@@ -1028,41 +1009,41 @@ bool InlineFlowBox::nodeAtPoint(const HitTestRequest& request, HitTestResult& re
     if (!locationInContainer.intersects(overflowRect))
         return false;
 
-    // Check children first.
-    // We need to account for culled inline parents of the hit-tested nodes, so that they may also get included in area-based hit-tests.
-    RenderObject* culledParent = 0;
-    for (InlineBox* curr = lastChild(); curr; curr = curr->prevOnLine()) {
-        if (curr->renderer().isText() || !curr->boxModelObject()->hasSelfPaintingLayer()) {
-            RenderObject* newParent = 0;
-            // Culled parents are only relevant for area-based hit-tests, so ignore it in point-based ones.
-            if (locationInContainer.isRectBasedTest()) {
-                newParent = curr->renderer().parent();
-                if (newParent == renderer())
-                    newParent = 0;
-            }
-            // Check the culled parent after all its children have been checked, to do this we wait until
-            // we are about to test an element with a different parent.
-            if (newParent != culledParent) {
-                if (!newParent || !newParent->isDescendantOf(culledParent)) {
-                    while (culledParent && culledParent != renderer() && culledParent != newParent) {
-                        if (culledParent->isRenderInline() && toRenderInline(culledParent)->hitTestCulledInline(request, result, locationInContainer, accumulatedOffset))
-                            return true;
-                        culledParent = culledParent->parent();
-                    }
-                }
-                culledParent = newParent;
-            }
-            if (curr->nodeAtPoint(request, result, locationInContainer, accumulatedOffset, lineTop, lineBottom)) {
-                renderer().updateHitTestResult(result, locationInContainer.point() - toLayoutSize(accumulatedOffset));
-                return true;
-            }
-        }
-    }
-    // Check any culled ancestor of the final children tested.
-    while (culledParent && culledParent != renderer()) {
-        if (culledParent->isRenderInline() && toRenderInline(culledParent)->hitTestCulledInline(request, result, locationInContainer, accumulatedOffset))
+    // We need to hit test both our inline children (InlineBoxes) and culled inlines
+    // (RenderObjects). We check our inlines in the same order as line layout but
+    // for each inline we additionally need to hit test its culled inline parents.
+    // While hit testing culled inline parents, we can stop once we reach
+    // a non-inline parent or a culled inline associated with a different inline box.
+    InlineBox* prev;
+    for (InlineBox* curr = lastChild(); curr; curr = prev) {
+        prev = curr->prevOnLine();
+
+        // Layers will handle hit testing themselves.
+        if (curr->boxModelObject() && curr->boxModelObject()->hasSelfPaintingLayer())
+            continue;
+
+        if (curr->nodeAtPoint(request, result, locationInContainer, accumulatedOffset, lineTop, lineBottom)) {
+            renderer().updateHitTestResult(result, locationInContainer.point() - toLayoutSize(accumulatedOffset));
             return true;
-        culledParent = culledParent->parent();
+        }
+
+        // If the current inlinebox's renderer and the previous inlinebox's renderer are same,
+        // we should yield the hit-test to the previous inlinebox.
+        if (prev && curr->renderer() == prev->renderer())
+            continue;
+
+        RenderObject* culledParent = &curr->renderer();
+        while (true) {
+            RenderObject* sibling = culledParent->style()->isLeftToRightDirection() ? culledParent->previousSibling() : culledParent->nextSibling();
+            culledParent = culledParent->parent();
+            ASSERT(culledParent);
+
+            if (culledParent == renderer() || (sibling && prev && prev->renderer().isDescendantOf(culledParent)))
+                break;
+
+            if (culledParent->isRenderInline() && toRenderInline(culledParent)->hitTestCulledInline(request, result, locationInContainer, accumulatedOffset))
+                return true;
+        }
     }
 
     // Now check ourselves. Pixel snap hit testing.

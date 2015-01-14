@@ -9,9 +9,15 @@
         <br>
         <br>
         <br>
-        <div style="opacity:0.8; margin:0.5em;">PASS</div>
+        <!-- The extra span below forces the creation of a transparency layer in Skia to work around
+             optimizations that would cause blending differences between the test and the
+             expectation. -->
+        <div style="opacity:0.8; margin:0.5em;">PA<span>SS</span></div>
     </div>
     <div style="float:left; width:5em; height:100%;">
-        <div style="opacity:0.8; margin:0 0.5em;">PASS</div>
+        <!-- The extra span below forces the creation of a transparency layer in Skia to work around
+             optimizations that would cause blending differences between the test and the
+             expectation. -->
+        <div style="opacity:0.8; margin:0 0.5em;">PA<span>SS</span></div>
     </div>
 </div>

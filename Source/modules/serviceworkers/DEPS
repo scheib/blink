@@ -5,6 +5,7 @@ include_rules = [
     "-modules",
     "+modules/EventModules.h",
     "+modules/EventTargetModules.h",
+    "+modules/fetch",
     "+modules/serviceworkers",
     "+platform",
     "+public/platform",

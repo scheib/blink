@@ -177,7 +177,7 @@ public:
     void setUnderlyingEvent(PassRefPtrWillBeRawPtr<Event>);
 
     EventPath& eventPath() { ASSERT(m_eventPath); return *m_eventPath; }
-    EventPath& ensureEventPath();
+    void initEventPath(Node&);
 
     PassRefPtrWillBeRawPtr<StaticNodeList> path() const;
 
@@ -196,6 +196,8 @@ protected:
 
     virtual void receivedTarget();
     bool dispatched() const { return m_target; }
+
+    void setCanBubble(bool bubble) { m_canBubble = bubble; }
 
 private:
     AtomicString m_type;

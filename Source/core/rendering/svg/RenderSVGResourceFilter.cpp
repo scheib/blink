@@ -30,6 +30,7 @@
 #include "platform/graphics/filters/SkiaImageFilterBuilder.h"
 #include "platform/graphics/filters/SourceAlpha.h"
 #include "platform/graphics/filters/SourceGraphic.h"
+#include "third_party/skia/include/core/SkPicture.h"
 
 namespace blink {
 
@@ -113,16 +114,9 @@ PassRefPtrWillBeRawPtr<SVGFilterBuilder> RenderSVGResourceFilter::buildPrimitive
 
 static void beginDeferredFilter(GraphicsContext* context, FilterData* filterData)
 {
+    // FIXME: Create a new GraphicsContext here to replace the existing context instead
+    // of nesting recordings.
     context->beginRecording(filterData->boundaries);
-    // We pass the boundaries to SkPictureImageFilter so it knows the
-    // world-space position of the filter primitives. It gets them
-    // from the DisplayList, which also applies the inverse translate
-    // to the origin. So we apply the forward translate here to avoid
-    // it being applied twice.
-    // FIXME: we should fix SkPicture to handle this offset itself, or
-    // make the translate optional on SkPictureImageFilter.
-    // See https://code.google.com/p/skia/issues/detail?id=2801
-    context->translate(filterData->boundaries.x(), filterData->boundaries.y());
 }
 
 static void endDeferredFilter(GraphicsContext* context, FilterData* filterData)
@@ -161,19 +155,23 @@ static void drawDeferredFilter(GraphicsContext* context, FilterData* filterData,
         resizeMatrix.scale(1 / filterResScaleX, 1 / filterResScaleY);
         imageFilter = builder.buildTransform(resizeMatrix, imageFilter.get());
     }
-    // If the CTM contains rotation or shearing, apply the filter to
-    // the unsheared/unrotated matrix, and do the shearing/rotation
-    // as a final pass.
-    AffineTransform ctm = context->getCTM();
-    if (ctm.b() || ctm.c()) {
-        AffineTransform scaleAndTranslate;
-        scaleAndTranslate.translate(ctm.e(), ctm.f());
-        scaleAndTranslate.scale(ctm.xScale(), ctm.yScale());
-        ASSERT(scaleAndTranslate.isInvertible());
-        AffineTransform shearAndRotate = scaleAndTranslate.inverse();
-        shearAndRotate.multiply(ctm);
-        context->setCTM(scaleAndTranslate);
-        imageFilter = builder.buildTransform(shearAndRotate, imageFilter.get());
+
+    // See crbug.com/382491.
+    if (!RuntimeEnabledFeatures::slimmingPaintEnabled()) {
+        // If the CTM contains rotation or shearing, apply the filter to
+        // the unsheared/unrotated matrix, and do the shearing/rotation
+        // as a final pass.
+        AffineTransform ctm = context->getCTM();
+        if (ctm.b() || ctm.c()) {
+            AffineTransform scaleAndTranslate;
+            scaleAndTranslate.translate(ctm.e(), ctm.f());
+            scaleAndTranslate.scale(ctm.xScale(), ctm.yScale());
+            ASSERT(scaleAndTranslate.isInvertible());
+            AffineTransform shearAndRotate = scaleAndTranslate.inverse();
+            shearAndRotate.multiply(ctm);
+            context->setCTM(scaleAndTranslate);
+            imageFilter = builder.buildTransform(shearAndRotate, imageFilter.get());
+        }
     }
     context->beginLayer(1, CompositeSourceOver, &boundaries, ColorFilterNone, imageFilter.get());
     context->endLayer();
@@ -202,13 +200,11 @@ bool RenderSVGResourceFilter::prepareEffect(RenderObject* object, GraphicsContex
     if (filterData->boundaries.isEmpty())
         return false;
 
-    filterData->drawingRegion = object->strokeBoundingBox();
-    filterData->drawingRegion.intersect(filterData->boundaries);
-    IntRect intDrawingRegion = enclosingIntRect(filterData->drawingRegion);
-
     // Create the SVGFilter object.
+    FloatRect drawingRegion = object->strokeBoundingBox();
+    drawingRegion.intersect(filterData->boundaries);
     bool primitiveBoundingBoxMode = filterElement->primitiveUnits()->currentValue()->enumValue() == SVGUnitTypes::SVG_UNIT_TYPE_OBJECTBOUNDINGBOX;
-    filterData->filter = SVGFilter::create(intDrawingRegion, targetBoundingBox, filterData->boundaries, primitiveBoundingBoxMode);
+    filterData->filter = SVGFilter::create(enclosingIntRect(drawingRegion), targetBoundingBox, filterData->boundaries, primitiveBoundingBoxMode);
 
     // Create all relevant filter primitives.
     filterData->builder = buildPrimitives(filterData->filter.get());
@@ -289,12 +285,6 @@ void RenderSVGResourceFilter::primitiveAttributeChanged(RenderObject* object, co
         markClientForInvalidation(it->key, PaintInvalidation);
     }
     markAllClientLayersForInvalidation();
-}
-
-FloatRect RenderSVGResourceFilter::drawingRegion(RenderObject* object) const
-{
-    FilterData* filterData = m_filter.get(object);
-    return filterData ? filterData->drawingRegion : FloatRect();
 }
 
 }

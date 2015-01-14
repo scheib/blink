@@ -34,7 +34,7 @@
 #include "core/svg/SVGUseElement.h"
 #include "platform/RuntimeEnabledFeatures.h"
 #include "platform/graphics/GraphicsContextStateSaver.h"
-#include "platform/graphics/Picture.h"
+#include "third_party/skia/include/core/SkPicture.h"
 #include "wtf/TemporaryChange.h"
 
 namespace blink {
@@ -230,7 +230,6 @@ void RenderSVGResourceClipper::drawClipMaskContent(GraphicsContext* context, con
         createPicture(context);
     }
 
-    ASSERT(m_clipContentPicture);
     context->drawPicture(m_clipContentPicture.get());
 }
 
@@ -279,7 +278,7 @@ void RenderSVGResourceClipper::createPicture(GraphicsContext* context)
         // - masker/filter not applied when rendering the children
         // - fill is set to the initial fill paint server (solid, black)
         // - stroke is set to the initial stroke paint server (none)
-        PaintInfo info(context, PaintInfo::infiniteRect(), PaintPhaseForeground, PaintBehaviorRenderingClipPathAsMask);
+        PaintInfo info(context, LayoutRect::infiniteIntRect(), PaintPhaseForeground, PaintBehaviorRenderingClipPathAsMask);
         renderer->paint(info, IntPoint());
     }
 

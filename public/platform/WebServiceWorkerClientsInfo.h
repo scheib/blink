@@ -6,6 +6,7 @@
 #define WebServiceWorkerClientsInfo_h
 
 #include "public/platform/WebCallbacks.h"
+#include "public/platform/WebPageVisibilityState.h"
 #include "public/platform/WebURL.h"
 #include "public/platform/WebURLRequest.h"
 #include "public/platform/WebVector.h"
@@ -15,10 +16,17 @@ namespace blink {
 struct WebServiceWorkerError;
 
 struct WebServiceWorkerClientInfo {
+    WebServiceWorkerClientInfo()
+        : clientID(0)
+        , pageVisibilityState(WebPageVisibilityStateLast)
+        , isFocused(false)
+        , frameType(WebURLRequest::FrameTypeNone)
+    {
+    }
+
     int clientID;
-    // FIXME: Use WebPageVisibilityState? That will require moving
-    // WebPageVisibilityState from public/web to public/platform.
-    WebString visibilityState;
+
+    WebPageVisibilityState pageVisibilityState;
     bool isFocused;
     WebURL url;
     WebURLRequest::FrameType frameType;
@@ -26,8 +34,6 @@ struct WebServiceWorkerClientInfo {
 
 struct WebServiceWorkerClientsInfo {
     WebVector<WebServiceWorkerClientInfo> clients;
-    // FIXME: Remove this once the embedder stops using it.
-    WebVector<int> clientIDs;
 };
 
 typedef WebCallbacks<WebServiceWorkerClientsInfo, WebServiceWorkerError> WebServiceWorkerClientsCallbacks;

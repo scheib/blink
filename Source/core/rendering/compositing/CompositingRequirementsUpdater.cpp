@@ -190,7 +190,7 @@ void CompositingRequirementsUpdater::update(RenderLayer* root)
     TRACE_EVENT0("blink", "CompositingRequirementsUpdater::updateRecursive");
 
     // Go through the layers in presentation order, so that we can compute which RenderLayers need compositing layers.
-    // FIXME: we could maybe do this and the hierarchy udpate in one pass, but the parenting logic would be more complex.
+    // FIXME: we could maybe do this and the hierarchy update in one pass, but the parenting logic would be more complex.
     RecursionData recursionData(root);
     OverlapMap overlapTestRequestMap;
     bool saw3DTransform = false;
@@ -220,8 +220,29 @@ void CompositingRequirementsUpdater::updateRecursive(RenderLayer* ancestorLayer,
     if (currentRecursionData.m_compositingAncestor && currentRecursionData.m_compositingAncestor->renderer()->isVideo())
         directReasons |= CompositingReasonVideoOverlay;
 
-    if (compositor->canBeComposited(layer))
+    if (compositor->canBeComposited(layer)) {
         reasonsToComposite |= directReasons;
+
+        if (layer->isRootLayer() && compositor->rootShouldAlwaysComposite())
+            reasonsToComposite |= CompositingReasonRoot;
+
+        if (reasonsToComposite && layer->scrollsOverflow() && !layer->needsCompositedScrolling()) {
+            // We will only set needsCompositedScrolling if we don't care about
+            // the LCD text hit, we may be able to switch to the compositor
+            // driven path if we're alread composited for other reasons and are
+            // therefore using grayscale AA.
+            //
+            // FIXME: it should also be possible to promote if the layer can
+            // still use LCD text when promoted, but detecting when the
+            // compositor can do this is tricky. Currently, the layer must be
+            // both opaque and may only have an integer translation as its
+            // transform. Both opacity and screen space transform are inherited
+            // properties, so this cannot be determined from local information.
+            layer->scrollableArea()->updateNeedsCompositedScrolling(RenderLayerScrollableArea::IgnoreLCDText);
+            if (layer->needsCompositedScrolling())
+                reasonsToComposite |= CompositingReasonOverflowScrollingTouch;
+        }
+    }
 
     // Next, accumulate reasons related to overlap.
     // If overlap testing is used, this reason will be overridden. If overlap testing is not

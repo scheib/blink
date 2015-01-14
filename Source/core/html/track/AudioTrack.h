@@ -10,14 +10,17 @@
 
 namespace blink {
 
-class AudioTrack final : public TrackBase, public ScriptWrappable {
+class AudioTrack final : public NoBaseWillBeGarbageCollectedFinalized<AudioTrack>, public TrackBase, public ScriptWrappable {
     DEFINE_WRAPPERTYPEINFO();
+    WILL_BE_USING_GARBAGE_COLLECTED_MIXIN(AudioTrack);
 public:
     static PassRefPtrWillBeRawPtr<AudioTrack> create(const String& id, const AtomicString& kind, const AtomicString& label, const AtomicString& language, bool enabled)
     {
         return adoptRefWillBeNoop(new AudioTrack(id, kind, label, language, enabled));
     }
+
     virtual ~AudioTrack();
+    virtual void trace(Visitor*) override;
 
     bool enabled() const { return m_enabled; }
     void setEnabled(bool);

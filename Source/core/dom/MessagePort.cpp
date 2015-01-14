@@ -260,4 +260,10 @@ PassOwnPtrWillBeRawPtr<MessagePortArray> MessagePort::entanglePorts(ExecutionCon
     return portArray.release();
 }
 
+void MessagePort::trace(Visitor* visitor)
+{
+    ActiveDOMObject::trace(visitor);
+    EventTargetWithInlineData::trace(visitor);
+}
+
 } // namespace blink

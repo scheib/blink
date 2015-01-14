@@ -567,6 +567,11 @@ RTCDataChannel* RTCPeerConnection::createDataChannel(String label, const Diction
     if (exceptionState.hadException())
         return nullptr;
     m_dataChannels.append(channel);
+    RTCDataChannel::ReadyState handlerState = channel->getHandlerState();
+    if (handlerState != RTCDataChannel::ReadyStateConnecting) {
+        // There was an early state transition.  Don't miss it!
+        channel->didChangeReadyState(handlerState);
+    }
     return channel;
 }
 
@@ -808,7 +813,8 @@ void RTCPeerConnection::trace(Visitor* visitor)
 #if ENABLE(OILPAN)
     visitor->trace(m_scheduledEvents);
 #endif
-    EventTargetWithInlineData::trace(visitor);
+    RefCountedGarbageCollectedEventTargetWithInlineData<RTCPeerConnection>::trace(visitor);
+    ActiveDOMObject::trace(visitor);
 }
 
 } // namespace blink

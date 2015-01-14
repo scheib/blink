@@ -62,6 +62,7 @@ class WebColorChooserClient;
 class WebContentDecryptionModule;
 class WebCookieJar;
 class WebDataSource;
+class WebEncryptedMediaClient;
 class WebExternalPopupMenu;
 class WebExternalPopupMenuClient;
 class WebFormElement;
@@ -107,6 +108,7 @@ public:
     virtual WebMediaPlayer* createMediaPlayer(WebLocalFrame*, const WebURL&, WebMediaPlayerClient*, WebContentDecryptionModule*) { return 0; }
 
     // May return null.
+    // FIXME: remove once encryptedMediaClient() is used.
     virtual WebContentDecryptionModule* createContentDecryptionModule(WebLocalFrame*, const WebSecurityOrigin&, const WebString& keySystem) { return 0; }
 
     // May return null.
@@ -254,7 +256,8 @@ public:
     virtual void didCreateDataSource(WebLocalFrame*, WebDataSource*) { }
 
     // A new provisional load has been started.
-    virtual void didStartProvisionalLoad(WebLocalFrame* localFrame, bool isTransitionNavigation) { }
+    virtual void didStartProvisionalLoad(WebLocalFrame* localFrame, bool isTransitionNavigation,
+        double triggeringEventTime) { }
 
     // The provisional load was redirected via a HTTP 3xx response.
     virtual void didReceiveServerRedirectForProvisionalLoad(WebLocalFrame*) { }
@@ -512,6 +515,11 @@ public:
     virtual WebUserMediaClient* userMediaClient() { return 0; }
 
 
+    // Encrypted Media -------------------------------------------------
+
+    virtual WebEncryptedMediaClient* encryptedMediaClient() { return 0; }
+
+
     // Web MIDI -------------------------------------------------------------
 
     virtual WebMIDIClient* webMIDIClient() { return 0; }
@@ -591,6 +599,17 @@ public:
 
     // Access the embedder API for speech recognition services.
     virtual WebSpeechRecognizer* speechRecognizer() { return 0; }
+
+
+    // Fullscreen ----------------------------------------------------------
+
+    // Called to enter/exit fullscreen mode. If enterFullScreen returns true,
+    // then WebWidget::{will,Did}EnterFullScreen should bound resizing the
+    // WebWidget into fullscreen mode. Similarly, when exitFullScreen is
+    // called, WebWidget::{will,Did}ExitFullScreen should bound resizing the
+    // WebWidget out of fullscreen mode.
+    virtual bool enterFullscreen() { return false; }
+    virtual bool exitFullscreen() { return false; }
 
 protected:
     virtual ~WebFrameClient() { }

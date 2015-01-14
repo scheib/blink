@@ -85,7 +85,7 @@ public:
     virtual void dispatchDidReceiveServerRedirectForProvisionalLoad() override;
     virtual void dispatchDidNavigateWithinPage(HistoryItem*, HistoryCommitType) override;
     virtual void dispatchWillClose() override;
-    virtual void dispatchDidStartProvisionalLoad(bool isTransitionNavigation) override;
+    virtual void dispatchDidStartProvisionalLoad(bool isTransitionNavigation, double triggeringEventTime) override;
     virtual void dispatchDidReceiveTitle(const String&) override;
     virtual void dispatchDidChangeIcons(IconType) override;
     virtual void dispatchDidCommitLoad(LocalFrame*, HistoryItem*, HistoryCommitType) override;
@@ -116,7 +116,7 @@ public:
     virtual WTF::String userAgent(const KURL&) override;
     virtual WTF::String doNotTrackValue() override;
     virtual void transitionToCommittedForNewPage() override;
-    virtual PassRefPtrWillBeRawPtr<LocalFrame> createFrame(const KURL&, const WTF::AtomicString& name, HTMLFrameOwnerElement*) override;
+    virtual PassRefPtrWillBeRawPtr<LocalFrame> createFrame(const KURL&, const WTF::AtomicString& name, HTMLFrameOwnerElement*, ContentSecurityPolicyDisposition) override;
     virtual bool canCreatePluginWithoutRenderer(const String& mimeType) const;
     virtual PassOwnPtrWillBeRawPtr<PluginPlaceholder> createPluginPlaceholder(
         Document&, const KURL&,

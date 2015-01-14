@@ -5,8 +5,10 @@
 #include "config.h"
 #include "core/paint/SVGImagePainter.h"
 
+#include "core/paint/GraphicsContextAnnotator.h"
 #include "core/paint/ObjectPainter.h"
-#include "core/rendering/GraphicsContextAnnotator.h"
+#include "core/paint/RenderDrawingRecorder.h"
+#include "core/paint/TransformRecorder.h"
 #include "core/rendering/ImageQualityController.h"
 #include "core/rendering/PaintInfo.h"
 #include "core/rendering/RenderImageResource.h"
@@ -16,7 +18,7 @@
 #include "core/svg/SVGImageElement.h"
 #include "platform/graphics/GraphicsContext.h"
 #include "platform/graphics/GraphicsContextStateSaver.h"
-#include "platform/graphics/Picture.h"
+#include "third_party/skia/include/core/SkPicture.h"
 
 namespace blink {
 
@@ -29,36 +31,32 @@ void SVGImagePainter::paint(const PaintInfo& paintInfo)
         || !m_renderSVGImage.imageResource()->hasImage())
         return;
 
-    FloatRect invalBox = m_renderSVGImage.paintInvalidationRectInLocalCoordinates();
-    if (!SVGRenderSupport::paintInfoIntersectsPaintInvalidationRect(invalBox, m_renderSVGImage.localToParentTransform(), paintInfo))
-        return;
+    FloatRect boundingBox = m_renderSVGImage.paintInvalidationRectInLocalCoordinates();
 
     PaintInfo childPaintInfo(paintInfo);
-    GraphicsContextStateSaver stateSaver(*childPaintInfo.context, false);
-
-    childPaintInfo.applyTransform(m_renderSVGImage.localToParentTransform(), &stateSaver);
-
-    // SVGRenderingContext may taint the state - make sure we're always saving.
-    stateSaver.saveIfNeeded();
-
+    GraphicsContextStateSaver stateSaver(*childPaintInfo.context);
+    TransformRecorder transformRecorder(*childPaintInfo.context, m_renderSVGImage.displayItemClient(), m_renderSVGImage.localToParentTransform());
     SVGRenderingContext renderingContext(&m_renderSVGImage, childPaintInfo);
     if (renderingContext.isRenderingPrepared()) {
-        if (m_renderSVGImage.style()->svgStyle().bufferedRendering() != BR_STATIC) {
-            paintForeground(childPaintInfo);
-        } else {
-            RefPtr<Picture>& bufferedForeground = m_renderSVGImage.bufferedForeground();
-            if (!bufferedForeground) {
-                childPaintInfo.context->beginRecording(m_renderSVGImage.objectBoundingBox());
+        RenderDrawingRecorder recorder(childPaintInfo.context, m_renderSVGImage, childPaintInfo.phase, boundingBox);
+        if (!recorder.canUseCachedDrawing()) {
+            if (m_renderSVGImage.style()->svgStyle().bufferedRendering() != BR_STATIC) {
                 paintForeground(childPaintInfo);
-                bufferedForeground = childPaintInfo.context->endRecording();
-            }
+            } else {
+                RefPtr<const SkPicture>& bufferedForeground = m_renderSVGImage.bufferedForeground();
+                if (!bufferedForeground) {
+                    childPaintInfo.context->beginRecording(m_renderSVGImage.objectBoundingBox());
+                    paintForeground(childPaintInfo);
+                    bufferedForeground = childPaintInfo.context->endRecording();
+                }
 
-            childPaintInfo.context->drawPicture(bufferedForeground.get());
+                childPaintInfo.context->drawPicture(bufferedForeground.get());
+            }
         }
     }
 
     if (m_renderSVGImage.style()->outlineWidth())
-        ObjectPainter(m_renderSVGImage).paintOutline(childPaintInfo, IntRect(invalBox));
+        ObjectPainter(m_renderSVGImage).paintOutline(childPaintInfo, IntRect(boundingBox));
 }
 
 void SVGImagePainter::paintForeground(const PaintInfo& paintInfo)

@@ -215,7 +215,7 @@ WebInspector.AnimationSection.prototype = {
         function updateSliderCallback(currentTime, isRunning)
         {
             if (isRunning && this._parentPane.isShowing()) {
-                this.currentTimeSlider.value = this.player.source().iterationCount() == null ? currentTime % this.player.source().duration() : currentTime;
+                this.currentTimeSlider.value = this.player.source().iterations() == null ? currentTime % this.player.source().duration() : currentTime;
                 finishCallback();
                 this.updateCurrentTime();
             } else {
@@ -263,18 +263,18 @@ WebInspector.AnimationSection.prototype = {
         }
 
         var iterationDuration = this.player.source().duration();
-        var iterationCount = this.player.source().iterationCount();
+        var iterations = this.player.source().iterations();
         var slider = createElement("input");
         slider.type = "range";
         slider.min = 0;
         slider.step = 0.01;
 
-        if (!iterationCount) {
+        if (!iterations) {
             // Infinite iterations
             slider.max = iterationDuration;
             slider.value = this.player.currentTime() % iterationDuration;
         } else {
-            slider.max = iterationCount * iterationDuration;
+            slider.max = iterations * iterationDuration;
             slider.value = this.player.currentTime();
         }
 
@@ -367,14 +367,13 @@ WebInspector.AnimationSection.prototype = {
             "start-time": p.startTime(),
             "player-playback-rate": p.playbackRate(),
             "id": p.id(),
-            "start-delay": p.source().startDelay(),
+            "delay": p.source().delay(),
             "playback-rate": p.source().playbackRate(),
             "iteration-start": p.source().iterationStart(),
-            "iteration-count": p.source().iterationCount(),
+            "iterations": p.source().iterations(),
             "duration": p.source().duration(),
             "direction": p.source().direction(),
-            "fill-mode": p.source().fillMode(),
-            "time-fraction": p.source().timeFraction()
+            "fill": p.source().fill()
         };
         var obj = WebInspector.RemoteObject.fromLocalObject(animationObject);
         var objSection = new WebInspector.ObjectPropertiesSection(obj, WebInspector.UIString("Animation Properties"));
@@ -388,14 +387,14 @@ WebInspector.AnimationSection.prototype = {
                 model.setIsAttribute(true);
                 model.setEditable(true);
                 var styleSection = new WebInspector.StylePropertiesSection(this._stylesPane, model);
-                styleSection.expanded = true;
+                styleSection.expand();
                 this._keyframesElement.appendChild(styleSection.element);
             }
         }
     }
 }
 
-WebInspector.AnimationsSidebarPane._globalPlaybackRates = [0.1, 0.25, 0.5, 1.0, 2.0];
+WebInspector.AnimationsSidebarPane.GlobalPlaybackRates = [0.1, 0.25, 0.5, 1.0];
 
 /**
  * @constructor
@@ -415,7 +414,7 @@ WebInspector.AnimationsSidebarPane.GlobalAnimationControls = function(showSubtre
     this._pauseButton.addEventListener("click", this._pauseHandler.bind(this), this);
     this.appendStatusBarItem(this._pauseButton);
     this._playbackRateButtons = [];
-    WebInspector.AnimationsSidebarPane._globalPlaybackRates.forEach(this._createPlaybackRateButton.bind(this));
+    WebInspector.AnimationsSidebarPane.GlobalPlaybackRates.forEach(this._createPlaybackRateButton.bind(this));
 
     var subtreeCheckboxLabel = WebInspector.UIString("Show subtree animations");
     this._showSubtreeAnimationsCheckbox = new WebInspector.StatusBarCheckbox(subtreeCheckboxLabel, subtreeCheckboxLabel, showSubtreeAnimationsSetting);

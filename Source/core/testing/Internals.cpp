@@ -475,33 +475,53 @@ size_t Internals::countElementShadow(const Node* root, ExceptionState& exception
     return toShadowRoot(root)->childShadowRootCount();
 }
 
-Node* Internals::nextSiblingByWalker(Node* node)
+Node* Internals::nextSiblingInComposedTree(Node* node, ExceptionState& exceptionState)
 {
     ASSERT(node);
+    if (!node->canParticipateInComposedTree()) {
+        exceptionState.throwDOMException(InvalidAccessError, "The node argument doesn't particite in the composed tree.");
+        return 0;
+    }
     return ComposedTreeTraversal::nextSibling(*node);
 }
 
-Node* Internals::firstChildByWalker(Node* node)
+Node* Internals::firstChildInComposedTree(Node* node, ExceptionState& exceptionState)
 {
     ASSERT(node);
+    if (!node->canParticipateInComposedTree()) {
+        exceptionState.throwDOMException(InvalidAccessError, "The node argument doesn't particite in the composed tree");
+        return 0;
+    }
     return ComposedTreeTraversal::firstChild(*node);
 }
 
-Node* Internals::lastChildByWalker(Node* node)
+Node* Internals::lastChildInComposedTree(Node* node, ExceptionState& exceptionState)
 {
     ASSERT(node);
+    if (!node->canParticipateInComposedTree()) {
+        exceptionState.throwDOMException(InvalidAccessError, "The node argument doesn't particite in the composed tree.");
+        return 0;
+    }
     return ComposedTreeTraversal::lastChild(*node);
 }
 
-Node* Internals::nextNodeByWalker(Node* node)
+Node* Internals::nextInComposedTree(Node* node, ExceptionState& exceptionState)
 {
     ASSERT(node);
+    if (!node->canParticipateInComposedTree()) {
+        exceptionState.throwDOMException(InvalidAccessError, "The node argument doesn't particite in the composed tree.");
+        return 0;
+    }
     return ComposedTreeTraversal::next(*node);
 }
 
-Node* Internals::previousNodeByWalker(Node* node)
+Node* Internals::previousInComposedTree(Node* node, ExceptionState& exceptionState)
 {
     ASSERT(node);
+    if (!node->canParticipateInComposedTree()) {
+        exceptionState.throwDOMException(InvalidAccessError, "The node argument doesn't particite in the composed tree.");
+        return 0;
+    }
     return ComposedTreeTraversal::previous(*node);
 }
 
@@ -915,8 +935,8 @@ void Internals::scrollElementToRect(Element* element, long x, long y, long w, lo
         exceptionState.throwDOMException(InvalidNodeTypeError, element ? "No view can be obtained from the provided element's document." : ExceptionMessages::argumentNullOrIncorrectType(1, "Element"));
         return;
     }
-    FrameView* frameView = element->document().view();
-    frameView->scrollElementToRect(element, IntRect(x, y, w, h));
+    FrameView* mainFrame = toLocalFrame(element->document().page()->mainFrame())->view();
+    mainFrame->scrollElementToRect(element, IntRect(x, y, w, h));
 }
 
 PassRefPtrWillBeRawPtr<Range> Internals::rangeFromLocationAndLength(Element* scope, int rangeLocation, int rangeLength)
@@ -1990,7 +2010,7 @@ PassRefPtr<SerializedScriptValue> Internals::deserializeBuffer(PassRefPtr<DOMArr
 
 void Internals::forceReload(bool endToEnd)
 {
-    frame()->loader().reload(endToEnd ? EndToEndReload : NormalReload);
+    frame()->reload(endToEnd ? EndToEndReload : NormalReload, NotClientRedirect);
 }
 
 PassRefPtrWillBeRawPtr<ClientRect> Internals::selectionBounds(ExceptionState& exceptionState)
@@ -2134,7 +2154,7 @@ private:
 
 ScriptPromise Internals::createResolvedPromise(ScriptState* scriptState, ScriptValue value)
 {
-    RefPtr<ScriptPromiseResolver> resolver = ScriptPromiseResolver::create(scriptState);
+    RefPtrWillBeRawPtr<ScriptPromiseResolver> resolver = ScriptPromiseResolver::create(scriptState);
     ScriptPromise promise = resolver->promise();
     resolver->resolve(value);
     return promise;
@@ -2142,7 +2162,7 @@ ScriptPromise Internals::createResolvedPromise(ScriptState* scriptState, ScriptV
 
 ScriptPromise Internals::createRejectedPromise(ScriptState* scriptState, ScriptValue value)
 {
-    RefPtr<ScriptPromiseResolver> resolver = ScriptPromiseResolver::create(scriptState);
+    RefPtrWillBeRawPtr<ScriptPromiseResolver> resolver = ScriptPromiseResolver::create(scriptState);
     ScriptPromise promise = resolver->promise();
     resolver->reject(value);
     return promise;
@@ -2189,6 +2209,7 @@ ScriptPromise Internals::promiseCheckOverload(ScriptState* scriptState, Location
 void Internals::trace(Visitor* visitor)
 {
     visitor->trace(m_runtimeFlags);
+    ContextLifecycleObserver::trace(visitor);
 }
 
 void Internals::setValueForUser(Element* element, const String& value)
@@ -2350,7 +2371,7 @@ Iterator* Internals::iterator(ScriptState* scriptState, ExceptionState& exceptio
 
 void Internals::forceBlinkGCWithoutV8GC()
 {
-    ThreadState::current()->scheduleGC(ThreadState::ForcedGC);
+    ThreadState::current()->scheduleGC();
 }
 
 } // namespace blink

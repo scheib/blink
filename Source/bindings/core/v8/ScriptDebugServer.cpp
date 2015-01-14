@@ -352,7 +352,7 @@ PassRefPtrWillBeRawPtr<JavaScriptCallFrame> ScriptDebugServer::toJavaScriptCallF
 PassRefPtrWillBeRawPtr<JavaScriptCallFrame> ScriptDebugServer::wrapCallFrames(int maximumLimit, ScopeInfoDetails scopeDetails)
 {
     const int scopeBits = 2;
-    COMPILE_ASSERT(NoScopes < (1 << scopeBits), not_enough_bits_to_encode_ScopeInfoDetails);
+    static_assert(NoScopes < (1 << scopeBits), "there must be enough bits to encode ScopeInfoDetails");
 
     ASSERT(maximumLimit >= 0);
     int data = (maximumLimit << scopeBits) | scopeDetails;
@@ -559,7 +559,7 @@ void ScriptDebugServer::handleV8AsyncTaskEvent(ScriptDebugListener* listener, Sc
 
     m_pausedScriptState = pausedScriptState;
     m_executionState = executionState;
-    listener->didReceiveV8AsyncTaskEvent(pausedScriptState->executionContext(), type, name, id);
+    listener->didReceiveV8AsyncTaskEvent(pausedScriptState, type, name, id);
     m_pausedScriptState.clear();
     m_executionState.Clear();
 }

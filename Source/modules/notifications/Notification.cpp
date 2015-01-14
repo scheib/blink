@@ -33,9 +33,11 @@
 
 #include "bindings/core/v8/ScriptWrappable.h"
 #include "core/dom/Document.h"
+#include "core/dom/ExecutionContext.h"
+#include "core/dom/ExecutionContextTask.h"
+#include "core/dom/ScopedWindowFocusAllowedIndicator.h"
 #include "core/events/Event.h"
 #include "core/frame/UseCounter.h"
-#include "core/page/WindowFocusAllowedIndicator.h"
 #include "modules/notifications/NotificationOptions.h"
 #include "modules/notifications/NotificationPermissionClient.h"
 #include "public/platform/Platform.h"
@@ -72,6 +74,25 @@ Notification* Notification::create(ExecutionContext* context, const String& titl
         ? UseCounter::NotificationSecureOrigin : UseCounter::NotificationInsecureOrigin;
     UseCounter::count(context, feature);
 
+    notification->scheduleShow();
+    notification->suspendIfNeeded();
+    return notification;
+}
+
+Notification* Notification::create(ExecutionContext* context, const String& persistentId, const WebNotificationData& data)
+{
+    Notification* notification = new Notification(data.title, context);
+
+    notification->setPersistentId(persistentId);
+    notification->setDir(data.direction == WebNotificationData::DirectionLeftToRight ? "ltr" : "rtl");
+    notification->setLang(data.lang);
+    notification->setBody(data.body);
+    notification->setTag(data.tag);
+
+    if (!data.icon.isEmpty())
+        notification->setIconUrl(data.icon);
+
+    notification->setState(NotificationStateShowing);
     notification->suspendIfNeeded();
     return notification;
 }
@@ -84,12 +105,18 @@ Notification::Notification(const String& title, ExecutionContext* context)
     , m_asyncRunner(this, &Notification::show)
 {
     ASSERT(notificationManager());
-
-    m_asyncRunner.runAsync();
 }
 
 Notification::~Notification()
 {
+}
+
+void Notification::scheduleShow()
+{
+    ASSERT(m_state == NotificationStateIdle);
+    ASSERT(!m_asyncRunner.isActive());
+
+    m_asyncRunner.runAsync();
 }
 
 void Notification::show()
@@ -116,8 +143,16 @@ void Notification::close()
     if (m_state != NotificationStateShowing)
         return;
 
-    m_state = NotificationStateClosed;
-    notificationManager()->close(this);
+    if (m_persistentId.isEmpty()) {
+        // Fire the close event asynchronously.
+        executionContext()->postTask(createSameThreadTask(&Notification::dispatchCloseEvent, this));
+
+        m_state = NotificationStateClosing;
+        notificationManager()->close(this);
+    } else {
+        m_state = NotificationStateClosed;
+        notificationManager()->closePersistent(m_persistentId);
+    }
 }
 
 void Notification::dispatchShowEvent()
@@ -128,7 +163,7 @@ void Notification::dispatchShowEvent()
 void Notification::dispatchClickEvent()
 {
     UserGestureIndicator gestureIndicator(DefinitelyProcessingNewUserGesture);
-    WindowFocusAllowedIndicator windowFocusAllowed;
+    ScopedWindowFocusAllowedIndicator windowFocusAllowed(executionContext());
     dispatchEvent(Event::create(EventTypeNames::click));
 }
 
@@ -139,6 +174,11 @@ void Notification::dispatchErrorEvent()
 
 void Notification::dispatchCloseEvent()
 {
+    // The notification will be showing when the user initiated the close, or it will be
+    // closing if the developer initiated the close.
+    if (m_state != NotificationStateShowing && m_state != NotificationStateClosing)
+        return;
+
     m_state = NotificationStateClosed;
     dispatchEvent(Event::create(EventTypeNames::close));
 }
@@ -212,6 +252,12 @@ void Notification::stop()
 bool Notification::hasPendingActivity() const
 {
     return m_state == NotificationStateShowing || m_asyncRunner.isActive();
+}
+
+void Notification::trace(Visitor* visitor)
+{
+    RefCountedGarbageCollectedEventTargetWithInlineData<Notification>::trace(visitor);
+    ActiveDOMObject::trace(visitor);
 }
 
 } // namespace blink

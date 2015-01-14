@@ -69,14 +69,17 @@ interface Element : Node {
     readonly attribute long clientWidth;
     readonly attribute long clientHeight;
 
-    // FIXME: should be:
-    // attribute (Dictionary or double) scrollLeft;
-    // attribute (Dictionary or double) scrollTop;
-    // http://crbug.com/240176
-    [Custom=Setter] attribute double scrollLeft;
-    [Custom=Setter] attribute double scrollTop;
+    attribute double scrollLeft;
+    attribute double scrollTop;
     readonly attribute long scrollWidth;
     readonly attribute long scrollHeight;
+
+    [RuntimeEnabled=CSSOMSmoothScroll] void scroll(double x, double y);
+    [RuntimeEnabled=CSSOMSmoothScroll] void scroll(optional ScrollToOptions scrollToOptions);
+    [RuntimeEnabled=CSSOMSmoothScroll] void scrollTo(double x, double y);
+    [RuntimeEnabled=CSSOMSmoothScroll] void scrollTo(optional ScrollToOptions scrollToOptions);
+    [RuntimeEnabled=CSSOMSmoothScroll] void scrollBy(double x, double y);
+    [RuntimeEnabled=CSSOMSmoothScroll] void scrollBy(optional ScrollToOptions scrollToOptions);
 
     void focus();
     void blur();
@@ -114,6 +117,10 @@ interface Element : Node {
 
     [MeasureAs=ElementRequestPointerLock] void requestPointerLock();
 
+    // Experimental accessibility API
+    [RuntimeEnabled=ComputedAccessibilityInfo] readonly attribute DOMString? computedRole;
+    [RuntimeEnabled=ComputedAccessibilityInfo] readonly attribute DOMString? computedName;
+
     // Event handler attributes
     attribute EventHandler onbeforecopy;
     attribute EventHandler onbeforecut;
@@ -132,3 +139,4 @@ interface Element : Node {
 
 Element implements ParentNode;
 Element implements ChildNode;
+Element implements NonDocumentTypeChildNode;

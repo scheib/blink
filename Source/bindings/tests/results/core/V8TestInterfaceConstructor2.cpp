@@ -39,7 +39,7 @@ static void constructor1(const v8::FunctionCallbackInfo<v8::Value>& info)
         TOSTRING_VOID_INTERNAL(stringArg, info[0]);
     }
     RefPtr<TestInterfaceConstructor2> impl = TestInterfaceConstructor2::create(stringArg);
-    v8::Handle<v8::Object> wrapper = info.Holder();
+    v8::Local<v8::Object> wrapper = info.Holder();
     impl->associateWithWrapper(info.GetIsolate(), &V8TestInterfaceConstructor2::wrapperTypeInfo, wrapper);
     v8SetReturnValue(info, wrapper);
 }
@@ -57,7 +57,7 @@ static void constructor2(const v8::FunctionCallbackInfo<v8::Value>& info)
         TONATIVE_VOID_EXCEPTIONSTATE_INTERNAL(dictionaryArg, Dictionary(info[0], info.GetIsolate(), exceptionState), exceptionState);
     }
     RefPtr<TestInterfaceConstructor2> impl = TestInterfaceConstructor2::create(dictionaryArg);
-    v8::Handle<v8::Object> wrapper = info.Holder();
+    v8::Local<v8::Object> wrapper = info.Holder();
     impl->associateWithWrapper(info.GetIsolate(), &V8TestInterfaceConstructor2::wrapperTypeInfo, wrapper);
     v8SetReturnValue(info, wrapper);
 }
@@ -70,7 +70,7 @@ static void constructor3(const v8::FunctionCallbackInfo<v8::Value>& info)
         TONATIVE_VOID_EXCEPTIONSTATE_INTERNAL(stringSequenceSequenceArg, toImplArray<Vector<String>>(info[0], 1, info.GetIsolate(), exceptionState), exceptionState);
     }
     RefPtr<TestInterfaceConstructor2> impl = TestInterfaceConstructor2::create(stringSequenceSequenceArg);
-    v8::Handle<v8::Object> wrapper = info.Holder();
+    v8::Local<v8::Object> wrapper = info.Holder();
     impl->associateWithWrapper(info.GetIsolate(), &V8TestInterfaceConstructor2::wrapperTypeInfo, wrapper);
     v8SetReturnValue(info, wrapper);
 }
@@ -101,7 +101,7 @@ static void constructor4(const v8::FunctionCallbackInfo<v8::Value>& info)
         TONATIVE_VOID_EXCEPTIONSTATE_INTERNAL(defaultUndefinedOptionalDictionaryArg, Dictionary(info[4], info.GetIsolate(), exceptionState), exceptionState);
         if (UNLIKELY(info.Length() <= 5)) {
             RefPtr<TestInterfaceConstructor2> impl = TestInterfaceConstructor2::create(testInterfaceEmptyArg, longArg, defaultUndefinedOptionalStringArg, defaultNullStringOptionalStringArg, defaultUndefinedOptionalDictionaryArg);
-            v8::Handle<v8::Object> wrapper = info.Holder();
+            v8::Local<v8::Object> wrapper = info.Holder();
             impl->associateWithWrapper(info.GetIsolate(), &V8TestInterfaceConstructor2::wrapperTypeInfo, wrapper);
             v8SetReturnValue(info, wrapper);
             return;
@@ -109,7 +109,7 @@ static void constructor4(const v8::FunctionCallbackInfo<v8::Value>& info)
         TOSTRING_VOID_INTERNAL(optionalStringArg, info[5]);
     }
     RefPtr<TestInterfaceConstructor2> impl = TestInterfaceConstructor2::create(testInterfaceEmptyArg, longArg, defaultUndefinedOptionalStringArg, defaultNullStringOptionalStringArg, defaultUndefinedOptionalDictionaryArg, optionalStringArg);
-    v8::Handle<v8::Object> wrapper = info.Holder();
+    v8::Local<v8::Object> wrapper = info.Holder();
     impl->associateWithWrapper(info.GetIsolate(), &V8TestInterfaceConstructor2::wrapperTypeInfo, wrapper);
     v8SetReturnValue(info, wrapper);
 }
@@ -189,7 +189,7 @@ void V8TestInterfaceConstructor2::constructorCallback(const v8::FunctionCallback
     TestInterfaceConstructor2V8Internal::constructor(info);
 }
 
-static void installV8TestInterfaceConstructor2Template(v8::Handle<v8::FunctionTemplate> functionTemplate, v8::Isolate* isolate)
+static void installV8TestInterfaceConstructor2Template(v8::Local<v8::FunctionTemplate> functionTemplate, v8::Isolate* isolate)
 {
     functionTemplate->ReadOnlyPrototype();
 
@@ -209,24 +209,24 @@ static void installV8TestInterfaceConstructor2Template(v8::Handle<v8::FunctionTe
     functionTemplate->Set(v8AtomicString(isolate, "toString"), V8PerIsolateData::from(isolate)->toStringTemplate());
 }
 
-v8::Handle<v8::FunctionTemplate> V8TestInterfaceConstructor2::domTemplate(v8::Isolate* isolate)
+v8::Local<v8::FunctionTemplate> V8TestInterfaceConstructor2::domTemplate(v8::Isolate* isolate)
 {
     return V8DOMConfiguration::domClassTemplate(isolate, const_cast<WrapperTypeInfo*>(&wrapperTypeInfo), installV8TestInterfaceConstructor2Template);
 }
 
-bool V8TestInterfaceConstructor2::hasInstance(v8::Handle<v8::Value> v8Value, v8::Isolate* isolate)
+bool V8TestInterfaceConstructor2::hasInstance(v8::Local<v8::Value> v8Value, v8::Isolate* isolate)
 {
     return V8PerIsolateData::from(isolate)->hasInstance(&wrapperTypeInfo, v8Value);
 }
 
-v8::Handle<v8::Object> V8TestInterfaceConstructor2::findInstanceInPrototypeChain(v8::Handle<v8::Value> v8Value, v8::Isolate* isolate)
+v8::Local<v8::Object> V8TestInterfaceConstructor2::findInstanceInPrototypeChain(v8::Local<v8::Value> v8Value, v8::Isolate* isolate)
 {
     return V8PerIsolateData::from(isolate)->findInstanceInPrototypeChain(&wrapperTypeInfo, v8Value);
 }
 
-TestInterfaceConstructor2* V8TestInterfaceConstructor2::toImplWithTypeCheck(v8::Isolate* isolate, v8::Handle<v8::Value> value)
+TestInterfaceConstructor2* V8TestInterfaceConstructor2::toImplWithTypeCheck(v8::Isolate* isolate, v8::Local<v8::Value> value)
 {
-    return hasInstance(value, isolate) ? toImpl(v8::Handle<v8::Object>::Cast(value)) : 0;
+    return hasInstance(value, isolate) ? toImpl(v8::Local<v8::Object>::Cast(value)) : 0;
 }
 
 void V8TestInterfaceConstructor2::refObject(ScriptWrappable* scriptWrappable)

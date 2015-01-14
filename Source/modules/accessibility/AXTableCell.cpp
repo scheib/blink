@@ -37,8 +37,8 @@ namespace blink {
 
 using namespace HTMLNames;
 
-AXTableCell::AXTableCell(RenderObject* renderer)
-    : AXRenderObject(renderer)
+AXTableCell::AXTableCell(RenderObject* renderer, AXObjectCacheImpl* axObjectCache)
+    : AXRenderObject(renderer, axObjectCache)
 {
 }
 
@@ -46,9 +46,14 @@ AXTableCell::~AXTableCell()
 {
 }
 
-PassRefPtr<AXTableCell> AXTableCell::create(RenderObject* renderer)
+PassRefPtr<AXTableCell> AXTableCell::create(RenderObject* renderer, AXObjectCacheImpl* axObjectCache)
 {
-    return adoptRef(new AXTableCell(renderer));
+    return adoptRef(new AXTableCell(renderer, axObjectCache));
+}
+
+bool AXTableCell::isTableHeaderCell() const
+{
+    return node() && node()->hasTagName(thTag);
 }
 
 bool AXTableCell::computeAccessibilityIsIgnored() const
@@ -91,12 +96,56 @@ bool AXTableCell::isTableCell() const
     return true;
 }
 
+static AccessibilityRole decideRoleFromSibling(Node* siblingNode)
+{
+    if (!siblingNode)
+        return CellRole;
+    if (siblingNode->hasTagName(thTag))
+        return ColumnHeaderRole;
+    if (siblingNode->hasTagName(tdTag))
+        return RowHeaderRole;
+    return CellRole;
+}
+
+AccessibilityRole AXTableCell::scanToDecideHeaderRole()
+{
+    if (!isTableHeaderCell())
+        return CellRole;
+
+    // Check scope attribute first.
+    const AtomicString& scope = getAttribute(scopeAttr);
+    if (equalIgnoringCase(scope, "row"))
+        return RowHeaderRole;
+    if (equalIgnoringCase(scope, "col"))
+        return ColumnHeaderRole;
+
+    // Check the previous cell and the next cell
+    RenderTableCell* renderCell = toRenderTableCell(m_renderer);
+    AccessibilityRole headerRole = CellRole;
+
+    // if header is preceded by header cells then it's a column header,
+    // if it is preceded by cells then it's a row header.
+    if (RenderTableCell* cell = renderCell->previousCell()) {
+        Node* siblingNode = cell->node();
+        headerRole = decideRoleFromSibling(siblingNode);
+        if (headerRole != CellRole)
+            return headerRole;
+    }
+    // if header is followed by header cells then it's a column header,
+    // if it is followed by cells then it's a row header.
+    if (RenderTableCell* cell = renderCell->nextCell()) {
+        Node* siblingNode = cell->node();
+        headerRole = decideRoleFromSibling(siblingNode);
+    }
+    return headerRole;
+}
+
 AccessibilityRole AXTableCell::determineAccessibilityRole()
 {
     if (!isTableCell())
         return AXRenderObject::determineAccessibilityRole();
 
-    return CellRole;
+    return scanToDecideHeaderRole();
 }
 
 void AXTableCell::rowIndexRange(pair<unsigned, unsigned>& rowRange)

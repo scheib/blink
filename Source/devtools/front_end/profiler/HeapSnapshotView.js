@@ -493,7 +493,7 @@ WebInspector.HeapSnapshotView.prototype = {
          */
         function profileCallback(heapSnapshotProxy)
         {
-            heapSnapshotProxy.getStatistics(this._gotStatistics.bind(this));
+            heapSnapshotProxy.getStatistics().then(this._gotStatistics.bind(this));
             var list = this._profiles();
             var profileIndex = list.indexOf(this._profile);
             this._baseSelect.setSelectedIndex(Math.max(0, profileIndex - 1));
@@ -513,6 +513,7 @@ WebInspector.HeapSnapshotView.prototype = {
         this._statisticsView.addRecord(statistics.strings, WebInspector.UIString("Strings"), "#5e5");
         this._statisticsView.addRecord(statistics.jsArrays, WebInspector.UIString("JS Arrays"), "#7af");
         this._statisticsView.addRecord(statistics.native, WebInspector.UIString("Typed Arrays"), "#fc5");
+        this._statisticsView.addRecord(statistics.system, WebInspector.UIString("System Objects"), "#98f");
         this._statisticsView.addRecord(statistics.total, WebInspector.UIString("Total"));
     },
 
@@ -780,7 +781,7 @@ WebInspector.HeapSnapshotView.prototype = {
         if (dataSource) {
             this._retainmentDataGrid.setDataSource(dataSource.snapshot, dataSource.snapshotNodeIndex);
             if (this._allocationStackView)
-                this._allocationStackView.setAllocatedObject(dataSource.snapshot, dataSource.snapshotNodeIndex)
+                this._allocationStackView.setAllocatedObject(dataSource.snapshot, dataSource.snapshotNodeIndex);
         } else {
             if (this._allocationStackView)
                 this._allocationStackView.clear();
@@ -1226,7 +1227,6 @@ WebInspector.TrackingHeapSnapshotProfileType.prototype = {
         var index;
         for (var i = 0; i < samples.length; i += 3) {
             index = samples[i];
-            var count = samples[i+1];
             var size  = samples[i+2];
             this._profileSamples.sizes[index] = size;
             if (!this._profileSamples.max[index])
@@ -1677,7 +1677,7 @@ WebInspector.HeapSnapshotLoadFromFileDelegate.prototype = {
      * @param {!WebInspector.ChunkedReader} reader
      * @param {!Event} e
      */
-    onError: function (reader, e)
+    onError: function(reader, e)
     {
         var subtitle;
         switch(e.target.error.code) {
@@ -2026,8 +2026,9 @@ WebInspector.HeapTrackingOverviewGrid.SmoothScale.prototype = {
             var maxChangePerDelta = Math.pow(maxChangePerSec, timeDeltaMs / 1000);
             var scaleChange = target / this._currentScale;
             this._currentScale *= Number.constrain(scaleChange, 1 / maxChangePerDelta, maxChangePerDelta);
-        } else
+        } else {
             this._currentScale = target;
+        }
         return this._currentScale;
     }
 }

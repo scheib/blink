@@ -29,6 +29,7 @@
 #include "core/frame/LocalFrame.h"
 #include "core/html/canvas/ANGLEInstancedArrays.h"
 #include "core/html/canvas/CHROMIUMSubscribeUniform.h"
+#include "core/html/canvas/ContextAttributeHelpers.h"
 #include "core/html/canvas/EXTBlendMinMax.h"
 #include "core/html/canvas/EXTFragDepth.h"
 #include "core/html/canvas/EXTShaderTextureLOD.h"
@@ -45,7 +46,6 @@
 #include "core/html/canvas/WebGLCompressedTextureETC1.h"
 #include "core/html/canvas/WebGLCompressedTexturePVRTC.h"
 #include "core/html/canvas/WebGLCompressedTextureS3TC.h"
-#include "core/html/canvas/WebGLContextAttributes.h"
 #include "core/html/canvas/WebGLContextEvent.h"
 #include "core/html/canvas/WebGLDebugRendererInfo.h"
 #include "core/html/canvas/WebGLDebugShaders.h"
@@ -64,7 +64,7 @@ namespace blink {
 
 static bool shouldFailContextCreationForTesting = false;
 
-PassOwnPtrWillBeRawPtr<WebGLRenderingContext> WebGLRenderingContext::create(HTMLCanvasElement* canvas, WebGLContextAttributes* attrs)
+PassOwnPtrWillBeRawPtr<WebGLRenderingContext> WebGLRenderingContext::create(HTMLCanvasElement* canvas, const CanvasContextCreationAttributes& attrs)
 {
     Document& document = canvas->document();
     LocalFrame* frame = document.frame();
@@ -81,24 +81,38 @@ PassOwnPtrWillBeRawPtr<WebGLRenderingContext> WebGLRenderingContext::create(HTML
         return nullptr;
     }
 
-    // The only situation that attrs is null is through Document::getCSSCanvasContext().
-    RefPtrWillBeRawPtr<WebGLContextAttributes> defaultAttrs = nullptr;
-    if (!attrs) {
-        defaultAttrs = WebGLContextAttributes::create();
-        attrs = defaultAttrs.get();
-    }
-    blink::WebGraphicsContext3D::Attributes attributes = attrs->attributes(document.topDocument().url().string(), settings, 1);
+    WebGLContextAttributes attributes = toWebGLContextAttributes(attrs);
+    blink::WebGraphicsContext3D::Attributes wgc3dAttributes = toWebGraphicsContext3DAttributes(attributes, document.topDocument().url().string(), settings, 1);
     blink::WebGLInfo glInfo;
-    OwnPtr<blink::WebGraphicsContext3D> context = adoptPtr(blink::Platform::current()->createOffscreenGraphicsContext3D(attributes, 0, &glInfo));
+    OwnPtr<blink::WebGraphicsContext3D> context = adoptPtr(blink::Platform::current()->createOffscreenGraphicsContext3D(wgc3dAttributes, 0, &glInfo));
     if (!context || shouldFailContextCreationForTesting) {
         shouldFailContextCreationForTesting = false;
-        String statusMessage("Could not create a WebGL context for VendorInfo = ");
-        statusMessage.append(glInfo.vendorInfo);
-        statusMessage.append(", RendererInfo = ");
-        statusMessage.append(glInfo.rendererInfo);
-        statusMessage.append(", DriverInfo = ");
-        statusMessage.append(glInfo.driverVersion);
-        statusMessage.append(".");
+        String statusMessage;
+        if (!glInfo.contextInfoCollectionFailure.isEmpty()) {
+            statusMessage.append("Could not create a WebGL context. ");
+            statusMessage.append(glInfo.contextInfoCollectionFailure);
+        } else {
+            statusMessage.append("Could not create a WebGL context");
+            if (!glInfo.vendorInfo.isEmpty()) {
+                statusMessage.append(" VendorInfo = ");
+                statusMessage.append(glInfo.vendorInfo);
+            } else {
+                statusMessage.append(" VendorInfo = Not Available");
+            }
+            if (!glInfo.rendererInfo.isEmpty()) {
+                statusMessage.append(", RendererInfo = ");
+                statusMessage.append(glInfo.rendererInfo);
+            } else {
+                statusMessage.append(", RendererInfo = Not Available");
+            }
+            if (!glInfo.driverVersion.isEmpty()) {
+                statusMessage.append(", DriverInfo = ");
+                statusMessage.append(glInfo.driverVersion);
+            } else {
+                statusMessage.append(", DriverInfo = Not Available");
+            }
+            statusMessage.append(".");
+        }
         canvas->dispatchEvent(WebGLContextEvent::create(EventTypeNames::webglcontextcreationerror, false, true, statusMessage));
         return nullptr;
     }
@@ -109,7 +123,7 @@ PassOwnPtrWillBeRawPtr<WebGLRenderingContext> WebGLRenderingContext::create(HTML
     if (extensionsUtil->supportsExtension("GL_EXT_debug_marker"))
         context->pushGroupMarkerEXT("WebGLRenderingContext");
 
-    OwnPtrWillBeRawPtr<WebGLRenderingContext> renderingContext = adoptPtrWillBeNoop(new WebGLRenderingContext(canvas, context.release(), attrs));
+    OwnPtrWillBeRawPtr<WebGLRenderingContext> renderingContext = adoptPtrWillBeNoop(new WebGLRenderingContext(canvas, context.release(), attributes));
     renderingContext->registerContextExtensions();
     renderingContext->suspendIfNeeded();
 
@@ -121,7 +135,7 @@ PassOwnPtrWillBeRawPtr<WebGLRenderingContext> WebGLRenderingContext::create(HTML
     return renderingContext.release();
 }
 
-WebGLRenderingContext::WebGLRenderingContext(HTMLCanvasElement* passedCanvas, PassOwnPtr<blink::WebGraphicsContext3D> context, WebGLContextAttributes* requestedAttributes)
+WebGLRenderingContext::WebGLRenderingContext(HTMLCanvasElement* passedCanvas, PassOwnPtr<blink::WebGraphicsContext3D> context, const WebGLContextAttributes& requestedAttributes)
     : WebGLRenderingContextBase(passedCanvas, context, requestedAttributes)
 {
 }

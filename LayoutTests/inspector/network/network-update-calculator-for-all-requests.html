@@ -7,14 +7,14 @@ function test() {
     var target = WebInspector.panels.network._networkLogView;
     target._resourceTypeFilterUI._toggleTypeFilter(WebInspector.resourceTypes.XHR.name(), false);
     InspectorTest.addResult("Clicked '" + WebInspector.resourceTypes.XHR.name() + "' button.");
-    target._reset();
+    target.reset();
 
     function appendRequest(id, type, startTime, endTime)
     {
         var request = new WebInspector.NetworkRequest(WebInspector.targetManager.mainTarget(), "", "", "", "", "");
         request.setResourceType(type);
         request.requestId = id;
-        request.startTime = startTime;
+        request.setIssueTime(startTime);
         request.endTime = endTime;
         target._appendRequest(request);
         target.refresh();

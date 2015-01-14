@@ -139,16 +139,6 @@ void WebSettingsImpl::setMinimumLogicalFontSize(int size)
 void WebSettingsImpl::setDeviceSupportsTouch(bool deviceSupportsTouch)
 {
     m_settings->setDeviceSupportsTouch(deviceSupportsTouch);
-
-    // FIXME: Until the embedder is converted to using the new APIs, set them
-    // here to keep the media queries working unchanged.
-    if (deviceSupportsTouch) {
-        m_settings->setPrimaryPointerType(blink::PointerTypeCoarse);
-        m_settings->setPrimaryHoverType(blink::HoverTypeOnDemand);
-    } else {
-        m_settings->setPrimaryPointerType(blink::PointerTypeNone);
-        m_settings->setPrimaryHoverType(blink::HoverTypeNone);
-    }
 }
 
 void WebSettingsImpl::setDeviceSupportsMouse(bool deviceSupportsMouse)
@@ -547,11 +537,6 @@ void WebSettingsImpl::setHyperlinkAuditingEnabled(bool enabled)
     m_settings->setHyperlinkAuditingEnabled(enabled);
 }
 
-void WebSettingsImpl::setLayerSquashingEnabled(bool enabled)
-{
-    m_settings->setLayerSquashingEnabled(enabled);
-}
-
 void WebSettingsImpl::setAsynchronousSpellCheckingEnabled(bool enabled)
 {
     m_settings->setAsynchronousSpellCheckingEnabled(enabled);
@@ -580,6 +565,16 @@ void WebSettingsImpl::setAllowDisplayOfInsecureContent(bool enabled)
 void WebSettingsImpl::setAllowRunningOfInsecureContent(bool enabled)
 {
     m_settings->setAllowRunningOfInsecureContent(enabled);
+}
+
+void WebSettingsImpl::setStrictMixedContentChecking(bool enabled)
+{
+    m_settings->setStrictMixedContentChecking(enabled);
+}
+
+void WebSettingsImpl::setStrictPowerfulFeatureRestrictions(bool enabled)
+{
+    m_settings->setStrictPowerfulFeatureRestrictions(enabled);
 }
 
 void WebSettingsImpl::setAllowConnectingInsecureWebSocket(bool enabled)

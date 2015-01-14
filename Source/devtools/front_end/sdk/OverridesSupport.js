@@ -141,7 +141,7 @@ WebInspector.OverridesSupport.GeolocationPosition.parseSetting = function(value)
     if (value) {
         var splitError = value.split(":");
         if (splitError.length === 2) {
-            var splitPosition = splitError[0].split("@")
+            var splitPosition = splitError[0].split("@");
             if (splitPosition.length === 2)
                 return new WebInspector.OverridesSupport.GeolocationPosition(parseFloat(splitPosition[0]), parseFloat(splitPosition[1]), splitError[1]);
         }
@@ -161,7 +161,7 @@ WebInspector.OverridesSupport.GeolocationPosition.parseUserInput = function(lati
         return /^[-]?[0-9]*[.]?[0-9]*$/.test(value);
     }
 
-    if (!latitudeString ^ !latitudeString)
+    if (!latitudeString && !longitudeString)
         return null;
 
     var isLatitudeValid = isUserInputValid(latitudeString);
@@ -228,7 +228,7 @@ WebInspector.OverridesSupport.DeviceOrientation.parseUserInput = function(alphaS
         return /^[-]?[0-9]*[.]?[0-9]*$/.test(value);
     }
 
-    if (!alphaString ^ !betaString ^ !gammaString)
+    if (!alphaString && !betaString && !gammaString)
         return null;
 
     var isAlphaValid = isUserInputValid(alphaString);

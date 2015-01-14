@@ -7,7 +7,7 @@
 
 #include "core/paint/BlockPainter.h"
 #include "core/paint/BoxPainter.h"
-#include "core/paint/DrawingRecorder.h"
+#include "core/paint/RenderDrawingRecorder.h"
 #include "core/rendering/PaintInfo.h"
 #include "core/rendering/RenderTableCell.h"
 
@@ -131,7 +131,9 @@ void TableCellPainter::paintCollapsedBorders(const PaintInfo& paintInfo, const L
     if (!m_renderTableCell.table()->currentBorderValue())
         return;
 
-    DrawingRecorder recorder(paintInfo.context, &m_renderTableCell, paintInfo.phase, paintRect);
+    RenderDrawingRecorder recorder(paintInfo.context, m_renderTableCell, paintInfo.phase, paintRect);
+    if (recorder.canUseCachedDrawing())
+        return;
 
     const RenderStyle* styleForCellFlow = m_renderTableCell.styleForCellFlow();
     CollapsedBorderValue leftVal = cachedCollapsedLeftBorder(styleForCellFlow);
@@ -206,7 +208,7 @@ void TableCellPainter::paintBackgroundsBehindCell(const PaintInfo& paintInfo, co
         GraphicsContextStateSaver stateSaver(*paintInfo.context, shouldClip);
         if (shouldClip) {
             LayoutRect clipRect(paintRect.location(), m_renderTableCell.size());
-            clipRect.contract(m_renderTableCell.borderBoxExtent());
+            clipRect.expand(m_renderTableCell.borderInsets());
             paintInfo.context->clip(clipRect);
         }
         BoxPainter(m_renderTableCell).paintFillLayers(paintInfo, c, bgLayer, paintRect, BackgroundBleedNone, CompositeSourceOver, backgroundObject);
@@ -223,7 +225,10 @@ void TableCellPainter::paintBoxDecorationBackground(const PaintInfo& paintInfo, 
         return;
 
     LayoutRect paintRect = paintBounds(paintOffset, DoNotAddOffsetFromParent);
-    DrawingRecorder recorder(paintInfo.context, &m_renderTableCell, paintInfo.phase, pixelSnappedIntRect(paintRect));
+    RenderDrawingRecorder recorder(paintInfo.context, m_renderTableCell, paintInfo.phase, pixelSnappedIntRect(paintRect));
+    if (recorder.canUseCachedDrawing())
+        return;
+
     BoxPainter::paintBoxShadow(paintInfo, paintRect, m_renderTableCell.style(), Normal);
 
     // Paint our cell background.

@@ -147,6 +147,40 @@ TEST_F(ScrollingCoordinatorChromiumTest, fastScrollingCanBeDisabledWithSetting)
     ASSERT_TRUE(rootScrollLayer->shouldScrollOnMainThread());
 }
 
+
+TEST_F(ScrollingCoordinatorChromiumTest, fastFractionalScrollingDiv)
+{
+    registerMockedHttpURLLoad("fractional-scroll-div.html");
+    navigateTo(m_baseURL + "fractional-scroll-div.html");
+    forceFullCompositingUpdate();
+
+    Document* document = frame()->document();
+    Element* scrollableElement = document->getElementById("scroller");
+    ASSERT(scrollableElement);
+
+    scrollableElement->setScrollTop(1.0);
+    scrollableElement->setScrollLeft(1.0);
+    forceFullCompositingUpdate();
+
+    // Make sure the fractional scroll offset change 1.0 -> 1.2 gets propagated
+    // to compositor.
+    scrollableElement->setScrollTop(1.2);
+    scrollableElement->setScrollLeft(1.2);
+    forceFullCompositingUpdate();
+
+    RenderObject* renderer = scrollableElement->renderer();
+    ASSERT_TRUE(renderer->isBox());
+    RenderBox* box = toRenderBox(renderer);
+    ASSERT_TRUE(box->usesCompositedScrolling());
+    CompositedLayerMapping* compositedLayerMapping = box->layer()->compositedLayerMapping();
+    ASSERT_TRUE(compositedLayerMapping->hasScrollingLayer());
+    ASSERT(compositedLayerMapping->scrollingContentsLayer());
+    WebLayer* webScrollLayer = compositedLayerMapping->scrollingContentsLayer()->platformLayer();
+    ASSERT_TRUE(webScrollLayer);
+    ASSERT_NEAR(1.2, webScrollLayer->scrollPositionDouble().x, 0.01);
+    ASSERT_NEAR(1.2, webScrollLayer->scrollPositionDouble().y, 0.01);
+}
+
 static WebLayer* webLayerFromElement(Element* element)
 {
     if (!element)
@@ -164,6 +198,27 @@ static WebLayer* webLayerFromElement(Element* element)
     if (!graphicsLayer)
         return 0;
     return graphicsLayer->platformLayer();
+}
+
+
+TEST_F(ScrollingCoordinatorChromiumTest, fractionalScrollingNonLayerFixedPosition)
+{
+    registerMockedHttpURLLoad("fractional-scroll-fixed-position.html");
+    navigateTo(m_baseURL + "fractional-scroll-fixed-position.html");
+    // Prevent fixed-position element from getting its own layer.
+    webViewImpl()->settings()->setPreferCompositingToLCDTextEnabled(false);
+    forceFullCompositingUpdate();
+
+    FrameView* frameView = frame()->view();
+    frameView->scrollTo(DoublePoint(1.5, 1.5));
+    WebLayer* rootScrollLayer = getRootScrollLayer();
+    // Scroll on main if there is non-composited fixed position element.
+    // And the containing scroll layer should not get fractional scroll offset.
+    ASSERT_TRUE(rootScrollLayer->shouldScrollOnMainThread());
+    ASSERT_EQ(1.0, rootScrollLayer->scrollPositionDouble().x);
+    ASSERT_EQ(1.0, rootScrollLayer->scrollPositionDouble().y);
+    ASSERT_EQ(0.0, rootScrollLayer->position().x);
+    ASSERT_EQ(0.0, rootScrollLayer->position().y);
 }
 
 TEST_F(ScrollingCoordinatorChromiumTest, fastScrollingForFixedPosition)

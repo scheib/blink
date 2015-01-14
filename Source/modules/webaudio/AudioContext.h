@@ -76,10 +76,10 @@ class WaveShaperNode;
 // AudioContext is the cornerstone of the web audio API and all AudioNodes are created from it.
 // For thread safety between the audio thread and the main thread, it has a rendering graph locking mechanism.
 
-class AudioContext : public RefCountedGarbageCollectedWillBeGarbageCollectedFinalized<AudioContext>, public ActiveDOMObject, public EventTargetWithInlineData {
+class AudioContext : public RefCountedGarbageCollectedEventTargetWithInlineData<AudioContext>, public ActiveDOMObject {
     DEFINE_EVENT_TARGET_REFCOUNTING_WILL_BE_REMOVED(RefCountedGarbageCollected<AudioContext>);
-    DEFINE_WRAPPERTYPEINFO();
     WILL_BE_USING_GARBAGE_COLLECTED_MIXIN(AudioContext);
+    DEFINE_WRAPPERTYPEINFO();
 public:
     // The state of an audio context.  On creation, the state is Suspended. The state is Running if
     // audio is being processed (audio graph is being pulled for data). The state is Closed if the
@@ -317,9 +317,9 @@ private:
 
     // Vector of promises created by resume(). It takes time to handle them, so we collect all of
     // the promises here until they can be resolved or rejected.
-    Vector<RefPtr<ScriptPromiseResolver> > m_resumeResolvers;
+    WillBeHeapVector<RefPtrWillBeMember<ScriptPromiseResolver> > m_resumeResolvers;
     // Like m_resumeResolvers but for suspend().
-    Vector<RefPtr<ScriptPromiseResolver> > m_suspendResolvers;
+    WillBeHeapVector<RefPtrWillBeMember<ScriptPromiseResolver> > m_suspendResolvers;
     void rejectPendingResolvers();
 
     // True if we're in the process of resolving promises for resume().  Resolving can take some

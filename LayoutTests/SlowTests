@@ -9,7 +9,7 @@
 
 crbug.com/24182 [ Debug ] storage/indexeddb/objectstore-cursor.html [ Slow ]
 crbug.com/24182 [ Linux Win Debug ] editing/selection/move-by-word-visually-mac.html [ Slow ]
-crbug.com/24182 [ Win Debug ] editing/selection/move-by-word-visually-multi-line.html [ Slow ]
+crbug.com/24182 editing/selection/move-by-word-visually-multi-line.html [ Slow ]
 crbug.com/24182 [ Win ] virtual/gpu/fast/canvas/webgl/canvas-test.html [ Slow ]
 crbug.com/24182 [ Win ] virtual/gpu/fast/canvas/webgl/framebuffer-object-attachment.html [ Slow ]
 crbug.com/24182 compositing/culling/filter-occlusion-blur-large.html [ Slow ]
@@ -17,7 +17,10 @@ crbug.com/24182 compositing/video-frame-size-change.html [ Slow ]
 crbug.com/24182 css3/filters/effect-reference-hidpi-hw.html [ Slow ]
 crbug.com/24182 css3/filters/filter-change-repaint-composited.html [ Slow ]
 crbug.com/24182 editing/selection/caret-at-bidi-boundary.html [ Slow ]
+crbug.com/24182 editing/selection/move-by-word-visually-single-space-inline-element.html [ Slow ]
+crbug.com/24182 editing/selection/move-by-word-visually-inline-block-positioned-element.html [ Slow ]
 crbug.com/24182 editing/selection/move-by-word-visually-multi-space.html [ Slow ]
+crbug.com/24182 editing/selection/move-by-word-visually-crash-test-5.html [ Slow ]
 crbug.com/24182 fast/canvas/webgl/read-pixels-test.html [ Slow ]
 crbug.com/24182 fast/dom/SelectorAPI/resig-SelectorsAPI-test.xhtml [ Slow ]
 crbug.com/24182 fast/forms/time-multiple-fields/time-multiple-fields-stepup-stepdown-from-renderer.html [ Slow ]
@@ -81,7 +84,6 @@ webkit.org/b/90488 [ Release ] http/tests/inspector/compiler-source-mapping-debu
 webkit.org/b/90488 [ Debug ] http/tests/inspector-enabled/ [ Slow ]
 webkit.org/b/90488 [ Debug ] inspector-protocol/ [ Slow ]
 webkit.org/b/90488 [ Debug ] virtual/deferred/inspector/ [ Slow ]
-webkit.org/b/90488 [ Debug ] virtual/implsidepainting/inspector/ [ Slow ]
 webkit.org/b/90488 inspector/sources/debugger/frameworks-dom-xhr-event-breakpoints.html [ Slow ]
 crbug.com/243492 http/tests/inspector-enabled/injected-script-discard.html [ Slow ]
 crbug.com/246190 [ Release ] http/tests/inspector/indexeddb/ [ Slow ]
@@ -99,7 +101,6 @@ crbug.com/247466 [ Debug ] inspector-enabled/sources/debugger/script-formatter-b
 crbug.com/247466 [ Debug ] inspector-enabled/sources/debugger/script-formatter-breakpoints-4.html [ Slow ]
 crbug.com/394210 [ Release ] inspector/profiler/webgl/webgl-profiler-api-changes.html [ Slow ]
 crbug.com/420008 [ Release ] inspector/tracing [ Slow ]
-crbug.com/420008 [ Release ] virtual/implsidepainting/inspector/tracing [ Slow ]
 crbug.com/420008 [ Release ] virtual/deferred/inspector/tracing [ Slow ]
 crbug.com/420008 [ Release ] inspector/editor/text-editor-word-jumps.html [ Slow ]
 crbug.com/420008 [ Release ] http/tests/inspector/console-xhr-logging.html [ Slow ]
@@ -137,6 +138,9 @@ crbug.com/311482 virtual/threaded/animations/keyframes-unprefixed-03.html [ Slow
 
 crbug.com/258896 animations/animation-direction-reverse-fill-mode.html [ Slow ]
 
+# This test has to generate >250MB of data which takes ~6s in both release and debug.
+crbug.com/420240 http/tests/xmlhttprequest/xmlhttprequest-json-response-overflow.html [ Slow ]
+
 # FIXME: These tests might still be buggy and time out. They were marked as Slow on 9/20/2013.
 # Double-check the data after they've been running another week or so.
 webkit.org/b/58193 [ Win7 ] http/tests/local/fileapi/send-sliced-dragged-file.html [ Slow ]
@@ -154,7 +158,6 @@ crbug.com/241869 [ Debug ] css3/flexbox/multiline-justify-content.html [ Slow ]
 crbug.com/243249 http/tests/misc/submit-post-keygen.html [ Slow ]
 crbug.com/245154 editing/selection/move-by-character-brute-force.html [ Slow ]
 crbug.com/246749 inspector/extensions/extensions-panel.html [ Slow ]
-crbug.com/248969 [ Debug ] printing/page-count-with-one-word.html [ Slow ]
 
 crbug.com/336481 inspector/jump-to-previous-editing-location.html [ Slow ]
 

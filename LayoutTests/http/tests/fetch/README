@@ -1,0 +1,24 @@
+This directory contains Fetch API layout tests. As it is exposed to Window and
+Worker, most (if not all) of tests are expected to run on Window,
+DedicatedWorker and ServiceWorker.
+For each test (say X), we have
+- a script X.js in /fetch/script-tests,
+- /fetch/window/X.html Window test file,
+- /fetch/workers/X.html Worker test file, and
+- /fetch/serviceworker/X.html ServiceWorker test file.
+
+Run
+$ python generate.py
+at this (/LayoutTests/http/tests/fetch/) directory to generate these files
+from templates script-tests/TEMPLATE*.html.
+
+PRESUBMIT.py checks the existence of the files.
+For each file in /fetch/script-tests, the
+corresponding html files must exist at the paths listed above.
+
+Other resources such as helper JS files and server side scripts are located on
+/fetch/resources.
+
+Tests should conform to Service Worker Testing style[1].
+
+1: http://www.chromium.org/blink/serviceworker/testing

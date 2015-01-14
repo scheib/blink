@@ -133,7 +133,7 @@ WebInspector.NetworkManager.prototype = {
 
     dispose: function()
     {
-        WebInspector.settings.cacheDisabled.removeChangeListener(this._cacheDisabledSettingChanged, this)
+        WebInspector.settings.cacheDisabled.removeChangeListener(this._cacheDisabledSettingChanged, this);
     },
 
     __proto__: WebInspector.SDKModel.prototype
@@ -210,6 +210,8 @@ WebInspector.NetworkDispatcher.prototype = {
             networkRequest.setFromDiskCache();
         networkRequest.timing = response.timing;
 
+        networkRequest.protocol = response.protocol;
+
         if (!this._mimeTypeIsConsistentWithType(networkRequest)) {
             var consoleModel = this._manager._target.consoleModel;
             consoleModel.addMessage(new WebInspector.ConsoleMessage(consoleModel.target(), WebInspector.ConsoleMessage.MessageSource.Network,
@@ -280,7 +282,7 @@ WebInspector.NetworkDispatcher.prototype = {
             networkRequest = this._createNetworkRequest(requestId, frameId, loaderId, request.url, documentURL, initiator);
         networkRequest.hasNetworkData = true;
         this._updateNetworkRequestWithRequest(networkRequest, request);
-        networkRequest.startTime = time;
+        networkRequest.setIssueTime(time);
         networkRequest.setResourceType(WebInspector.resourceTypes[resourceType]);
 
         this._startNetworkRequest(networkRequest);
@@ -414,7 +416,7 @@ WebInspector.NetworkDispatcher.prototype = {
 
         networkRequest.requestMethod = "GET";
         networkRequest.setRequestHeaders(this._headersMapToHeadersArray(request.headers));
-        networkRequest.startTime = time;
+        networkRequest.setIssueTime(time);
 
         this._updateNetworkRequest(networkRequest);
     },
@@ -440,6 +442,7 @@ WebInspector.NetworkDispatcher.prototype = {
         if (response.requestHeadersText)
             networkRequest.setRequestHeadersText(response.requestHeadersText);
         networkRequest.responseReceivedTime = time;
+        networkRequest.protocol = "websocket";
 
         this._updateNetworkRequest(networkRequest);
     },

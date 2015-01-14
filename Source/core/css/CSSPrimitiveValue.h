@@ -26,6 +26,7 @@
 #include "core/CSSValueKeywords.h"
 #include "core/css/CSSValue.h"
 #include "platform/graphics/Color.h"
+#include "wtf/BitVector.h"
 #include "wtf/Forward.h"
 #include "wtf/MathExtras.h"
 #include "wtf/PassRefPtr.h"
@@ -66,8 +67,7 @@ template<> inline float roundForImpreciseConversion(double value)
 
 // CSSPrimitiveValues are immutable. This class has manual ref-counting
 // of unioned types and does not have the code necessary
-// to handle any kind of mutations. All DOM-exposed "setters" just throw
-// exceptions.
+// to handle any kind of mutations.
 class CSSPrimitiveValue : public CSSValue {
 public:
     enum UnitType {
@@ -151,7 +151,10 @@ public:
     };
 
     typedef Vector<double, CSSPrimitiveValue::LengthUnitTypeCount> CSSLengthArray;
+    typedef BitVector CSSLengthTypeArray;
+
     void accumulateLengthArray(CSSLengthArray&, double multiplier = 1) const;
+    void accumulateLengthArray(CSSLengthArray&, CSSLengthTypeArray&, double multiplier = 1) const;
 
     // This enum follows the BisonCSSParser::Units enum augmented with UNIT_FREQUENCY for frequencies.
     enum UnitCategory {
@@ -262,7 +265,7 @@ public:
 
     UnitType primitiveType() const;
 
-    double computeDegrees();
+    double computeDegrees() const;
     double computeSeconds();
 
     /*
@@ -386,6 +389,7 @@ private:
 };
 
 typedef CSSPrimitiveValue::CSSLengthArray CSSLengthArray;
+typedef CSSPrimitiveValue::CSSLengthTypeArray CSSLengthTypeArray;
 
 DEFINE_CSS_VALUE_TYPE_CASTS(CSSPrimitiveValue, isPrimitiveValue());
 

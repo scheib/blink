@@ -36,6 +36,7 @@
 #include "platform/geometry/IntRect.h"
 #include "platform/graphics/GraphicsLayer.h"
 #include "platform/heap/Handle.h"
+#include "public/platform/WebFloatSize.h"
 #include "public/platform/WebGestureCurveTarget.h"
 #include "public/platform/WebLayer.h"
 #include "public/platform/WebPoint.h"
@@ -121,6 +122,7 @@ public:
     virtual void applyViewportDeltas(
         const WebSize& pinchViewportDelta,
         const WebSize& mainFrameDelta,
+        const WebFloatSize& elasticOverscrollDelta,
         float pageScaleDelta,
         float topControlsDelta) override;
     virtual void mouseCaptureLost() override;
@@ -153,8 +155,8 @@ public:
     virtual void didChangeWindowResizerRect() override;
 
     // WebView methods:
+    virtual bool isWebView() const { return true; }
     virtual void setMainFrame(WebFrame*) override;
-    virtual void setAutofillClient(WebAutofillClient*) override;
     virtual void setCredentialManagerClient(WebCredentialManagerClient*) override;
     virtual void setDevToolsAgentClient(WebDevToolsAgentClient*) override;
     virtual void setPrerendererClient(WebPrerendererClient*) override;
@@ -283,6 +285,8 @@ public:
 
     Color baseBackgroundColor() const { return m_baseBackgroundColor; }
 
+    WebColor backgroundColorOverride() const { return m_backgroundColorOverride; }
+
     PageOverlayList* pageOverlays() const { return m_pageOverlays.get(); }
 
     void setOverlayLayer(GraphicsLayer*);
@@ -302,11 +306,6 @@ public:
     WebViewClient* client()
     {
         return m_client;
-    }
-
-    WebAutofillClient* autofillClient()
-    {
-        return m_autofillClient;
     }
 
     WebSpellCheckClient* spellCheckClient()
@@ -446,7 +445,7 @@ public:
     void computeScaleAndScrollForBlockRect(const WebPoint& hitPoint, const WebRect& blockRect, float padding, float defaultScaleWhenAlreadyLegible, float& scale, WebPoint& scroll);
     Node* bestTapNode(const GestureEventWithHitTestResults& targetedTapEvent);
     void enableTapHighlightAtPoint(const GestureEventWithHitTestResults& targetedTapEvent);
-    void enableTapHighlights(WillBeHeapVector<RawPtrWillBeMember<Node> >&);
+    void enableTapHighlights(WillBeHeapVector<RawPtrWillBeMember<Node>>&);
     void computeScaleAndScrollForFocusedNode(Node* focusedNode, float& scale, IntPoint& scroll, bool& needAnimation);
 
     void animateDoubleTapZoom(const IntPoint&);
@@ -529,6 +528,7 @@ private:
     IntSize contentsSize() const;
 
     void updateMainFrameScrollPosition(const IntPoint& scrollPosition, bool programmaticScroll);
+    void updateRootLayerScrollPosition(const IntPoint& scrollPosition);
 
     void performResize();
 
@@ -602,7 +602,6 @@ private:
     WebPlugin* focusedPluginIfInputMethodSupported(LocalFrame*);
 
     WebViewClient* m_client; // Can be 0 (e.g. unittests, shared workers, etc.)
-    WebAutofillClient* m_autofillClient;
     WebSpellCheckClient* m_spellCheckClient;
 
     ChromeClientImpl m_chromeClientImpl;
@@ -729,7 +728,7 @@ private:
     WebPoint m_globalPositionOnFlingStart;
     int m_flingModifier;
     bool m_flingSourceDevice;
-    Vector<OwnPtr<LinkHighlight> > m_linkHighlights;
+    Vector<OwnPtr<LinkHighlight>> m_linkHighlights;
     OwnPtrWillBePersistent<FullscreenController> m_fullscreenController;
 
     bool m_showFPSCounter;
@@ -751,6 +750,7 @@ private:
     float m_topControlsLayoutHeight;
 };
 
+DEFINE_TYPE_CASTS(WebViewImpl, WebWidget, widget, widget->isWebView(), widget.isWebView());
 // We have no ways to check if the specified WebView is an instance of
 // WebViewImpl because WebViewImpl is the only implementation of WebView.
 DEFINE_TYPE_CASTS(WebViewImpl, WebView, webView, true, true);

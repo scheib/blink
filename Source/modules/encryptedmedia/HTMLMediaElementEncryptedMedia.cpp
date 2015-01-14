@@ -54,6 +54,8 @@ public:
     static ScriptPromise create(ScriptState*, HTMLMediaElement&, MediaKeys*);
     virtual ~SetMediaKeysHandler();
 
+    virtual void trace(Visitor*) override;
+
 private:
     SetMediaKeysHandler(ScriptState*, HTMLMediaElement&, MediaKeys*);
     void timerFired(Timer<SetMediaKeysHandler>*);
@@ -65,8 +67,8 @@ private:
     void reportSetFailed(ExceptionCode, const String& errorMessage);
 
     // Keep media element alive until promise is fulfilled
-    RefPtrWillBePersistent<HTMLMediaElement> m_element;
-    Persistent<MediaKeys> m_newMediaKeys;
+    RefPtrWillBeMember<HTMLMediaElement> m_element;
+    PersistentWillBeMember<MediaKeys> m_newMediaKeys;
     Timer<SetMediaKeysHandler> m_timer;
 };
 
@@ -89,6 +91,12 @@ public:
         (*m_successCallback)();
     }
 
+    virtual void completeWithContentDecryptionModule(WebContentDecryptionModule*) override
+    {
+        ASSERT_NOT_REACHED();
+        (*m_failureCallback)(InvalidStateError, "Unexpected completion.");
+    }
+
     virtual void completeWithSession(blink::WebContentDecryptionModuleResult::SessionStatus status) override
     {
         ASSERT_NOT_REACHED();
@@ -97,7 +105,10 @@ public:
 
     virtual void completeWithError(blink::WebContentDecryptionModuleException code, unsigned long systemCode, const blink::WebString& message) override
     {
-        (*m_failureCallback)(WebCdmExceptionToExceptionCode(code), message);
+        // The error string is in the format of: OriginalMessage (systemCode)
+        String errorString = message;
+        errorString.append(" (" + String::number(systemCode) + ")");
+        (*m_failureCallback)(WebCdmExceptionToExceptionCode(code), errorString);
     }
 
 private:
@@ -107,7 +118,7 @@ private:
 
 ScriptPromise SetMediaKeysHandler::create(ScriptState* scriptState, HTMLMediaElement& element, MediaKeys* mediaKeys)
 {
-    RefPtr<SetMediaKeysHandler> handler = adoptRef(new SetMediaKeysHandler(scriptState, element, mediaKeys));
+    RefPtrWillBeRawPtr<SetMediaKeysHandler> handler = adoptRefWillBeNoop(new SetMediaKeysHandler(scriptState, element, mediaKeys));
     handler->suspendIfNeeded();
     handler->keepAliveWhilePending();
     return handler->promise();
@@ -228,6 +239,13 @@ void SetMediaKeysHandler::reportSetFailed(ExceptionCode code, const String& erro
     reject(DOMException::create(code, errorMessage));
 }
 
+void SetMediaKeysHandler::trace(Visitor* visitor)
+{
+    visitor->trace(m_element);
+    visitor->trace(m_newMediaKeys);
+    ScriptPromiseResolver::trace(visitor);
+}
+
 HTMLMediaElementEncryptedMedia::HTMLMediaElementEncryptedMedia()
     : m_emeMode(EmeModeNotSelected)
 {
@@ -291,10 +309,10 @@ ScriptPromise HTMLMediaElementEncryptedMedia::setMediaKeys(ScriptState* scriptSt
 static PassRefPtrWillBeRawPtr<Event> createEncryptedEvent(const String& initDataType, const unsigned char* initData, unsigned initDataLength)
 {
     MediaEncryptedEventInit initializer;
-    initializer.initDataType = initDataType;
-    initializer.initData = DOMArrayBuffer::create(initData, initDataLength);
-    initializer.bubbles = false;
-    initializer.cancelable = false;
+    initializer.setInitDataType(initDataType);
+    initializer.setInitData(DOMArrayBuffer::create(initData, initDataLength));
+    initializer.setBubbles(false);
+    initializer.setCancelable(false);
 
     return MediaEncryptedEvent::create(EventTypeNames::encrypted, initializer);
 }
@@ -303,11 +321,7 @@ static PassRefPtrWillBeRawPtr<Event> createEncryptedEvent(const String& initData
 static PassRefPtrWillBeRawPtr<Event> createWebkitNeedKeyEvent(const unsigned char* initData, unsigned initDataLength)
 {
     MediaKeyEventInit webkitInitializer;
-    webkitInitializer.keySystem = String();
-    webkitInitializer.sessionId = String();
-    webkitInitializer.initData = DOMUint8Array::create(initData, initDataLength);
-    webkitInitializer.bubbles = false;
-    webkitInitializer.cancelable = false;
+    webkitInitializer.setInitData(DOMUint8Array::create(initData, initDataLength));
 
     return MediaKeyEvent::create(EventTypeNames::webkitneedkey, webkitInitializer);
 }
@@ -435,10 +449,8 @@ void HTMLMediaElementEncryptedMedia::keyAdded(HTMLMediaElement& element, const S
     WTF_LOG(Media, "HTMLMediaElementEncryptedMedia::mediaPlayerKeyAdded");
 
     MediaKeyEventInit initializer;
-    initializer.keySystem = keySystem;
-    initializer.sessionId = sessionId;
-    initializer.bubbles = false;
-    initializer.cancelable = false;
+    initializer.setKeySystem(keySystem);
+    initializer.setSessionId(sessionId);
 
     RefPtrWillBeRawPtr<Event> event = MediaKeyEvent::create(EventTypeNames::webkitkeyadded, initializer);
     event->setTarget(&element);
@@ -472,12 +484,10 @@ void HTMLMediaElementEncryptedMedia::keyError(HTMLMediaElement& element, const S
     }
 
     MediaKeyEventInit initializer;
-    initializer.keySystem = keySystem;
-    initializer.sessionId = sessionId;
-    initializer.errorCode = MediaKeyError::create(mediaKeyErrorCode);
-    initializer.systemCode = systemCode;
-    initializer.bubbles = false;
-    initializer.cancelable = false;
+    initializer.setKeySystem(keySystem);
+    initializer.setSessionId(sessionId);
+    initializer.setErrorCode(MediaKeyError::create(mediaKeyErrorCode));
+    initializer.setSystemCode(systemCode);
 
     RefPtrWillBeRawPtr<Event> event = MediaKeyEvent::create(EventTypeNames::webkitkeyerror, initializer);
     event->setTarget(&element);
@@ -489,12 +499,10 @@ void HTMLMediaElementEncryptedMedia::keyMessage(HTMLMediaElement& element, const
     WTF_LOG(Media, "HTMLMediaElementEncryptedMedia::mediaPlayerKeyMessage: sessionID=%s", sessionId.utf8().data());
 
     MediaKeyEventInit initializer;
-    initializer.keySystem = keySystem;
-    initializer.sessionId = sessionId;
-    initializer.message = DOMUint8Array::create(message, messageLength);
-    initializer.defaultURL = KURL(defaultURL);
-    initializer.bubbles = false;
-    initializer.cancelable = false;
+    initializer.setKeySystem(keySystem);
+    initializer.setSessionId(sessionId);
+    initializer.setMessage(DOMUint8Array::create(message, messageLength));
+    initializer.setDefaultURL(KURL(defaultURL));
 
     RefPtrWillBeRawPtr<Event> event = MediaKeyEvent::create(EventTypeNames::webkitkeymessage, initializer);
     event->setTarget(&element);

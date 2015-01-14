@@ -27,12 +27,12 @@
 #include "core/loader/FrameLoader.h"
 #include "core/loader/NavigationPolicy.h"
 #include "core/frame/ConsoleTypes.h"
+#include "core/html/forms/PopupMenuClient.h"
 #include "core/page/FocusType.h"
 #include "core/rendering/style/RenderStyleConstants.h"
 #include "platform/Cursor.h"
 #include "platform/HostWindow.h"
 #include "platform/PopupMenu.h"
-#include "platform/PopupMenuClient.h"
 #include "platform/heap/Handle.h"
 #include "platform/scroll/ScrollTypes.h"
 #include "wtf/Forward.h"
@@ -114,7 +114,7 @@ public:
 
     virtual void setResizable(bool) = 0;
 
-    virtual bool shouldReportDetailedMessageForSource(const String& source) = 0;
+    virtual bool shouldReportDetailedMessageForSource(LocalFrame&, const String& source) = 0;
     virtual void addMessageToConsole(LocalFrame*, MessageSource, MessageLevel, const String& message, unsigned lineNumber, const String& sourceID, const String& stackTrace) = 0;
 
     virtual bool canRunBeforeUnloadConfirmPanel() = 0;
@@ -133,8 +133,7 @@ public:
     virtual IntRect windowResizerRect() const = 0;
 
     // Methods used by HostWindow.
-    virtual void invalidateContentsAndRootView(const IntRect&) = 0;
-    virtual void invalidateContentsForSlowScroll(const IntRect&) = 0;
+    virtual void invalidateRect(const IntRect&) = 0;
     virtual IntRect rootViewToScreen(const IntRect&) const = 0;
     virtual blink::WebScreenInfo screenInfo() const = 0;
     virtual void setCursor(const Cursor&) = 0;
@@ -196,7 +195,7 @@ public:
 
     // Checks if there is an opened popup, called by RenderMenuList::showPopup().
     virtual bool hasOpenedPopup() const = 0;
-    virtual PassRefPtrWillBeRawPtr<PopupMenu> createPopupMenu(LocalFrame&, PopupMenuClient*) const = 0;
+    virtual PassRefPtrWillBeRawPtr<PopupMenu> createPopupMenu(LocalFrame&, PopupMenuClient*) = 0;
     virtual DOMWindow* pagePopupWindowForTesting() const = 0;
 
     virtual void postAccessibilityNotification(AXObject*, AXObjectCache::AXNotification) { }
@@ -215,6 +214,11 @@ public:
     virtual bool requestPointerLock() { return false; }
     virtual void requestPointerUnlock() { }
 
+    // Heuristic-based function for determining if we should disable workarounds
+    // for viewing websites that are not optimized for mobile devices, e.g.,
+    // for disabling touch adjustment or link disambiguation.
+    virtual bool shouldDisableDesktopWorkarounds() { return false; }
+
     virtual FloatSize minimumWindowSize() const { return FloatSize(100, 100); }
 
     virtual bool isChromeClientImpl() const { return false; }
@@ -223,12 +227,15 @@ public:
     virtual void didChangeValueInTextField(HTMLFormControlElement&) { }
     virtual void didEndEditingOnTextField(HTMLInputElement&) { }
     virtual void handleKeyboardEventOnTextField(HTMLInputElement&, KeyboardEvent&) { }
+    virtual void textFieldDataListChanged(HTMLInputElement&) { }
 
     // Input mehtod editor related functions.
     virtual void didCancelCompositionOnSelectionChange() { }
     virtual void willSetInputMethodState() { }
     virtual void didUpdateTextOfFocusedElementByNonUserInput() { }
     virtual void showImeIfNeeded() { }
+
+    virtual void registerViewportLayers() const { }
 
 protected:
     virtual ~ChromeClient() { }

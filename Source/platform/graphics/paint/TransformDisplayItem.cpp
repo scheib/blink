@@ -6,12 +6,12 @@
 #include "platform/graphics/paint/TransformDisplayItem.h"
 
 #include "platform/graphics/GraphicsContext.h"
-#include "platform/transforms/TransformationMatrix.h"
+#include "platform/transforms/AffineTransform.h"
 #include "public/platform/WebDisplayItemList.h"
 
 namespace blink {
 
-BeginTransformDisplayItem::BeginTransformDisplayItem(DisplayItemClient client, const TransformationMatrix& transform)
+BeginTransformDisplayItem::BeginTransformDisplayItem(DisplayItemClient client, const AffineTransform& transform)
     : DisplayItem(client, BeginTransform)
     , m_transform(transform)
 { }
@@ -19,22 +19,13 @@ BeginTransformDisplayItem::BeginTransformDisplayItem(DisplayItemClient client, c
 void BeginTransformDisplayItem::replay(GraphicsContext* context)
 {
     context->save();
-    context->concatCTM(m_transform.toAffineTransform());
+    context->concatCTM(m_transform);
 }
 
 void BeginTransformDisplayItem::appendToWebDisplayItemList(WebDisplayItemList* list) const
 {
-    list->appendTransformItem(affineTransformToSkMatrix(m_transform.toAffineTransform()));
+    list->appendTransformItem(affineTransformToSkMatrix(m_transform));
 }
-
-#ifndef NDEBUG
-WTF::String BeginTransformDisplayItem::asDebugString() const
-{
-    return String::format("{%s, type: \"%s\"}",
-        clientDebugString().utf8().data(), typeAsDebugString(type()).utf8().data());
-
-}
-#endif
 
 void EndTransformDisplayItem::replay(GraphicsContext* context)
 {
@@ -45,14 +36,5 @@ void EndTransformDisplayItem::appendToWebDisplayItemList(WebDisplayItemList* lis
 {
     list->appendEndTransformItem();
 }
-
-#ifndef NDEBUG
-WTF::String EndTransformDisplayItem::asDebugString() const
-{
-    return String::format("{%s, type: \"%s\"}",
-        clientDebugString().utf8().data(), typeAsDebugString(type()).utf8().data());
-
-}
-#endif
 
 } // namespace blink

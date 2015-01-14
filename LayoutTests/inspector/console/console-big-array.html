@@ -51,6 +51,9 @@ function onload()
         f[i] = i;
     console.log("%O", f)
 
+    var g = new Uint8Array(new ArrayBuffer(Math.pow(20, 6) + Math.pow(20, 4) + 3));
+    console.dir(g);
+
     runTest();
 }
 
@@ -67,7 +70,7 @@ function test()
         while (node) {
             if (node._section) {
                 sections.push(node._section);
-                node._section.expanded = true;
+                node._section.expand();
             }
             node = node.traverseNextNode(element);
         }

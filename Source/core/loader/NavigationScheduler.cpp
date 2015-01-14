@@ -121,7 +121,7 @@ protected:
 private:
     RefPtrWillBePersistent<Document> m_originDocument;
     String m_url;
-    ContentSecurityPolicyCheck m_shouldCheckMainWorldContentSecurityPolicy;
+    ContentSecurityPolicyDisposition m_shouldCheckMainWorldContentSecurityPolicy;
 };
 
 class ScheduledRedirect final : public ScheduledURLNavigation {
@@ -132,7 +132,7 @@ public:
         clearUserGesture();
     }
 
-    virtual bool shouldStartTimer(LocalFrame* frame) override { return frame->loader().allAncestorsAreComplete(); }
+    virtual bool shouldStartTimer(LocalFrame* frame) override { return frame->document()->loadEventFinished(); }
 
     virtual void fire(LocalFrame* frame) override
     {

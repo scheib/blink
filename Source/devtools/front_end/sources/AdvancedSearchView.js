@@ -28,19 +28,17 @@ WebInspector.AdvancedSearchView = function()
     this._search.setAttribute("results", "0");
     this._search.setAttribute("size", 30);
 
-    this._ignoreCaseLabel = this._searchPanelElement.createChild("label");
+    this._ignoreCaseLabel = createCheckboxLabel(WebInspector.UIString("Ignore case"));
     this._ignoreCaseLabel.classList.add("search-config-label");
-    this._ignoreCaseCheckbox = this._ignoreCaseLabel.createChild("input");
-    this._ignoreCaseCheckbox.setAttribute("type", "checkbox");
+    this._searchPanelElement.appendChild(this._ignoreCaseLabel);
+    this._ignoreCaseCheckbox = this._ignoreCaseLabel.checkboxElement;
     this._ignoreCaseCheckbox.classList.add("search-config-checkbox");
-    this._ignoreCaseLabel.createTextChild(WebInspector.UIString("Ignore case"));
 
-    this._regexLabel = this._searchPanelElement.createChild("label");
+    this._regexLabel = createCheckboxLabel(WebInspector.UIString("Regular expression"));
     this._regexLabel.classList.add("search-config-label");
-    this._regexCheckbox = this._regexLabel.createChild("input");
-    this._regexCheckbox.setAttribute("type", "checkbox");
+    this._searchPanelElement.appendChild(this._regexLabel);
+    this._regexCheckbox = this._regexLabel.checkboxElement;
     this._regexCheckbox.classList.add("search-config-checkbox");
-    this._regexLabel.createTextChild(WebInspector.UIString("Regular expression"));
 
     this._searchStatusBarElement = this.contentElement.createChild("div", "search-status-bar-summary");
     this._searchMessageElement = this._searchStatusBarElement.createChild("div", "search-message");
@@ -363,7 +361,7 @@ WebInspector.AdvancedSearchView.ToggleDrawerViewActionDelegate.prototype = {
     {
         var searchView = WebInspector.AdvancedSearchView._instance;
         if (!searchView || !searchView.isShowing() || searchView._search !== document.activeElement) {
-            var selection = window.getSelection();
+            var selection = WebInspector.inspectorView.element.getDeepSelection();
             var queryCandidate = "";
             if (selection.rangeCount)
                 queryCandidate = selection.toString().replace(/\r?\n.*/, "");

@@ -245,6 +245,8 @@ protected:
     virtual void styleWillChange(StyleDifference, const RenderStyle& newStyle) override;
     virtual void styleDidChange(StyleDifference, const RenderStyle* oldStyle) override;
 
+    void updateBlockChildDirtyBitsBeforeLayout(bool relayoutChildren, RenderBox&);
+
     void addOverflowFromFloats();
 
     LayoutUnit logicalRightOffsetForLine(LayoutUnit logicalTop, LayoutUnit fixedOffset, bool applyTextIndent, LayoutUnit logicalHeight = 0) const
@@ -279,7 +281,7 @@ private:
 
     // Called from lineWidth, to position the floats added in the last line.
     // Returns true if and only if it has positioned any floats.
-    bool positionNewFloats();
+    bool positionNewFloats(LineWidth* = 0);
 
     LayoutUnit getClearDelta(RenderBox* child, LayoutUnit yPos);
 
@@ -344,7 +346,7 @@ public:
             , rect(f->frameRect())
             , everHadLayout(f->everHadLayout())
         {
-            rect.expand(f->marginBox());
+            rect.expand(f->marginBoxOutsets());
         }
 
         RenderBox* object;

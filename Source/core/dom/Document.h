@@ -47,6 +47,7 @@
 #include "core/dom/custom/CustomElement.h"
 #include "core/frame/LocalDOMWindow.h"
 #include "core/html/CollectionType.h"
+#include "core/html/parser/ParserSynchronizationPolicy.h"
 #include "core/page/FocusType.h"
 #include "core/page/PageVisibilityState.h"
 #include "platform/Length.h"
@@ -351,6 +352,7 @@ public:
     String origin() const { return securityOrigin()->toString(); }
 
     String visibilityState() const;
+    PageVisibilityState pageVisibilityState() const;
     bool hidden() const;
     void didChangeVisibilityState();
 
@@ -509,7 +511,7 @@ public:
     DocumentLoader* loader() const;
 
     void open(Document* ownerDocument = nullptr, ExceptionState& = ASSERT_NO_EXCEPTION);
-    PassRefPtrWillBeRawPtr<DocumentParser> implicitOpen();
+    PassRefPtrWillBeRawPtr<DocumentParser> implicitOpen(ParserSynchronizationPolicy);
 
     // close() is the DOM API document.close()
     void close(ExceptionState& = ASSERT_NO_EXCEPTION);
@@ -556,9 +558,6 @@ public:
 
     virtual String userAgent(const KURL&) const override final;
     virtual void disableEval(const String& errorMessage) override final;
-
-    bool canNavigate(const Frame& targetFrame);
-    LocalFrame* findUnsafeParentScrollPropagationBoundary();
 
     CSSStyleSheet& elementSheet();
 
@@ -793,7 +792,7 @@ public:
 
     DocumentMarkerController& markers() const { return *m_markers; }
 
-    bool execCommand(const String& command, bool userInterface = false, const String& value = String());
+    bool execCommand(const String& command, bool showUI, const String& value);
     bool queryCommandEnabled(const String& command);
     bool queryCommandIndeterm(const String& command);
     bool queryCommandState(const String& command);
@@ -1053,6 +1052,8 @@ public:
 
     AtomicString convertLocalName(const AtomicString&);
 
+    void platformColorsChanged();
+
     virtual v8::Handle<v8::Object> wrap(v8::Handle<v8::Object> creationContext, v8::Isolate*) override;
     virtual v8::Handle<v8::Object> associateWithWrapper(v8::Isolate*, const WrapperTypeInfo*, v8::Handle<v8::Object> wrapper) override;
 
@@ -1071,9 +1072,9 @@ protected:
 
     bool importContainerNodeChildren(ContainerNode* oldContainerNode, PassRefPtrWillBeRawPtr<ContainerNode> newContainerNode, ExceptionState&);
     void lockCompatibilityMode() { m_compatibilityModeLocked = true; }
+    ParserSynchronizationPolicy parserSynchronizationPolicy() const { return m_parserSyncPolicy; }
 
 private:
-    friend class Node;
     friend class IgnoreDestructiveWriteCountIncrementer;
 
     bool isDocumentFragment() const = delete; // This will catch anyone doing an unnecessary check.
@@ -1136,8 +1137,6 @@ private:
 
     void loadEventDelayTimerFired(Timer<Document>*);
     void pluginLoadingTimerFired(Timer<Document>*);
-
-    PageVisibilityState pageVisibilityState() const;
 
     // Note that dispatching a window load event may cause the LocalDOMWindow to be detached from
     // the LocalFrame, so callers should take a reference to the LocalDOMWindow (which owns us) to
@@ -1385,6 +1384,8 @@ private:
     DocumentVisibilityObserverSet m_visibilityObservers;
 
     int m_styleRecalcElementCounter;
+
+    ParserSynchronizationPolicy m_parserSyncPolicy;
 };
 
 inline bool Document::shouldOverrideLegacyDescription(ViewportDescription::Type origin)

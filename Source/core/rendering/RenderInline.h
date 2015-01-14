@@ -48,7 +48,7 @@ public:
 
     Element* node() const { return toElement(RenderBoxModelObject::node()); }
 
-    virtual LayoutBoxExtent marginBox() const override final;
+    virtual LayoutRectOutsets marginBoxOutsets() const override final;
     virtual LayoutUnit marginLeft() const override final;
     virtual LayoutUnit marginRight() const override final;
     virtual LayoutUnit marginTop() const override final;
@@ -127,6 +127,8 @@ private:
     void addChildToContinuation(RenderObject* newChild, RenderObject* beforeChild);
     virtual void addChildIgnoringContinuation(RenderObject* newChild, RenderObject* beforeChild = 0) override final;
 
+    void moveChildrenToIgnoringContinuation(RenderInline* to, RenderObject* startChild);
+
     void splitInlines(RenderBlock* fromBlock, RenderBlock* toBlock, RenderBlock* middleBlock,
                       RenderObject* beforeChild, RenderBoxModelObject* oldCont);
     void splitFlow(RenderObject* beforeChild, RenderBlock* newBlockBox,
@@ -145,9 +147,14 @@ private:
     virtual LayoutUnit offsetWidth() const override final { return linesBoundingBox().width(); }
     virtual LayoutUnit offsetHeight() const override final { return linesBoundingBox().height(); }
 
+    virtual LayoutRect absoluteClippedOverflowRect() const override;
     virtual LayoutRect clippedOverflowRectForPaintInvalidation(const RenderLayerModelObject* paintInvalidationContainer, const PaintInvalidationState* = 0) const override;
     virtual LayoutRect rectWithOutlineForPaintInvalidation(const RenderLayerModelObject* paintInvalidationContainer, LayoutUnit outlineWidth, const PaintInvalidationState* = 0) const override final;
     virtual void mapRectToPaintInvalidationBacking(const RenderLayerModelObject* paintInvalidationContainer, LayoutRect&, const PaintInvalidationState*) const override final;
+
+    // This method differs from clippedOverflowRectForPaintInvalidation in that it includes
+    // the rects for culled inline boxes, which aren't necessary for paint invalidation.
+    LayoutRect clippedOverflowRect(const RenderLayerModelObject*, const PaintInvalidationState* = 0) const;
 
     virtual void mapLocalToContainer(const RenderLayerModelObject* paintInvalidationContainer, TransformState&, MapCoordinatesFlags = ApplyContainerFlip, bool* wasFixed = 0, const PaintInvalidationState* = 0) const override;
 

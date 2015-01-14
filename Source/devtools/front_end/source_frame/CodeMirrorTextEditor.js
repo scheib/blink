@@ -704,15 +704,12 @@ WebInspector.CodeMirrorTextEditor.prototype = {
         this._codeMirror.redo();
     },
 
-    /**
-     * // FIXME: remove this suppression.
-     * @suppressGlobalPropertiesCheck
-     */
     _setupWhitespaceHighlight: function()
     {
-        if (WebInspector.CodeMirrorTextEditor._whitespaceStyleInjected || !WebInspector.settings.showWhitespacesInEditor.get())
+        var doc = this.element.ownerDocument;
+        if (doc._codeMirrorWhitespaceStyleInjected || !WebInspector.settings.showWhitespacesInEditor.get())
             return;
-        WebInspector.CodeMirrorTextEditor._whitespaceStyleInjected = true;
+        doc._codeMirrorWhitespaceStyleInjected = true;
         const classBase = ".show-whitespaces .CodeMirror .cm-whitespace-";
         const spaceChar = "·";
         var spaceChars = "";
@@ -722,9 +719,9 @@ WebInspector.CodeMirrorTextEditor.prototype = {
             var rule = classBase + i + "::before { content: '" + spaceChars + "';}\n";
             rules += rule;
         }
-        var style = createElement("style");
+        var style = doc.createElement("style");
         style.textContent = rules;
-        document.head.appendChild(style);
+        doc.head.appendChild(style);
     },
 
     _handleKeyDown: function(e)
@@ -777,8 +774,6 @@ WebInspector.CodeMirrorTextEditor.prototype = {
      * @param {number} x
      * @param {number} y
      * @return {?WebInspector.TextRange}
-     * // FIXME: remove this suppression.
-     * @suppressGlobalPropertiesCheck
      */
     coordinatesToCursorPosition: function(x, y)
     {
@@ -931,7 +926,7 @@ WebInspector.CodeMirrorTextEditor.prototype = {
      */
     setReadOnly: function(readOnly)
     {
-        this.element.classList.toggle("CodeMirror-readonly", readOnly)
+        this.element.classList.toggle("CodeMirror-readonly", readOnly);
         this._codeMirror.setOption("readOnly", readOnly);
     },
 
@@ -1135,7 +1130,7 @@ WebInspector.CodeMirrorTextEditor.prototype = {
         var lineInfo = this._codeMirror.lineInfo(lineNumber);
         var wrapClass = lineInfo.wrapClass || "";
         var classNames = wrapClass.split(" ");
-        return classNames.indexOf(className) !== -1
+        return classNames.indexOf(className) !== -1;
     },
 
     /**
@@ -1739,7 +1734,7 @@ WebInspector.CodeMirrorTextEditor.TokenHighlighter.prototype = {
         var selectedText = selections[0];
         if (this._isWord(selectedText, selectionStart.line, selectionStart.ch, selectionEnd.ch)) {
             if (selectionStart)
-                this._codeMirror.addLineClass(selectionStart.line, "wrap", "cm-line-with-selection")
+                this._codeMirror.addLineClass(selectionStart.line, "wrap", "cm-line-with-selection");
             this._setHighlighter(this._tokenHighlighter.bind(this, selectedText, selectionStart), selectionStart);
         }
     },
@@ -1796,7 +1791,7 @@ WebInspector.CodeMirrorTextEditor.TokenHighlighter.prototype = {
             return "search-highlight search-highlight-start";
         }
 
-        while (!stream.match(regex, false) && stream.next()) {};
+        while (!stream.match(regex, false) && stream.next()) {}
     },
 
     /**

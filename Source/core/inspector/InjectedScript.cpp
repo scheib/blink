@@ -242,7 +242,7 @@ void InjectedScript::getInternalProperties(ErrorString* errorString, const Strin
 Node* InjectedScript::nodeForObjectId(const String& objectId)
 {
     if (isEmpty() || !canAccessInspectedWindow())
-        return 0;
+        return nullptr;
 
     ScriptFunctionCall function(injectedScriptObject(), "nodeForObjectId");
     function.appendArgument(objectId);
@@ -359,6 +359,15 @@ void InjectedScript::setLastEvaluationResult(const String& objectId)
     setLastResultFunction.appendArgument(objectId);
     RefPtr<JSONValue> result;
     makeCall(setLastResultFunction, &result);
+}
+
+void InjectedScript::setCustomObjectFormatterEnabled(bool enabled)
+{
+    ASSERT(!isEmpty());
+    ScriptFunctionCall function(injectedScriptObject(), "setCustomObjectFormatterEnabled");
+    function.appendArgument(enabled);
+    RefPtr<JSONValue> result;
+    makeCall(function, &result);
 }
 
 } // namespace blink

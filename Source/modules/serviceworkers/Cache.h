@@ -45,9 +45,12 @@ public:
 
     static PassRefPtrWillBeRawPtr<DOMException> domExceptionForCacheError(WebServiceWorkerCacheError);
 
+    static WebServiceWorkerCache::QueryParams toWebQueryParams(const CacheQueryOptions&);
+
     void trace(Visitor*) { }
 
 private:
+    class AsyncPutBatch;
     explicit Cache(WebServiceWorkerCache*);
 
     ScriptPromise matchImpl(ScriptState*, const Request*, const CacheQueryOptions&);
@@ -58,6 +61,8 @@ private:
     ScriptPromise putImpl(ScriptState*, Request*, Response*);
     ScriptPromise keysImpl(ScriptState*);
     ScriptPromise keysImpl(ScriptState*, const Request*, const CacheQueryOptions&);
+
+    WebServiceWorkerCache* webCache() const;
 
     OwnPtr<WebServiceWorkerCache> m_webCache;
 };

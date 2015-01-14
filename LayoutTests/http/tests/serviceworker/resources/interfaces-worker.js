@@ -8,9 +8,9 @@ test(function() {
     verify_interface('ServiceWorkerGlobalScope',
                      self,
                      {
-                       scope: 'string',
                        clients: 'object',
                        close: 'function',
+                       skipWaiting: 'function',
 
                        onactivate: EVENT_HANDLER,
                        onfetch: EVENT_HANDLER,
@@ -20,27 +20,32 @@ test(function() {
   }, 'ServiceWorkerGlobalScope');
 
 test(function() {
-    verify_interface('ServiceWorkerClients',
+    verify_interface('Clients',
                      self.clients,
                      {
                        getAll: 'function'
                      });
-  }, 'ServiceWorkerClients');
+  }, 'Clients');
 
 test(function() {
-    verify_interface('ServiceWorkerClient');
+    verify_interface('Client');
     // FIXME: Get an instance and test it, or ensure property exists on
     // prototype.
-  }, 'ServiceWorkerClient');
+  }, 'Client');
+
+test(function() {
+    verify_interface('WindowClient');
+    // FIXME: Get an instance and test it, or ensure property exists on
+    // prototype.
+  }, 'WindowClient');
 
 test(function() {
     verify_interface('CacheStorage',
                      self.caches,
                      {
                        match: 'function',
-                       get: 'function',
                        has: 'function',
-                       create: 'function',
+                       open: 'function',
                        delete: 'function',
                        keys: 'function'
                      });
@@ -67,4 +72,8 @@ test(function() {
     assert_equals(new ExtendableEvent('ExtendableEvent').type, 'ExtendableEvent');
     assert_equals(new InstallEvent('InstallEvent').type, 'InstallEvent');
 
+    assert_equals(new InstallEvent('InstallEvent').cancelable, false);
+    assert_equals(new InstallEvent('InstallEvent').bubbles, false);
+    assert_equals(new InstallEvent('InstallEvent', { cancelable : true }).cancelable, true);
+    assert_equals(new InstallEvent('InstallEvent', { bubbles : true }).bubbles, true);
   }, 'Event constructors');

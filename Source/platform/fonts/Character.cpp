@@ -181,7 +181,7 @@ bool Character::shouldIgnoreRotation(UChar32 character)
     if (isInRange(character, 0x002E5, 0x002EB))
         return true;
 
-    if (isInRange(character, 0x01100, 0x011FF) || isInRange(character, 0x01401, 0x0167F) || isInRange(character, 0x01800, 0x018FF))
+    if (isInRange(character, 0x01100, 0x011FF) || isInRange(character, 0x01401, 0x0167F) || isInRange(character, 0x018B0, 0x018FF))
         return true;
 
     if (character == 0x02016 || character == 0x02018 || character == 0x02019 || character == 0x02020 || character == 0x02021
@@ -217,7 +217,7 @@ bool Character::shouldIgnoreRotation(UChar32 character)
         || isInRange(character, 0x030FD, 0x0A4CF))
         return true;
 
-    if (isInRange(character, 0x0A840, 0x0A87F) || isInRange(character, 0x0A960, 0x0A97F)
+    if (isInRange(character, 0x0A960, 0x0A97F)
         || isInRange(character, 0x0AC00, 0x0D7FF) || isInRange(character, 0x0E000, 0x0FAFF))
         return true;
 
@@ -343,22 +343,29 @@ unsigned Character::expansionOpportunityCount(const LChar* characters, size_t le
 {
     unsigned count = 0;
     if (textJustify == TextJustifyDistribute) {
-        count = length - 1;
-    } else {
-        if (direction == LTR) {
-            for (size_t i = 0; i < length; ++i) {
-                if (treatAsSpace(characters[i]))
-                    count++;
+        isAfterExpansion = true;
+        return length;
+    }
+
+    if (direction == LTR) {
+        for (size_t i = 0; i < length; ++i) {
+            if (treatAsSpace(characters[i])) {
+                count++;
+                isAfterExpansion = true;
+            } else {
+                isAfterExpansion = false;
             }
-        } else {
-            for (size_t i = length; i > 0; --i) {
-                if (treatAsSpace(characters[i - 1]))
-                    count++;
+        }
+    } else {
+        for (size_t i = length; i > 0; --i) {
+            if (treatAsSpace(characters[i - 1])) {
+                count++;
+                isAfterExpansion = true;
+            } else {
+                isAfterExpansion = false;
             }
         }
     }
-    int lastCharacter = (direction == LTR) ? length - 1 : 0;
-    isAfterExpansion = treatAsSpace(characters[lastCharacter]);
 
     return count;
 }
@@ -378,6 +385,13 @@ unsigned Character::expansionOpportunityCount(const UChar* characters, size_t le
                 character = U16_GET_SUPPLEMENTARY(character, characters[i + 1]);
                 i++;
             }
+            if (textJustify == TextJustify::TextJustifyAuto && isCJKIdeographOrSymbol(character)) {
+                if (!isAfterExpansion)
+                    count++;
+                count++;
+                isAfterExpansion = true;
+                continue;
+            }
             isAfterExpansion = false;
         }
     } else {
@@ -391,6 +405,13 @@ unsigned Character::expansionOpportunityCount(const UChar* characters, size_t le
             if (U16_IS_TRAIL(character) && i > 1 && U16_IS_LEAD(characters[i - 2])) {
                 character = U16_GET_SUPPLEMENTARY(characters[i - 2], character);
                 i--;
+            }
+            if (textJustify == TextJustify::TextJustifyAuto && isCJKIdeographOrSymbol(character)) {
+                if (!isAfterExpansion)
+                    count++;
+                count++;
+                isAfterExpansion = true;
+                continue;
             }
             isAfterExpansion = false;
         }

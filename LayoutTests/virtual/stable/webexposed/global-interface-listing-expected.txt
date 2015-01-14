@@ -8,6 +8,7 @@ CONSOLE WARNING: 'webkitIDBFactory' is deprecated. Please use 'IDBFactory' inste
 CONSOLE WARNING: 'webkitIDBDatabase' is deprecated. Please use 'IDBDatabase' instead.
 CONSOLE WARNING: 'webkitIDBCursor' is deprecated. Please use 'IDBCursor' instead.
 CONSOLE WARNING: 'webkitIndexedDB' is deprecated. Please use 'indexedDB' instead.
+CONSOLE WARNING: 'webkitURL' is deprecated. Please use 'URL' instead.
 This test documents all interface attributes and methods on the global window object and element instances.
 
 On success, you will see a series of "PASS" messages, followed by "TEST COMPLETE".
@@ -190,6 +191,10 @@ interface CSSStyleSheet
     method deleteRule
     method insertRule
     method removeRule
+interface CSSSupportsRule
+    method constructor
+    method deleteRule
+    method insertRule
 interface CSSUnknownRule
     method constructor
 interface CSSViewportRule
@@ -258,6 +263,8 @@ interface ClientRect
 interface ClientRectList
     method constructor
     method item
+interface ClipboardEvent
+    method constructor
 interface CloseEvent
     method constructor
 interface Comment
@@ -673,6 +680,8 @@ interface HTMLContentElement
 interface HTMLDListElement
     method constructor
 interface HTMLDataListElement
+    method constructor
+interface HTMLDetailsElement
     method constructor
 interface HTMLDialogElement
     method close
@@ -1114,7 +1123,6 @@ interface Navigator
     method sendBeacon
     method unregisterProtocolHandler
     method vibrate
-    method webkitGetGamepads
     method webkitGetUserMedia
 interface Node
     attribute ATTRIBUTE_NODE
@@ -1285,6 +1293,8 @@ interface Promise
 interface RTCIceCandidate
     method constructor
 interface RTCSessionDescription
+    method constructor
+interface RadioNodeList
     method constructor
 interface Range
     attribute END_TO_END
@@ -1913,7 +1923,6 @@ interface ShadowRoot
     method cloneNode
     method constructor
     method elementFromPoint
-    method getElementById
     method getElementsByClassName
     method getElementsByTagName
     method getElementsByTagNameNS

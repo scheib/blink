@@ -35,7 +35,7 @@ WebInspector.ResourceWebSocketFrameView = function(request)
         {id: "data", title: WebInspector.UIString("Data"), sortable: false, weight: 88},
         {id: "length", title: WebInspector.UIString("Length"), sortable: false, align: WebInspector.DataGrid.Align.Right, weight: 5},
         {id: "time", title: WebInspector.UIString("Time"), sortable: true, weight: 7}
-    ]
+    ];
 
     this._dataGrid = new WebInspector.SortableDataGrid(columns, undefined, undefined, undefined, this._onContextMenu.bind(this));
     this._dataGrid.setStickToBottom(true);
@@ -138,7 +138,7 @@ WebInspector.ResourceWebSocketFrameView.prototype = {
      */
     _onContextMenu: function(contextMenu, node)
     {
-        contextMenu.appendItem(WebInspector.UIString(WebInspector.useLowerCaseMenuTitles() ? "Copy message" : "Copy Message"), this._copyMessage.bind(this, node.data));
+        contextMenu.appendItem(WebInspector.UIString.capitalize("Copy ^message"), this._copyMessage.bind(this, node.data));
     },
 
     /**

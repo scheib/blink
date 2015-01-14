@@ -266,14 +266,14 @@ WebInspector.StatusBarText.prototype = {
  * @constructor
  * @extends {WebInspector.StatusBarItem}
  * @param {string=} placeholder
- * @param {number=} width
+ * @param {number=} growFactor
  */
-WebInspector.StatusBarInput = function(placeholder, width)
+WebInspector.StatusBarInput = function(placeholder, growFactor)
 {
     WebInspector.StatusBarItem.call(this, createElementWithClass("input", "status-bar-item"));
     this.element.addEventListener("input", this._onChangeCallback.bind(this), false);
-    if (width)
-        this.element.style.width = width + "px";
+    if (growFactor)
+        this.element.style.flexGrow = growFactor;
     if (placeholder)
         this.element.setAttribute("placeholder", placeholder);
     this._value = "";
@@ -755,10 +755,9 @@ WebInspector.StatusBarComboBox.prototype = {
  */
 WebInspector.StatusBarCheckbox = function(text, title, setting)
 {
-    WebInspector.StatusBarItem.call(this, createElementWithClass("label", "checkbox"));
-    this.inputElement = this.element.createChild("input");
-    this.inputElement.type = "checkbox";
-    this.element.createTextChild(text);
+    WebInspector.StatusBarItem.call(this, createCheckboxLabel(text));
+    this.element.classList.add("checkbox");
+    this.inputElement = this.element.checkboxElement;
     if (title)
         this.element.title = title;
     if (setting)
@@ -811,7 +810,7 @@ WebInspector.StatusBarStatesSettingButton = function(className, states, titles, 
     this.setLongClickOptionsEnabled(this._createOptions.bind(this));
 
     this._currentState = null;
-    this.toggleState(initialState);
+    this._toggleState(initialState);
 }
 
 WebInspector.StatusBarStatesSettingButton.prototype = {
@@ -820,13 +819,13 @@ WebInspector.StatusBarStatesSettingButton.prototype = {
      */
     _onClick: function(e)
     {
-        this.toggleState(e.target.state());
+        this._toggleState(e.target.state());
     },
 
     /**
      * @param {string} state
      */
-    toggleState: function(state)
+    _toggleState: function(state)
     {
         if (this._currentState === state)
             return;
@@ -842,6 +841,14 @@ WebInspector.StatusBarStatesSettingButton.prototype = {
         var defaultState = this._defaultState();
         this.setState(defaultState);
         this.setTitle(this._buttons[this._states.indexOf(defaultState)].title());
+    },
+
+    /**
+     * Toggle state similarly to user click.
+     */
+    toggle: function()
+    {
+        this._toggleState(this.state());
     },
 
     /**

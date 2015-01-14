@@ -31,8 +31,6 @@
 #include "core/rendering/shapes/Shape.h"
 
 #include "core/css/BasicShapeFunctions.h"
-#include "core/dom/DOMArrayBuffer.h"
-#include "core/dom/DOMTypedArray.h"
 #include "core/fetch/ImageResource.h"
 #include "core/rendering/shapes/BoxShape.h"
 #include "core/rendering/shapes/PolygonShape.h"
@@ -41,11 +39,11 @@
 #include "core/rendering/style/RenderStyle.h"
 #include "core/svg/graphics/SVGImage.h"
 #include "platform/LengthFunctions.h"
+#include "platform/geometry/FloatRoundedRect.h"
 #include "platform/geometry/FloatSize.h"
 #include "platform/graphics/GraphicsContext.h"
 #include "platform/graphics/GraphicsTypes.h"
 #include "platform/graphics/ImageBuffer.h"
-#include "wtf/ArrayBufferContents.h"
 #include "wtf/MathExtras.h"
 #include "wtf/OwnPtr.h"
 
@@ -204,10 +202,7 @@ PassOwnPtr<Shape> Shape::createRasterShape(Image* image, float threshold, const 
         ImageObserverDisabler disabler(image);
         graphicsContext->drawImage(image, IntRect(IntPoint(), imageRect.size()));
 
-        WTF::ArrayBufferContents contents;
-        imageBuffer->getImageData(Unmultiplied, IntRect(IntPoint(), imageRect.size()), contents);
-        RefPtr<DOMArrayBuffer> arrayBuffer = DOMArrayBuffer::create(contents);
-        RefPtr<DOMUint8ClampedArray> pixelArray = DOMUint8ClampedArray::create(arrayBuffer, 0, arrayBuffer->byteLength());
+        RefPtr<Uint8ClampedArray> pixelArray = imageBuffer->getImageData(Unmultiplied, IntRect(IntPoint(), imageRect.size()));
         unsigned pixelArrayOffset = 3; // Each pixel is four bytes: RGBA.
         uint8_t alphaPixelThreshold = threshold * 255;
 
@@ -238,7 +233,7 @@ PassOwnPtr<Shape> Shape::createRasterShape(Image* image, float threshold, const 
     return rasterShape.release();
 }
 
-PassOwnPtr<Shape> Shape::createLayoutBoxShape(const RoundedRect& roundedRect, WritingMode writingMode, float margin)
+PassOwnPtr<Shape> Shape::createLayoutBoxShape(const FloatRoundedRect& roundedRect, WritingMode writingMode, float margin)
 {
     FloatRect rect(0, 0, roundedRect.rect().width(), roundedRect.rect().height());
     FloatRoundedRect bounds(rect, roundedRect.radii());

@@ -48,6 +48,7 @@
 #include "core/rendering/style/StyleGridData.h"
 #include "core/rendering/style/StyleGridItemData.h"
 #include "core/rendering/style/StyleInheritedData.h"
+#include "core/rendering/style/StyleMotionPath.h"
 #include "core/rendering/style/StyleMultiColData.h"
 #include "core/rendering/style/StyleRareInheritedData.h"
 #include "core/rendering/style/StyleRareNonInheritedData.h"
@@ -65,14 +66,14 @@
 #include "platform/fonts/FontBaseline.h"
 #include "platform/fonts/FontDescription.h"
 #include "platform/geometry/FloatRoundedRect.h"
-#include "platform/geometry/LayoutBoxExtent.h"
-#include "platform/geometry/RoundedRect.h"
+#include "platform/geometry/LayoutRectOutsets.h"
 #include "platform/graphics/Color.h"
 #include "platform/graphics/GraphicsTypes.h"
 #include "platform/scroll/ScrollableArea.h"
 #include "platform/text/TextDirection.h"
 #include "platform/text/UnicodeBidi.h"
 #include "platform/transforms/TransformOperations.h"
+#include "public/platform/WebScrollBlocksOn.h"
 #include "wtf/Forward.h"
 #include "wtf/OwnPtr.h"
 #include "wtf/RefCounted.h"
@@ -121,7 +122,7 @@ class RenderStyle: public RefCounted<RenderStyle> {
     friend class CSSPropertyEquality; // Used by CSS animations. We can't allow them to animate based off visited colors.
     friend class ApplyStyleCommand; // Editing has to only reveal unvisited info.
     friend class EditingStyle; // Editing has to only reveal unvisited info.
-    friend class CSSComputedStyleDeclaration; // Ignores visited styles, so needs to be able to see unvisited info.
+    friend class RenderStyleCSSValueMapping; // Needs to be able to see visited and unvisited colors for devtools.
     friend class StyleBuilderFunctions; // Sets color styles
     friend class CachedUAStyle; // Saves Border/Background information for later comparison.
 
@@ -398,12 +399,12 @@ public:
         return hasBackgroundImage();
     }
 
-    LayoutBoxExtent imageOutsets(const NinePieceImage&) const;
+    LayoutRectOutsets imageOutsets(const NinePieceImage&) const;
     bool hasBorderImageOutsets() const
     {
         return borderImage().hasImage() && borderImage().outset().nonZero();
     }
-    LayoutBoxExtent borderImageOutsets() const
+    LayoutRectOutsets borderImageOutsets() const
     {
         return imageOutsets(borderImage());
     }
@@ -688,7 +689,7 @@ public:
 
     short widows() const { return rareInheritedData->widows; }
     short orphans() const { return rareInheritedData->orphans; }
-    bool hasAutoWidows() const { return rareInheritedData->m_hasAutoWidows; }
+    bool hasAutoWidows() const { return rareInheritedData->widows == 1; }
     bool hasAutoOrphans() const { return rareInheritedData->m_hasAutoOrphans; }
     EPageBreak pageBreakInside() const { return static_cast<EPageBreak>(noninherited_flags.pageBreakInside); }
     EPageBreak pageBreakBefore() const { return static_cast<EPageBreak>(noninherited_flags.pageBreakBefore); }
@@ -704,8 +705,6 @@ public:
     }
 
     ShadowList* textShadow() const { return rareInheritedData->textShadow.get(); }
-    void getTextShadowInlineDirectionExtent(LayoutUnit& logicalLeft, LayoutUnit& logicalRight) { getShadowInlineDirectionExtent(textShadow(), logicalLeft, logicalRight); }
-    void getTextShadowBlockDirectionExtent(LayoutUnit& logicalTop, LayoutUnit& logicalBottom) { getShadowBlockDirectionExtent(textShadow(), logicalTop, logicalBottom); }
 
     float textStrokeWidth() const { return rareInheritedData->textStrokeWidth; }
     float opacity() const { return rareNonInheritedData->opacity; }
@@ -767,9 +766,6 @@ public:
     const GridPosition& gridRowEnd() const { return rareNonInheritedData->m_gridItem->m_gridRowEnd; }
 
     ShadowList* boxShadow() const { return rareNonInheritedData->m_boxShadow.get(); }
-    void getBoxShadowExtent(LayoutUnit& top, LayoutUnit& right, LayoutUnit& bottom, LayoutUnit& left) const { getShadowExtent(boxShadow(), top, right, bottom, left); }
-    void getBoxShadowInlineDirectionExtent(LayoutUnit& logicalLeft, LayoutUnit& logicalRight) { getShadowInlineDirectionExtent(boxShadow(), logicalLeft, logicalRight); }
-    void getBoxShadowBlockDirectionExtent(LayoutUnit& logicalTop, LayoutUnit& logicalBottom) { getShadowBlockDirectionExtent(boxShadow(), logicalTop, logicalBottom); }
 
     EBoxDecorationBreak boxDecorationBreak() const { return m_box->boxDecorationBreak(); }
     StyleReflection* boxReflect() const { return rareNonInheritedData->m_boxReflect.get(); }
@@ -823,8 +819,14 @@ public:
     const Length& transformOriginX() const { return transformOrigin().x(); }
     const Length& transformOriginY() const { return transformOrigin().y(); }
     float transformOriginZ() const { return transformOrigin().z(); }
-    bool hasTransform() const { return !rareNonInheritedData->m_transform->m_operations.operations().isEmpty(); }
+    bool hasTransform() const { return hasTransformOperations() || hasMotionPath(); }
     bool transformDataEquivalent(const RenderStyle& otherStyle) const { return rareNonInheritedData->m_transform == otherStyle.rareNonInheritedData->m_transform; }
+
+    StyleMotionPath* motionPath() const { return rareNonInheritedData->m_transform->m_motion.m_path.get(); }
+    bool hasMotionPath() const { return rareNonInheritedData->m_transform->m_motion.m_path; }
+    const Length& motionPosition() const { return rareNonInheritedData->m_transform->m_motion.m_position; }
+    float motionRotation() const { return rareNonInheritedData->m_transform->m_motion.m_rotation; }
+    MotionRotationType motionRotationType() const { return rareNonInheritedData->m_transform->m_motion.m_rotationType; }
 
     TextEmphasisFill textEmphasisFill() const { return static_cast<TextEmphasisFill>(rareInheritedData->textEmphasisFill); }
     TextEmphasisMark textEmphasisMark() const;
@@ -839,13 +841,14 @@ public:
     ObjectFit objectFit() const { return static_cast<ObjectFit>(rareNonInheritedData->m_objectFit); }
     LengthPoint objectPosition() const { return rareNonInheritedData->m_objectPosition; }
 
-    // Return true if any transform related property (currently transform, transformStyle3D or perspective)
+    // Return true if any transform related property (currently transform/motionPath, transformStyle3D or perspective)
     // indicates that we are transforming
     bool hasTransformRelatedProperty() const { return hasTransform() || preserves3D() || hasPerspective(); }
 
     enum ApplyTransformOrigin { IncludeTransformOrigin, ExcludeTransformOrigin };
-    void applyTransform(TransformationMatrix&, const LayoutSize& borderBoxSize, ApplyTransformOrigin = IncludeTransformOrigin) const;
-    void applyTransform(TransformationMatrix&, const FloatRect& boundingBox, ApplyTransformOrigin = IncludeTransformOrigin) const;
+    enum ApplyMotionPath { IncludeMotionPath, ExcludeMotionPath };
+    void applyTransform(TransformationMatrix&, const LayoutSize& borderBoxSize, ApplyTransformOrigin = IncludeTransformOrigin, ApplyMotionPath = IncludeMotionPath) const;
+    void applyTransform(TransformationMatrix&, const FloatRect& boundingBox, ApplyTransformOrigin = IncludeTransformOrigin, ApplyMotionPath = IncludeMotionPath) const;
 
     bool hasMask() const { return rareNonInheritedData->m_mask.hasImage() || rareNonInheritedData->m_maskBoxImage.hasImage(); }
 
@@ -917,7 +920,8 @@ public:
     TouchAction touchAction() const { return static_cast<TouchAction>(rareNonInheritedData->m_touchAction); }
 
     ScrollBehavior scrollBehavior() const { return static_cast<ScrollBehavior>(rareNonInheritedData->m_scrollBehavior); }
-    ScrollBlocksOn scrollBlocksOn() const { return static_cast<ScrollBlocksOn>(rareNonInheritedData->m_scrollBlocksOn); }
+    WebScrollBlocksOn scrollBlocksOn() const { return static_cast<WebScrollBlocksOn>(rareNonInheritedData->m_scrollBlocksOn); }
+    bool hasScrollBlocksOn() const { return scrollBlocksOn() != WebScrollBlocksOnNone; }
 
     const Vector<CSSPropertyID>& willChangeProperties() const { return rareNonInheritedData->m_willChange->m_properties; }
     bool willChangeContents() const { return rareNonInheritedData->m_willChange->m_contents; }
@@ -1013,10 +1017,10 @@ public:
         setBorderRadius(LengthSize(Length(s.width(), Fixed), Length(s.height(), Fixed)));
     }
 
-    RoundedRect getRoundedBorderFor(const LayoutRect& borderRect, bool includeLogicalLeftEdge = true, bool includeLogicalRightEdge = true) const;
-    RoundedRect getRoundedInnerBorderFor(const LayoutRect& borderRect, bool includeLogicalLeftEdge = true, bool includeLogicalRightEdge = true) const;
+    FloatRoundedRect getRoundedBorderFor(const LayoutRect& borderRect, bool includeLogicalLeftEdge = true, bool includeLogicalRightEdge = true) const;
+    FloatRoundedRect getRoundedInnerBorderFor(const LayoutRect& borderRect, bool includeLogicalLeftEdge = true, bool includeLogicalRightEdge = true) const;
 
-    RoundedRect getRoundedInnerBorderFor(const LayoutRect& borderRect,
+    FloatRoundedRect getRoundedInnerBorderFor(const LayoutRect& borderRect,
         int topWidth, int bottomWidth, int leftWidth, int rightWidth, bool includeLogicalLeftEdge, bool includeLogicalRightEdge) const;
 
     void setBorderLeftWidth(unsigned v) { SET_VAR(surround, border.m_left.m_width, v); }
@@ -1169,8 +1173,8 @@ public:
     int zIndex() const { return m_box->zIndex(); }
     void setZIndex(int v) { SET_VAR(m_box, m_hasAutoZIndex, false); SET_VAR(m_box, m_zIndex, v); }
 
-    void setHasAutoWidows() { SET_VAR(rareInheritedData, m_hasAutoWidows, true); SET_VAR(rareInheritedData, widows, initialWidows()); }
-    void setWidows(short w) { SET_VAR(rareInheritedData, m_hasAutoWidows, false); SET_VAR(rareInheritedData, widows, w); }
+    void setHasAutoWidows() { SET_VAR(rareInheritedData, widows, initialWidows()); }
+    void setWidows(short w) { SET_VAR(rareInheritedData, widows, w); }
 
     void setHasAutoOrphans() { SET_VAR(rareInheritedData, m_hasAutoOrphans, true); SET_VAR(rareInheritedData, orphans, initialOrphans()); }
     void setOrphans(short o) { SET_VAR(rareInheritedData, m_hasAutoOrphans, false); SET_VAR(rareInheritedData, orphans, o); }
@@ -1285,6 +1289,12 @@ public:
     void setTextEmphasisPosition(TextEmphasisPosition position) { SET_VAR(rareInheritedData, textEmphasisPosition, position); }
     bool setTextOrientation(TextOrientation);
 
+    void setMotionPath(PassRefPtr<StyleMotionPath>);
+    void resetMotionPath();
+    void setMotionPosition(const Length& motionPosition) { SET_VAR(rareNonInheritedData.access()->m_transform, m_motion.m_position, motionPosition); }
+    void setMotionRotation(float motionRotation) { SET_VAR(rareNonInheritedData.access()->m_transform, m_motion.m_rotation, motionRotation); }
+    void setMotionRotationType(MotionRotationType motionRotationType) { SET_VAR(rareNonInheritedData.access()->m_transform, m_motion.m_rotationType, motionRotationType); }
+
     void setObjectFit(ObjectFit f) { SET_VAR(rareNonInheritedData, m_objectFit, f); }
     void setObjectPosition(LengthPoint position) { SET_VAR(rareNonInheritedData, m_objectPosition, position); }
 
@@ -1327,7 +1337,7 @@ public:
     void setTouchAction(TouchAction t) { SET_VAR(rareNonInheritedData, m_touchAction, t); }
 
     void setScrollBehavior(ScrollBehavior b) { SET_VAR(rareNonInheritedData, m_scrollBehavior, b); }
-    void setScrollBlocksOn(ScrollBlocksOn b) { SET_VAR(rareNonInheritedData, m_scrollBlocksOn, b); }
+    void setScrollBlocksOn(WebScrollBlocksOn b) { SET_VAR(rareNonInheritedData, m_scrollBlocksOn, b); }
 
     void setWillChangeProperties(const Vector<CSSPropertyID>& properties) { SET_VAR(rareNonInheritedData.access()->m_willChange, m_properties, properties); }
     void setWillChangeContents(bool b) { SET_VAR(rareNonInheritedData.access()->m_willChange, m_contents, b); }
@@ -1506,7 +1516,7 @@ public:
     static TextIndentLine initialTextIndentLine() { return TextIndentFirstLine; }
     static TextIndentType initialTextIndentType() { return TextIndentNormal; }
     static EVerticalAlign initialVerticalAlign() { return BASELINE; }
-    static short initialWidows() { return 2; }
+    static short initialWidows() { return 1; }
     static short initialOrphans() { return 2; }
     static Length initialLineHeight() { return Length(-100.0, Percent); }
     static ETextAlign initialTextAlign() { return TASTART; }
@@ -1575,6 +1585,10 @@ public:
     static TransformOrigin initialTransformOrigin() { return TransformOrigin(Length(50.0, Percent), Length(50.0, Percent), 0); }
     static EPointerEvents initialPointerEvents() { return PE_AUTO; }
     static ETransformStyle3D initialTransformStyle3D() { return TransformStyle3DFlat; }
+    static const StyleMotionPath* initialMotionPath() { return nullptr; }
+    static Length initialMotionPosition() { return Length(0, Fixed); }
+    static float initialMotionRotation() { return 0; }
+    static MotionRotationType initialMotionRotationType() { return MotionRotationAuto; }
     static EBackfaceVisibility initialBackfaceVisibility() { return BackfaceVisibilityVisible; }
     static float initialPerspective() { return 0; }
     static Length initialPerspectiveOriginX() { return Length(50.0, Percent); }
@@ -1599,7 +1613,7 @@ public:
     static ShadowList* initialBoxShadow() { return 0; }
     static ShadowList* initialTextShadow() { return 0; }
     static ScrollBehavior initialScrollBehavior() { return ScrollBehaviorAuto; }
-    static ScrollBlocksOn initialScrollBlocksOn() { return ScrollBlocksOnNone; }
+    static WebScrollBlocksOn initialScrollBlocksOn() { return WebScrollBlocksOnNone; }
 
     // The initial value is 'none' for grid tracks.
     static Vector<GridTrackSize> initialGridTemplateColumns() { return Vector<GridTrackSize>(); }
@@ -1659,17 +1673,6 @@ private:
     void setVisitedLinkTextStrokeColor(const StyleColor& v) { SET_VAR_WITH_SETTER(rareInheritedData, visitedLinkTextStrokeColor, setVisitedLinkTextStrokeColor, v); }
 
     void inheritUnicodeBidiFrom(const RenderStyle* parent) { noninherited_flags.unicodeBidi = parent->noninherited_flags.unicodeBidi; }
-    void getShadowExtent(const ShadowList*, LayoutUnit& top, LayoutUnit& right, LayoutUnit& bottom, LayoutUnit& left) const;
-    void getShadowHorizontalExtent(const ShadowList*, LayoutUnit& left, LayoutUnit& right) const;
-    void getShadowVerticalExtent(const ShadowList*, LayoutUnit& top, LayoutUnit& bottom) const;
-    void getShadowInlineDirectionExtent(const ShadowList* shadow, LayoutUnit& logicalLeft, LayoutUnit& logicalRight) const
-    {
-        return isHorizontalWritingMode() ? getShadowHorizontalExtent(shadow, logicalLeft, logicalRight) : getShadowVerticalExtent(shadow, logicalLeft, logicalRight);
-    }
-    void getShadowBlockDirectionExtent(const ShadowList* shadow, LayoutUnit& logicalTop, LayoutUnit& logicalBottom) const
-    {
-        return isHorizontalWritingMode() ? getShadowVerticalExtent(shadow, logicalTop, logicalBottom) : getShadowHorizontalExtent(shadow, logicalTop, logicalBottom);
-    }
 
     bool isDisplayFlexibleBox(EDisplay display) const
     {
@@ -1727,6 +1730,8 @@ private:
 
     void appendContent(PassOwnPtr<ContentData>);
     void addAppliedTextDecoration(const AppliedTextDecoration&);
+    bool hasTransformOperations() const { return !rareNonInheritedData->m_transform->m_operations.operations().isEmpty(); }
+    void applyMotionPathTransform(TransformationMatrix&) const;
 
     bool diffNeedsFullLayoutAndPaintInvalidation(const RenderStyle& other) const;
     bool diffNeedsFullLayout(const RenderStyle& other) const;

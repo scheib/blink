@@ -12,8 +12,6 @@
 namespace blink {
 
 class Blob;
-class DOMArrayBufferView;
-class DOMFormData;
 class ExceptionState;
 class ExecutionContext;
 class KURL;
@@ -25,6 +23,8 @@ public:
     static NavigatorBeacon& from(Navigator&);
 
     static bool sendBeacon(ExecutionContext*, Navigator&, const String&, const ArrayBufferViewOrBlobOrStringOrFormData&, ExceptionState&);
+
+    virtual void trace(Visitor*) override;
 
 private:
     explicit NavigatorBeacon(Navigator&);

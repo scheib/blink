@@ -33,14 +33,16 @@
  * @implements {WebInspector.CSSSourceMapping}
  * @param {!WebInspector.CSSStyleModel} cssModel
  * @param {!WebInspector.Workspace} workspace
+ * @param {!WebInspector.NetworkMapping} networkMapping
  */
-WebInspector.StylesSourceMapping = function(cssModel, workspace)
+WebInspector.StylesSourceMapping = function(cssModel, workspace, networkMapping)
 {
     this._cssModel = cssModel;
     this._workspace = workspace;
     this._workspace.addEventListener(WebInspector.Workspace.Events.ProjectRemoved, this._projectRemoved, this);
     this._workspace.addEventListener(WebInspector.Workspace.Events.UISourceCodeAdded, this._uiSourceCodeAddedToWorkspace, this);
     this._workspace.addEventListener(WebInspector.Workspace.Events.UISourceCodeRemoved, this._uiSourceCodeRemoved, this);
+    this._networkMapping = networkMapping;
 
     cssModel.target().resourceTreeModel.addEventListener(WebInspector.ResourceTreeModel.EventTypes.MainFrameNavigated, this._mainFrameNavigated, this);
 
@@ -59,7 +61,7 @@ WebInspector.StylesSourceMapping.prototype = {
     rawLocationToUILocation: function(rawLocation)
     {
         var location = /** @type WebInspector.CSSLocation */ (rawLocation);
-        var uiSourceCode = this._workspace.uiSourceCodeForURL(location.url);
+        var uiSourceCode = this._networkMapping.uiSourceCodeForURL(location.url);
         if (!uiSourceCode)
             return null;
         return uiSourceCode.uiLocation(location.lineNumber, location.columnNumber);
@@ -74,7 +76,8 @@ WebInspector.StylesSourceMapping.prototype = {
      */
     uiLocationToRawLocation: function(uiSourceCode, lineNumber, columnNumber)
     {
-        return new WebInspector.CSSLocation(this._cssModel.target(), null, uiSourceCode.url || "", lineNumber, columnNumber);
+        var networkURL = this._networkMapping.networkURL(uiSourceCode);
+        return new WebInspector.CSSLocation(this._cssModel.target(), null, networkURL || "", lineNumber, columnNumber);
     },
 
     /**
@@ -126,7 +129,7 @@ WebInspector.StylesSourceMapping.prototype = {
             map.set(header.frameId, headersById);
         }
         headersById.set(header.id, header);
-        var uiSourceCode = this._workspace.uiSourceCodeForURL(url);
+        var uiSourceCode = this._networkMapping.uiSourceCodeForURL(url);
         if (uiSourceCode)
             this._bindUISourceCode(uiSourceCode, header);
     },
@@ -150,7 +153,7 @@ WebInspector.StylesSourceMapping.prototype = {
             map.remove(header.frameId);
             if (!map.size) {
                 delete this._urlToHeadersByFrameId[url];
-                var uiSourceCode = this._workspace.uiSourceCodeForURL(url);
+                var uiSourceCode = this._networkMapping.uiSourceCodeForURL(url);
                 if (uiSourceCode)
                     this._unbindUISourceCode(uiSourceCode);
             }
@@ -175,10 +178,10 @@ WebInspector.StylesSourceMapping.prototype = {
     _uiSourceCodeAddedToWorkspace: function(event)
     {
         var uiSourceCode = /** @type {!WebInspector.UISourceCode} */ (event.data);
-        var url = uiSourceCode.url;
-        if (!url || !this._urlToHeadersByFrameId[url])
+        var networkURL = this._networkMapping.networkURL(uiSourceCode);
+        if (!networkURL || !this._urlToHeadersByFrameId[networkURL])
             return;
-        this._bindUISourceCode(uiSourceCode, this._urlToHeadersByFrameId[url].valuesArray()[0].valuesArray()[0]);
+        this._bindUISourceCode(uiSourceCode, this._urlToHeadersByFrameId[networkURL].valuesArray()[0].valuesArray()[0]);
     },
 
     /**
@@ -189,7 +192,6 @@ WebInspector.StylesSourceMapping.prototype = {
     {
         if (this._styleFiles.get(uiSourceCode) || header.isInline)
             return;
-        var url = uiSourceCode.url;
         this._styleFiles.set(uiSourceCode, new WebInspector.StyleFile(uiSourceCode, this));
         WebInspector.cssWorkspaceBinding.updateLocations(header);
     },
@@ -228,7 +230,7 @@ WebInspector.StylesSourceMapping.prototype = {
     _mainFrameNavigated: function(event)
     {
         for (var url in this._urlToHeadersByFrameId) {
-            var uiSourceCode = this._workspace.uiSourceCodeForURL(url);
+            var uiSourceCode = this._networkMapping.uiSourceCodeForURL(url);
             if (!uiSourceCode)
                 continue;
             this._unbindUISourceCode(uiSourceCode);
@@ -244,9 +246,10 @@ WebInspector.StylesSourceMapping.prototype = {
      */
     _setStyleContent: function(uiSourceCode, content, majorChange, userCallback)
     {
-        var styleSheetIds = this._cssModel.styleSheetIdsForURL(uiSourceCode.url);
+        var networkURL = this._networkMapping.networkURL(uiSourceCode);
+        var styleSheetIds = this._cssModel.styleSheetIdsForURL(networkURL);
         if (!styleSheetIds.length) {
-            userCallback("No stylesheet found: " + uiSourceCode.url);
+            userCallback("No stylesheet found: " + networkURL);
             return;
         }
 
@@ -307,7 +310,7 @@ WebInspector.StylesSourceMapping.prototype = {
         var styleSheetURL = header.resourceURL();
         if (!styleSheetURL)
             return;
-        var uiSourceCode = this._workspace.uiSourceCodeForURL(styleSheetURL)
+        var uiSourceCode = this._networkMapping.uiSourceCodeForURL(styleSheetURL);
         if (!uiSourceCode)
             return;
         header.requestContent(callback.bind(this, uiSourceCode));

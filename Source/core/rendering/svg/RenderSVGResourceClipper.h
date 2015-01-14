@@ -23,9 +23,9 @@
 #include "core/rendering/svg/RenderSVGResourceContainer.h"
 #include "core/svg/SVGClipPathElement.h"
 
-namespace blink {
+class SkPicture;
 
-class Picture;
+namespace blink {
 
 class RenderSVGResourceClipper final : public RenderSVGResourceContainer {
 public:
@@ -69,7 +69,7 @@ private:
     void createPicture(GraphicsContext*);
     void calculateClipContentPaintInvalidationRect();
 
-    RefPtr<Picture> m_clipContentPicture;
+    RefPtr<const SkPicture> m_clipContentPicture;
     FloatRect m_clipBoundaries;
 
     // Reference cycle detection.

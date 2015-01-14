@@ -33,6 +33,7 @@
 
 #include "../platform/WebCanvas.h"
 #include "../platform/WebCommon.h"
+#include "../platform/WebFloatSize.h"
 #include "../platform/WebPoint.h"
 #include "../platform/WebRect.h"
 #include "../platform/WebSize.h"
@@ -91,7 +92,7 @@ public:
     // FIXME: Remove this function once Chrome side patch lands.
     void animate(double monotonicFrameBeginTime)
     {
-        beginFrame(WebBeginFrameArgs(monotonicFrameBeginTime));
+        beginFrame(WebBeginFrameArgs(monotonicFrameBeginTime, 0, 0));
     }
     virtual void beginFrame(const WebBeginFrameArgs& frameTime) { }
 
@@ -149,6 +150,7 @@ public:
     virtual void applyViewportDeltas(
         const WebSize& pinchViewportDelta,
         const WebSize& mainFrameDelta,
+        const WebFloatSize& elasticOverscrollDelta,
         float scaleFactor,
         float topControlsDelta) { }
 
@@ -228,6 +230,8 @@ public:
     // to render its contents.
     virtual bool isAcceleratedCompositingActive() const { return false; }
 
+    // Returns true if the WebWidget created is of type WebView.
+    virtual bool isWebView() const { return false; }
     // Returns true if the WebWidget created is of type WebPagePopup.
     virtual bool isPagePopup() const { return false; }
     // Returns true if the WebWidget created is of type WebPopupMenu.

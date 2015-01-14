@@ -22,6 +22,9 @@ callback CustomElementConstructor = Element ();
 
 typedef (CanvasRenderingContext2D or WebGLRenderingContext) RenderingContext;
 
+// http://www.w3.org/TR/page-visibility/#VisibilityState
+enum VisibilityState { "hidden", "visible", "prerender", "unloaded" };
+
 interface Document : Node {
 
     // DOM Level 1 Core
@@ -93,15 +96,12 @@ interface Document : Node {
 
     // Common extensions
     [CustomElementCallbacks]
-    boolean            execCommand([Default=Undefined] optional DOMString command,
-                                   [Default=Undefined] optional boolean userInterface,
-                                   [TreatUndefinedAs=NullString, Default=Undefined] optional DOMString? value);
-
-    boolean            queryCommandEnabled([Default=Undefined] optional DOMString command);
-    boolean            queryCommandIndeterm([Default=Undefined] optional DOMString command);
-    boolean            queryCommandState([Default=Undefined] optional DOMString command);
-    boolean            queryCommandSupported([Default=Undefined] optional DOMString command);
-    DOMString          queryCommandValue([Default=Undefined] optional DOMString command);
+    boolean execCommand(DOMString command, optional boolean showUI = false, optional DOMString value = "");
+    boolean queryCommandEnabled(DOMString command);
+    boolean queryCommandIndeterm(DOMString command);
+    boolean queryCommandState(DOMString command);
+    boolean queryCommandSupported(DOMString command);
+    DOMString queryCommandValue(DOMString command);
 
     // Moved down from HTMLDocument
              [TreatNullAs=NullString, CustomElementCallbacks] attribute DOMString dir;
@@ -135,8 +135,7 @@ interface Document : Node {
     [MeasureAs=DocumentDefaultCharset, TreatReturnedNullStringAs=Undefined] readonly attribute DOMString defaultCharset;
     [TreatReturnedNullStringAs=Undefined] readonly attribute DOMString readyState;
 
-    Element            elementFromPoint([Default=Undefined] optional long x,
-                                        [Default=Undefined] optional long y);
+    Element            elementFromPoint(long x, long y);
     [MeasureAs=DocumentCaretRangeFromPoint]
     Range              caretRangeFromPoint([Default=Undefined] optional long x,
                                            [Default=Undefined] optional long y);
@@ -200,7 +199,7 @@ interface Document : Node {
     [CustomElementCallbacks, RaisesException] Element createElementNS(DOMString? namespaceURI, DOMString qualifiedName, DOMString? typeExtension);
 
     // Page visibility API.
-    readonly attribute DOMString visibilityState;
+    readonly attribute VisibilityState visibilityState;
     readonly attribute boolean hidden;
 
     // Deprecated prefixed page visibility API.

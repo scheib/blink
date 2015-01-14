@@ -121,7 +121,7 @@ DocumentWebSocketChannel::DocumentWebSocketChannel(ExecutionContext* context, We
     , m_sourceURLAtConstruction(sourceURL)
     , m_lineNumberAtConstruction(lineNumber)
 {
-    if (context->isDocument() && toDocument(context)->page())
+    if (context->isDocument())
         m_identifier = createUniqueIdentifier();
 }
 
@@ -137,7 +137,7 @@ bool DocumentWebSocketChannel::connect(const KURL& url, const String& protocol)
         return false;
 
     if (executionContext()->isDocument() && document()->frame()) {
-        if (!document()->frame()->loader().mixedContentChecker()->canConnectInsecureWebSocket(document()->securityOrigin(), url))
+        if (MixedContentChecker::shouldBlockConnection(document()->frame(), url))
             return false;
     }
     if (MixedContentChecker::isMixedContent(document()->securityOrigin(), url)) {
@@ -592,6 +592,7 @@ void DocumentWebSocketChannel::trace(Visitor* visitor)
     visitor->trace(m_blobLoader);
     visitor->trace(m_client);
     WebSocketChannel::trace(visitor);
+    ContextLifecycleObserver::trace(visitor);
 }
 
 } // namespace blink

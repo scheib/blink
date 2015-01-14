@@ -1306,7 +1306,7 @@ StringMultimap.prototype = {
         var values = this.get(key);
         values.remove(value);
         if (!values.size)
-            this._map.remove(key)
+            this._map.remove(key);
     },
 
     /**
@@ -1314,7 +1314,7 @@ StringMultimap.prototype = {
      */
     removeAll: function(key)
     {
-        this._map.remove(key)
+        this._map.remove(key);
     },
 
     /**
@@ -1434,4 +1434,19 @@ self.setImmediate = function(callback)
 {
     Promise.resolve().then(callback);
     return 0;
+}
+
+/**
+ * @param {function(...[?])} callback
+ * @return {!Promise.<T>}
+ * @template T
+ */
+Promise.prototype.spread = function(callback)
+{
+    return this.then(spreadPromise);
+
+    function spreadPromise(arg)
+    {
+        return callback.apply(null, arg);
+    }
 }

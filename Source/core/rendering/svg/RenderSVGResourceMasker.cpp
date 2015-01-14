@@ -24,8 +24,8 @@
 #include "core/rendering/svg/SVGRenderingContext.h"
 #include "core/svg/SVGElement.h"
 #include "platform/graphics/GraphicsContextStateSaver.h"
-#include "platform/graphics/Picture.h"
 #include "platform/transforms/AffineTransform.h"
+#include "third_party/skia/include/core/SkPicture.h"
 
 namespace blink {
 
@@ -117,7 +117,7 @@ void RenderSVGResourceMasker::drawMaskForRenderer(GraphicsContext* context, cons
         SubtreeContentTransformScope contentTransformScope(contentTransformation);
         createPicture(context);
     }
-    ASSERT(m_maskContentPicture);
+
     context->drawPicture(m_maskContentPicture.get());
 }
 

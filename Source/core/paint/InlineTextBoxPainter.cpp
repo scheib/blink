@@ -13,7 +13,7 @@
 #include "core/editing/InputMethodController.h"
 #include "core/frame/LocalFrame.h"
 #include "core/paint/BoxPainter.h"
-#include "core/paint/DrawingRecorder.h"
+#include "core/paint/RenderDrawingRecorder.h"
 #include "core/paint/TextPainter.h"
 #include "core/rendering/InlineTextBox.h"
 #include "core/rendering/PaintInfo.h"
@@ -73,9 +73,12 @@ void InlineTextBoxPainter::paint(const PaintInfo& paintInfo, const LayoutPoint& 
 
     // The text clip phase already has a DrawingRecorder. Text clips are initiated only in BoxPainter::paintLayerExtended, which is already
     // within a DrawingRecorder.
-    OwnPtr<DrawingRecorder> drawingRecorder;
-    if (RuntimeEnabledFeatures::slimmingPaintEnabled() && paintInfo.phase != PaintPhaseTextClip)
-        drawingRecorder = adoptPtr(new DrawingRecorder(paintInfo.context, &m_inlineTextBox.renderer(), paintInfo.phase, pixelSnappedIntRect(adjustedPaintOffset, logicalVisualOverflow.size())));
+    OwnPtr<RenderDrawingRecorder> drawingRecorder;
+    if (RuntimeEnabledFeatures::slimmingPaintEnabled() && paintInfo.phase != PaintPhaseTextClip) {
+        drawingRecorder = adoptPtr(new RenderDrawingRecorder(paintInfo.context, m_inlineTextBox.renderer(), paintInfo.phase, pixelSnappedIntRect(adjustedPaintOffset, logicalVisualOverflow.size())));
+        if (drawingRecorder->canUseCachedDrawing())
+            return;
+    }
 
     if (m_inlineTextBox.truncation() != cNoTruncation) {
         if (m_inlineTextBox.renderer().containingBlock()->style()->isLeftToRightDirection() != m_inlineTextBox.isLeftToRightDirection()) {
@@ -98,7 +101,7 @@ void InlineTextBoxPainter::paint(const PaintInfo& paintInfo, const LayoutPoint& 
     GraphicsContext* context = paintInfo.context;
     RenderStyle* styleToUse = m_inlineTextBox.renderer().style(m_inlineTextBox.isFirstLineStyle());
 
-    adjustedPaintOffset.move(0, styleToUse->isHorizontalWritingMode() ? 0 : -m_inlineTextBox.logicalHeight());
+    adjustedPaintOffset.move(0, styleToUse->isHorizontalWritingMode() ? LayoutUnit() : -m_inlineTextBox.logicalHeight().toLayoutUnit());
 
     FloatPoint boxOrigin = m_inlineTextBox.locationIncludingFlipping();
     boxOrigin.move(adjustedPaintOffset.x().toFloat(), adjustedPaintOffset.y().toFloat());
@@ -146,6 +149,7 @@ void InlineTextBoxPainter::paint(const PaintInfo& paintInfo, const LayoutPoint& 
     StringView string;
     if (!combinedText) {
         string = m_inlineTextBox.renderer().text().createView();
+        ASSERT(m_inlineTextBox.start() + length <= string.length());
         if (static_cast<unsigned>(length) != string.length() || m_inlineTextBox.start())
             string.narrow(m_inlineTextBox.start(), length);
         maximumLength = m_inlineTextBox.renderer().textLength() - m_inlineTextBox.start();
@@ -749,7 +753,7 @@ void InlineTextBoxPainter::paintCompositionUnderline(GraphicsContext* ctx, const
     float start = paintStart == static_cast<unsigned>(m_inlineTextBox.start()) ? 0 :
         m_inlineTextBox.renderer().width(m_inlineTextBox.start(), paintStart - m_inlineTextBox.start(), m_inlineTextBox.textPos(), m_inlineTextBox.isLeftToRightDirection() ? LTR : RTL, m_inlineTextBox.isFirstLineStyle());
     // how much line to draw
-    float width = (paintStart == static_cast<unsigned>(m_inlineTextBox.start()) && paintEnd == static_cast<unsigned>(m_inlineTextBox.end()) + 1) ? m_inlineTextBox.logicalWidth() :
+    float width = (paintStart == static_cast<unsigned>(m_inlineTextBox.start()) && paintEnd == static_cast<unsigned>(m_inlineTextBox.end()) + 1) ? m_inlineTextBox.logicalWidth().toFloat() :
         m_inlineTextBox.renderer().width(paintStart, paintEnd - paintStart, m_inlineTextBox.textPos() + start, m_inlineTextBox.isLeftToRightDirection() ? LTR : RTL, m_inlineTextBox.isFirstLineStyle());
 
     // Thick marked text underlines are 2px thick as long as there is room for the 2px line under the baseline.

@@ -14,11 +14,13 @@
 
 namespace blink {
 
+class DOMUint8Array;
 class Node;
 class NodeList;
 class TestArrayBuffer;
 class TestArrayBufferView;
 class TestDictionary;
+class TestInterface2;
 class TestInterfaceEmpty;
 class TestInterfaceGarbageCollected;
 class TestInterfaceImplementation;
@@ -55,15 +57,15 @@ private:
     RefPtr<TestArrayBufferView> m_arrayBufferView;
     Dictionary m_dictionary;
 
-    friend v8::Handle<v8::Value> toV8(const ArrayBufferOrArrayBufferViewOrDictionary&, v8::Handle<v8::Object>, v8::Isolate*);
+    friend v8::Local<v8::Value> toV8(const ArrayBufferOrArrayBufferViewOrDictionary&, v8::Local<v8::Object>, v8::Isolate*);
 };
 
 class V8ArrayBufferOrArrayBufferViewOrDictionary final {
 public:
-    static void toImpl(v8::Isolate*, v8::Handle<v8::Value>, ArrayBufferOrArrayBufferViewOrDictionary&, ExceptionState&);
+    static void toImpl(v8::Isolate*, v8::Local<v8::Value>, ArrayBufferOrArrayBufferViewOrDictionary&, ExceptionState&);
 };
 
-v8::Handle<v8::Value> toV8(const ArrayBufferOrArrayBufferViewOrDictionary&, v8::Handle<v8::Object>, v8::Isolate*);
+v8::Local<v8::Value> toV8(const ArrayBufferOrArrayBufferViewOrDictionary&, v8::Local<v8::Object>, v8::Isolate*);
 
 template <class CallbackInfo>
 inline void v8SetReturnValue(const CallbackInfo& callbackInfo, ArrayBufferOrArrayBufferViewOrDictionary& impl)
@@ -73,7 +75,7 @@ inline void v8SetReturnValue(const CallbackInfo& callbackInfo, ArrayBufferOrArra
 
 template <>
 struct NativeValueTraits<ArrayBufferOrArrayBufferViewOrDictionary> {
-    static ArrayBufferOrArrayBufferViewOrDictionary nativeValue(const v8::Handle<v8::Value>&, v8::Isolate*, ExceptionState&);
+    static ArrayBufferOrArrayBufferViewOrDictionary nativeValue(const v8::Local<v8::Value>&, v8::Isolate*, ExceptionState&);
 };
 
 class BooleanOrStringOrUnrestrictedDouble final {
@@ -107,15 +109,15 @@ private:
     String m_string;
     double m_unrestrictedDouble;
 
-    friend v8::Handle<v8::Value> toV8(const BooleanOrStringOrUnrestrictedDouble&, v8::Handle<v8::Object>, v8::Isolate*);
+    friend v8::Local<v8::Value> toV8(const BooleanOrStringOrUnrestrictedDouble&, v8::Local<v8::Object>, v8::Isolate*);
 };
 
 class V8BooleanOrStringOrUnrestrictedDouble final {
 public:
-    static void toImpl(v8::Isolate*, v8::Handle<v8::Value>, BooleanOrStringOrUnrestrictedDouble&, ExceptionState&);
+    static void toImpl(v8::Isolate*, v8::Local<v8::Value>, BooleanOrStringOrUnrestrictedDouble&, ExceptionState&);
 };
 
-v8::Handle<v8::Value> toV8(const BooleanOrStringOrUnrestrictedDouble&, v8::Handle<v8::Object>, v8::Isolate*);
+v8::Local<v8::Value> toV8(const BooleanOrStringOrUnrestrictedDouble&, v8::Local<v8::Object>, v8::Isolate*);
 
 template <class CallbackInfo>
 inline void v8SetReturnValue(const CallbackInfo& callbackInfo, BooleanOrStringOrUnrestrictedDouble& impl)
@@ -125,7 +127,7 @@ inline void v8SetReturnValue(const CallbackInfo& callbackInfo, BooleanOrStringOr
 
 template <>
 struct NativeValueTraits<BooleanOrStringOrUnrestrictedDouble> {
-    static BooleanOrStringOrUnrestrictedDouble nativeValue(const v8::Handle<v8::Value>&, v8::Isolate*, ExceptionState&);
+    static BooleanOrStringOrUnrestrictedDouble nativeValue(const v8::Local<v8::Value>&, v8::Isolate*, ExceptionState&);
 };
 
 class DoubleOrString final {
@@ -153,15 +155,15 @@ private:
     double m_double;
     String m_string;
 
-    friend v8::Handle<v8::Value> toV8(const DoubleOrString&, v8::Handle<v8::Object>, v8::Isolate*);
+    friend v8::Local<v8::Value> toV8(const DoubleOrString&, v8::Local<v8::Object>, v8::Isolate*);
 };
 
 class V8DoubleOrString final {
 public:
-    static void toImpl(v8::Isolate*, v8::Handle<v8::Value>, DoubleOrString&, ExceptionState&);
+    static void toImpl(v8::Isolate*, v8::Local<v8::Value>, DoubleOrString&, ExceptionState&);
 };
 
-v8::Handle<v8::Value> toV8(const DoubleOrString&, v8::Handle<v8::Object>, v8::Isolate*);
+v8::Local<v8::Value> toV8(const DoubleOrString&, v8::Local<v8::Object>, v8::Isolate*);
 
 template <class CallbackInfo>
 inline void v8SetReturnValue(const CallbackInfo& callbackInfo, DoubleOrString& impl)
@@ -171,7 +173,7 @@ inline void v8SetReturnValue(const CallbackInfo& callbackInfo, DoubleOrString& i
 
 template <>
 struct NativeValueTraits<DoubleOrString> {
-    static DoubleOrString nativeValue(const v8::Handle<v8::Value>&, v8::Isolate*, ExceptionState&);
+    static DoubleOrString nativeValue(const v8::Local<v8::Value>&, v8::Isolate*, ExceptionState&);
 };
 
 class NodeOrNodeList final {
@@ -201,15 +203,15 @@ private:
     RefPtrWillBeMember<Node> m_node;
     RefPtrWillBeMember<NodeList> m_nodeList;
 
-    friend v8::Handle<v8::Value> toV8(const NodeOrNodeList&, v8::Handle<v8::Object>, v8::Isolate*);
+    friend v8::Local<v8::Value> toV8(const NodeOrNodeList&, v8::Local<v8::Object>, v8::Isolate*);
 };
 
 class V8NodeOrNodeList final {
 public:
-    static void toImpl(v8::Isolate*, v8::Handle<v8::Value>, NodeOrNodeList&, ExceptionState&);
+    static void toImpl(v8::Isolate*, v8::Local<v8::Value>, NodeOrNodeList&, ExceptionState&);
 };
 
-v8::Handle<v8::Value> toV8(const NodeOrNodeList&, v8::Handle<v8::Object>, v8::Isolate*);
+v8::Local<v8::Value> toV8(const NodeOrNodeList&, v8::Local<v8::Object>, v8::Isolate*);
 
 template <class CallbackInfo>
 inline void v8SetReturnValue(const CallbackInfo& callbackInfo, NodeOrNodeList& impl)
@@ -219,7 +221,7 @@ inline void v8SetReturnValue(const CallbackInfo& callbackInfo, NodeOrNodeList& i
 
 template <>
 struct NativeValueTraits<NodeOrNodeList> {
-    static NodeOrNodeList nativeValue(const v8::Handle<v8::Value>&, v8::Isolate*, ExceptionState&);
+    static NodeOrNodeList nativeValue(const v8::Local<v8::Value>&, v8::Isolate*, ExceptionState&);
 };
 
 class StringOrArrayBufferOrArrayBufferView final {
@@ -253,15 +255,15 @@ private:
     RefPtr<TestArrayBuffer> m_arrayBuffer;
     RefPtr<TestArrayBufferView> m_arrayBufferView;
 
-    friend v8::Handle<v8::Value> toV8(const StringOrArrayBufferOrArrayBufferView&, v8::Handle<v8::Object>, v8::Isolate*);
+    friend v8::Local<v8::Value> toV8(const StringOrArrayBufferOrArrayBufferView&, v8::Local<v8::Object>, v8::Isolate*);
 };
 
 class V8StringOrArrayBufferOrArrayBufferView final {
 public:
-    static void toImpl(v8::Isolate*, v8::Handle<v8::Value>, StringOrArrayBufferOrArrayBufferView&, ExceptionState&);
+    static void toImpl(v8::Isolate*, v8::Local<v8::Value>, StringOrArrayBufferOrArrayBufferView&, ExceptionState&);
 };
 
-v8::Handle<v8::Value> toV8(const StringOrArrayBufferOrArrayBufferView&, v8::Handle<v8::Object>, v8::Isolate*);
+v8::Local<v8::Value> toV8(const StringOrArrayBufferOrArrayBufferView&, v8::Local<v8::Object>, v8::Isolate*);
 
 template <class CallbackInfo>
 inline void v8SetReturnValue(const CallbackInfo& callbackInfo, StringOrArrayBufferOrArrayBufferView& impl)
@@ -271,7 +273,7 @@ inline void v8SetReturnValue(const CallbackInfo& callbackInfo, StringOrArrayBuff
 
 template <>
 struct NativeValueTraits<StringOrArrayBufferOrArrayBufferView> {
-    static StringOrArrayBufferOrArrayBufferView nativeValue(const v8::Handle<v8::Value>&, v8::Isolate*, ExceptionState&);
+    static StringOrArrayBufferOrArrayBufferView nativeValue(const v8::Local<v8::Value>&, v8::Isolate*, ExceptionState&);
 };
 
 class StringOrDouble final {
@@ -299,15 +301,15 @@ private:
     String m_string;
     double m_double;
 
-    friend v8::Handle<v8::Value> toV8(const StringOrDouble&, v8::Handle<v8::Object>, v8::Isolate*);
+    friend v8::Local<v8::Value> toV8(const StringOrDouble&, v8::Local<v8::Object>, v8::Isolate*);
 };
 
 class V8StringOrDouble final {
 public:
-    static void toImpl(v8::Isolate*, v8::Handle<v8::Value>, StringOrDouble&, ExceptionState&);
+    static void toImpl(v8::Isolate*, v8::Local<v8::Value>, StringOrDouble&, ExceptionState&);
 };
 
-v8::Handle<v8::Value> toV8(const StringOrDouble&, v8::Handle<v8::Object>, v8::Isolate*);
+v8::Local<v8::Value> toV8(const StringOrDouble&, v8::Local<v8::Object>, v8::Isolate*);
 
 template <class CallbackInfo>
 inline void v8SetReturnValue(const CallbackInfo& callbackInfo, StringOrDouble& impl)
@@ -317,7 +319,99 @@ inline void v8SetReturnValue(const CallbackInfo& callbackInfo, StringOrDouble& i
 
 template <>
 struct NativeValueTraits<StringOrDouble> {
-    static StringOrDouble nativeValue(const v8::Handle<v8::Value>&, v8::Isolate*, ExceptionState&);
+    static StringOrDouble nativeValue(const v8::Local<v8::Value>&, v8::Isolate*, ExceptionState&);
+};
+
+class StringOrStringSequence final {
+    ALLOW_ONLY_INLINE_ALLOCATION();
+public:
+    StringOrStringSequence();
+    bool isNull() const { return m_type == SpecificTypeNone; }
+
+    bool isString() const { return m_type == SpecificTypeString; }
+    String getAsString() const;
+    void setString(String);
+
+    bool isStringSequence() const { return m_type == SpecificTypeStringSequence; }
+    const Vector<String>& getAsStringSequence() const;
+    void setStringSequence(const Vector<String>&);
+
+private:
+    enum SpecificTypes {
+        SpecificTypeNone,
+        SpecificTypeString,
+        SpecificTypeStringSequence,
+    };
+    SpecificTypes m_type;
+
+    String m_string;
+    Vector<String> m_stringSequence;
+
+    friend v8::Local<v8::Value> toV8(const StringOrStringSequence&, v8::Local<v8::Object>, v8::Isolate*);
+};
+
+class V8StringOrStringSequence final {
+public:
+    static void toImpl(v8::Isolate*, v8::Local<v8::Value>, StringOrStringSequence&, ExceptionState&);
+};
+
+v8::Local<v8::Value> toV8(const StringOrStringSequence&, v8::Local<v8::Object>, v8::Isolate*);
+
+template <class CallbackInfo>
+inline void v8SetReturnValue(const CallbackInfo& callbackInfo, StringOrStringSequence& impl)
+{
+    v8SetReturnValue(callbackInfo, toV8(impl, callbackInfo.Holder(), callbackInfo.GetIsolate()));
+}
+
+template <>
+struct NativeValueTraits<StringOrStringSequence> {
+    static StringOrStringSequence nativeValue(const v8::Local<v8::Value>&, v8::Isolate*, ExceptionState&);
+};
+
+class TestInterface2OrUint8Array final {
+    ALLOW_ONLY_INLINE_ALLOCATION();
+public:
+    TestInterface2OrUint8Array();
+    bool isNull() const { return m_type == SpecificTypeNone; }
+
+    bool isTestInterface2() const { return m_type == SpecificTypeTestInterface2; }
+    PassRefPtr<TestInterface2> getAsTestInterface2() const;
+    void setTestInterface2(PassRefPtr<TestInterface2>);
+
+    bool isUint8Array() const { return m_type == SpecificTypeUint8Array; }
+    PassRefPtr<DOMUint8Array> getAsUint8Array() const;
+    void setUint8Array(PassRefPtr<DOMUint8Array>);
+
+private:
+    enum SpecificTypes {
+        SpecificTypeNone,
+        SpecificTypeTestInterface2,
+        SpecificTypeUint8Array,
+    };
+    SpecificTypes m_type;
+
+    RefPtr<TestInterface2> m_testInterface2;
+    RefPtr<DOMUint8Array> m_uint8Array;
+
+    friend v8::Local<v8::Value> toV8(const TestInterface2OrUint8Array&, v8::Local<v8::Object>, v8::Isolate*);
+};
+
+class V8TestInterface2OrUint8Array final {
+public:
+    static void toImpl(v8::Isolate*, v8::Local<v8::Value>, TestInterface2OrUint8Array&, ExceptionState&);
+};
+
+v8::Local<v8::Value> toV8(const TestInterface2OrUint8Array&, v8::Local<v8::Object>, v8::Isolate*);
+
+template <class CallbackInfo>
+inline void v8SetReturnValue(const CallbackInfo& callbackInfo, TestInterface2OrUint8Array& impl)
+{
+    v8SetReturnValue(callbackInfo, toV8(impl, callbackInfo.Holder(), callbackInfo.GetIsolate()));
+}
+
+template <>
+struct NativeValueTraits<TestInterface2OrUint8Array> {
+    static TestInterface2OrUint8Array nativeValue(const v8::Local<v8::Value>&, v8::Isolate*, ExceptionState&);
 };
 
 class TestInterfaceGarbageCollectedOrString final {
@@ -347,15 +441,15 @@ private:
     Member<TestInterfaceGarbageCollected> m_testInterfaceGarbageCollected;
     String m_string;
 
-    friend v8::Handle<v8::Value> toV8(const TestInterfaceGarbageCollectedOrString&, v8::Handle<v8::Object>, v8::Isolate*);
+    friend v8::Local<v8::Value> toV8(const TestInterfaceGarbageCollectedOrString&, v8::Local<v8::Object>, v8::Isolate*);
 };
 
 class V8TestInterfaceGarbageCollectedOrString final {
 public:
-    static void toImpl(v8::Isolate*, v8::Handle<v8::Value>, TestInterfaceGarbageCollectedOrString&, ExceptionState&);
+    static void toImpl(v8::Isolate*, v8::Local<v8::Value>, TestInterfaceGarbageCollectedOrString&, ExceptionState&);
 };
 
-v8::Handle<v8::Value> toV8(const TestInterfaceGarbageCollectedOrString&, v8::Handle<v8::Object>, v8::Isolate*);
+v8::Local<v8::Value> toV8(const TestInterfaceGarbageCollectedOrString&, v8::Local<v8::Object>, v8::Isolate*);
 
 template <class CallbackInfo>
 inline void v8SetReturnValue(const CallbackInfo& callbackInfo, TestInterfaceGarbageCollectedOrString& impl)
@@ -365,7 +459,7 @@ inline void v8SetReturnValue(const CallbackInfo& callbackInfo, TestInterfaceGarb
 
 template <>
 struct NativeValueTraits<TestInterfaceGarbageCollectedOrString> {
-    static TestInterfaceGarbageCollectedOrString nativeValue(const v8::Handle<v8::Value>&, v8::Isolate*, ExceptionState&);
+    static TestInterfaceGarbageCollectedOrString nativeValue(const v8::Local<v8::Value>&, v8::Isolate*, ExceptionState&);
 };
 
 class TestInterfaceOrLong final {
@@ -393,15 +487,15 @@ private:
     RefPtr<TestInterfaceImplementation> m_testInterface;
     int m_long;
 
-    friend v8::Handle<v8::Value> toV8(const TestInterfaceOrLong&, v8::Handle<v8::Object>, v8::Isolate*);
+    friend v8::Local<v8::Value> toV8(const TestInterfaceOrLong&, v8::Local<v8::Object>, v8::Isolate*);
 };
 
 class V8TestInterfaceOrLong final {
 public:
-    static void toImpl(v8::Isolate*, v8::Handle<v8::Value>, TestInterfaceOrLong&, ExceptionState&);
+    static void toImpl(v8::Isolate*, v8::Local<v8::Value>, TestInterfaceOrLong&, ExceptionState&);
 };
 
-v8::Handle<v8::Value> toV8(const TestInterfaceOrLong&, v8::Handle<v8::Object>, v8::Isolate*);
+v8::Local<v8::Value> toV8(const TestInterfaceOrLong&, v8::Local<v8::Object>, v8::Isolate*);
 
 template <class CallbackInfo>
 inline void v8SetReturnValue(const CallbackInfo& callbackInfo, TestInterfaceOrLong& impl)
@@ -411,7 +505,7 @@ inline void v8SetReturnValue(const CallbackInfo& callbackInfo, TestInterfaceOrLo
 
 template <>
 struct NativeValueTraits<TestInterfaceOrLong> {
-    static TestInterfaceOrLong nativeValue(const v8::Handle<v8::Value>&, v8::Isolate*, ExceptionState&);
+    static TestInterfaceOrLong nativeValue(const v8::Local<v8::Value>&, v8::Isolate*, ExceptionState&);
 };
 
 class TestInterfaceOrTestInterfaceEmpty final {
@@ -439,15 +533,15 @@ private:
     RefPtr<TestInterfaceImplementation> m_testInterface;
     RefPtr<TestInterfaceEmpty> m_testInterfaceEmpty;
 
-    friend v8::Handle<v8::Value> toV8(const TestInterfaceOrTestInterfaceEmpty&, v8::Handle<v8::Object>, v8::Isolate*);
+    friend v8::Local<v8::Value> toV8(const TestInterfaceOrTestInterfaceEmpty&, v8::Local<v8::Object>, v8::Isolate*);
 };
 
 class V8TestInterfaceOrTestInterfaceEmpty final {
 public:
-    static void toImpl(v8::Isolate*, v8::Handle<v8::Value>, TestInterfaceOrTestInterfaceEmpty&, ExceptionState&);
+    static void toImpl(v8::Isolate*, v8::Local<v8::Value>, TestInterfaceOrTestInterfaceEmpty&, ExceptionState&);
 };
 
-v8::Handle<v8::Value> toV8(const TestInterfaceOrTestInterfaceEmpty&, v8::Handle<v8::Object>, v8::Isolate*);
+v8::Local<v8::Value> toV8(const TestInterfaceOrTestInterfaceEmpty&, v8::Local<v8::Object>, v8::Isolate*);
 
 template <class CallbackInfo>
 inline void v8SetReturnValue(const CallbackInfo& callbackInfo, TestInterfaceOrTestInterfaceEmpty& impl)
@@ -457,7 +551,7 @@ inline void v8SetReturnValue(const CallbackInfo& callbackInfo, TestInterfaceOrTe
 
 template <>
 struct NativeValueTraits<TestInterfaceOrTestInterfaceEmpty> {
-    static TestInterfaceOrTestInterfaceEmpty nativeValue(const v8::Handle<v8::Value>&, v8::Isolate*, ExceptionState&);
+    static TestInterfaceOrTestInterfaceEmpty nativeValue(const v8::Local<v8::Value>&, v8::Isolate*, ExceptionState&);
 };
 
 class TestInterfaceWillBeGarbageCollectedOrTestDictionary final {
@@ -487,15 +581,15 @@ private:
     RefPtrWillBeMember<TestInterfaceWillBeGarbageCollected> m_testInterfaceWillBeGarbageCollected;
     TestDictionary m_testDictionary;
 
-    friend v8::Handle<v8::Value> toV8(const TestInterfaceWillBeGarbageCollectedOrTestDictionary&, v8::Handle<v8::Object>, v8::Isolate*);
+    friend v8::Local<v8::Value> toV8(const TestInterfaceWillBeGarbageCollectedOrTestDictionary&, v8::Local<v8::Object>, v8::Isolate*);
 };
 
 class V8TestInterfaceWillBeGarbageCollectedOrTestDictionary final {
 public:
-    static void toImpl(v8::Isolate*, v8::Handle<v8::Value>, TestInterfaceWillBeGarbageCollectedOrTestDictionary&, ExceptionState&);
+    static void toImpl(v8::Isolate*, v8::Local<v8::Value>, TestInterfaceWillBeGarbageCollectedOrTestDictionary&, ExceptionState&);
 };
 
-v8::Handle<v8::Value> toV8(const TestInterfaceWillBeGarbageCollectedOrTestDictionary&, v8::Handle<v8::Object>, v8::Isolate*);
+v8::Local<v8::Value> toV8(const TestInterfaceWillBeGarbageCollectedOrTestDictionary&, v8::Local<v8::Object>, v8::Isolate*);
 
 template <class CallbackInfo>
 inline void v8SetReturnValue(const CallbackInfo& callbackInfo, TestInterfaceWillBeGarbageCollectedOrTestDictionary& impl)
@@ -505,12 +599,12 @@ inline void v8SetReturnValue(const CallbackInfo& callbackInfo, TestInterfaceWill
 
 template <>
 struct NativeValueTraits<TestInterfaceWillBeGarbageCollectedOrTestDictionary> {
-    static TestInterfaceWillBeGarbageCollectedOrTestDictionary nativeValue(const v8::Handle<v8::Value>&, v8::Isolate*, ExceptionState&);
+    static TestInterfaceWillBeGarbageCollectedOrTestDictionary nativeValue(const v8::Local<v8::Value>&, v8::Isolate*, ExceptionState&);
 };
 
 class V8DoubleOrStringOrNull final {
 public:
-    static void toImpl(v8::Isolate* isolate, v8::Handle<v8::Value> v8Value, DoubleOrString& impl, ExceptionState& exceptionState)
+    static void toImpl(v8::Isolate* isolate, v8::Local<v8::Value> v8Value, DoubleOrString& impl, ExceptionState& exceptionState)
     {
         if (isUndefinedOrNull(v8Value))
             return;

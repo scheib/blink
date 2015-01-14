@@ -53,8 +53,7 @@ class WebServiceWorkerProvider;
 class WebServiceWorkerRegistration;
 
 class ServiceWorkerContainer final
-    : public RefCountedGarbageCollectedWillBeGarbageCollectedFinalized<ServiceWorkerContainer>
-    , public EventTargetWithInlineData
+    : public RefCountedGarbageCollectedEventTargetWithInlineData<ServiceWorkerContainer>
     , public ContextLifecycleObserver
     , public WebServiceWorkerProviderClient {
     DEFINE_WRAPPERTYPEINFO();
@@ -66,7 +65,7 @@ public:
 
     void willBeDetachedFromFrame();
 
-    void trace(Visitor*);
+    virtual void trace(Visitor*) override;
 
     PassRefPtrWillBeRawPtr<ServiceWorker> controller() { return m_controller.get(); }
     ScriptPromise ready(ScriptState*);

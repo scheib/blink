@@ -125,6 +125,8 @@ void GlyphPageTreeNode::pruneTreeFontData(const SimpleFontData* fontData)
 static bool fill(GlyphPage* pageToFill, unsigned offset, unsigned length, UChar* buffer, unsigned bufferLength, const SimpleFontData* fontData)
 {
     bool hasGlyphs = fontData->fillGlyphPage(pageToFill, offset, length, buffer, bufferLength);
+    if (hasGlyphs && fontData->verticalData())
+        fontData->verticalData()->substituteWithVerticalGlyphs(fontData, pageToFill, offset, length);
     return hasGlyphs;
 }
 
@@ -282,7 +284,7 @@ void GlyphPageTreeNode::initializeOverridePage(const FontData* fontData, unsigne
     // overrides). getRootChild will always create a page if one
     // doesn't exist, but the page doesn't necessarily have glyphs
     // (this pointer may be 0).
-    GlyphPage* fallbackPage = getRootChild(fontData, pageNumber)->page();
+    GlyphPage* fallbackPage = getNormalRootChild(fontData, pageNumber)->page();
     if (!parentPage) {
         // When the parent has no glyphs for this page, we can easily
         // override it just by supplying the glyphs from our font.
@@ -414,22 +416,33 @@ void GlyphPageTreeNode::pruneFontData(const SimpleFontData* fontData, unsigned l
         it->value->pruneFontData(fontData, level);
 }
 
-void SystemFallbackGlyphPageTreeNode::pruneFontData(const SimpleFontData* fontData)
+GlyphPage* SystemFallbackGlyphPageTreeNode::page(UScriptCode script)
 {
-    m_page->removePerGlyphFontData(fontData);
+    PageByScriptMap::iterator it = m_pagesByScript.find(script);
+    if (it != m_pagesByScript.end())
+        return it->value.get();
+
+    RefPtr<GlyphPage> newPage = initializePage();
+    m_pagesByScript.set(script, newPage);
+    return newPage.get();
 }
 
-void SystemFallbackGlyphPageTreeNode::initializePage()
+void SystemFallbackGlyphPageTreeNode::pruneFontData(const SimpleFontData* fontData)
+{
+    PageByScriptMap::iterator end = m_pagesByScript.end();
+    for (PageByScriptMap::iterator it = m_pagesByScript.begin(); it != end; ++it)
+        it->value->removePerGlyphFontData(fontData);
+}
+
+PassRefPtr<GlyphPage> SystemFallbackGlyphPageTreeNode::initializePage()
 {
     // System fallback page is initialized with the parent's page, as individual
     // entries may use different fonts depending on character. If the Font
     // ever finds it needs a glyph out of the system fallback page, it will
     // ask the system for the best font to use and fill that glyph in for us.
-    if (GlyphPage* parentPage = m_parent->page()) {
-        m_page = parentPage->createCopiedSystemFallbackPage(this);
-        return;
-    }
-    m_page = GlyphPage::createForMixedFontData(this);
+    if (GlyphPage* parentPage = m_parent->page())
+        return parentPage->createCopiedSystemFallbackPage(this);
+    return GlyphPage::createForMixedFontData(this);
 }
 
 } // namespace blink

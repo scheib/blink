@@ -42,6 +42,7 @@
 #include "core/dom/Element.h"
 #include "core/dom/Fullscreen.h"
 #include "core/dom/StyleEngine.h"
+#include "core/events/Event.h"
 #include "core/html/HTMLAllCollection.h"
 #include "core/html/HTMLBodyElement.h"
 #include "core/html/HTMLCollection.h"
@@ -282,13 +283,6 @@ WebSize WebDocument::maximumScrollOffset() const
     if (FrameView* view = constUnwrap<Document>()->view())
         return toIntSize(view->maximumScrollPosition());
     return WebSize();
-}
-
-// FIXME: This will be removed once Chrome side implementation is done.
-void WebDocument::setIsTransitionDocument()
-{
-    // This ensures the transition UA stylesheet gets applied.
-    unwrap<Document>()->setIsTransitionDocument(true);
 }
 
 void WebDocument::setIsTransitionDocument(bool isTransitionDocument)

@@ -571,7 +571,7 @@ WebInspector.ElementsPanel.prototype = {
         if (treeElement) {
             treeElement.highlightSearchResults(this._searchQuery);
             treeElement.reveal();
-            var matches = treeElement.listItemElement.getElementsByClassName("highlighted-search-result");
+            var matches = treeElement.listItemElement.getElementsByClassName(WebInspector.highlightedSearchResultClassName);
             if (matches.length)
                 matches[0].scrollIntoViewIfNeeded();
         }
@@ -642,7 +642,7 @@ WebInspector.ElementsPanel.prototype = {
         if (!selectedDOMNode || !selectedDOMNode.target().cssModel.isEnabled())
             return;
 
-        this.sidebarPanes.styles.update(selectedDOMNode);
+        this.sidebarPanes.styles.setNode(selectedDOMNode);
         this.sidebarPanes.metrics.setNode(selectedDOMNode);
         this.sidebarPanes.platformFonts.setNode(selectedDOMNode);
     },
@@ -720,7 +720,7 @@ WebInspector.ElementsPanel.prototype = {
      */
     handleCopyEvent: function(event)
     {
-        if (!WebInspector.currentFocusElement().enclosingNodeOrSelfWithClass("elements-tree-outline"))
+        if (!WebInspector.currentFocusElement() || !WebInspector.currentFocusElement().enclosingNodeOrSelfWithClass("elements-tree-outline"))
             return;
         var treeOutline = this._treeOutlineForNode(this.selectedDOMNode());
         if (treeOutline)
@@ -803,7 +803,7 @@ WebInspector.ElementsPanel.prototype = {
             return;
         var commandCallback = WebInspector.Revealer.reveal.bind(WebInspector.Revealer, object);
 
-        contextMenu.appendItem(WebInspector.useLowerCaseMenuTitles() ? "Reveal in Elements panel" : "Reveal in Elements Panel", commandCallback);
+        contextMenu.appendItem(WebInspector.UIString.capitalize("Reveal in Elements ^panel"), commandCallback);
     },
 
     _sidebarContextMenuEventFired: function(event)
