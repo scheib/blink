@@ -160,6 +160,7 @@ interface TestObject {
     attribute (double or DOMString)? doubleOrStringOrNullAttribute;
     attribute (double? or DOMString) doubleOrNullStringAttribute;
     attribute (DOMString or sequence<DOMString>) stringOrStringSequenceAttribute;
+    attribute (TestEnum or double) testEnumOrDoubleAttribute;
 
     // Extended attributes
     [LogActivity, LogAllWorlds] attribute long activityLoggingAccessForAllWorldsLongAttribute;
@@ -311,6 +312,8 @@ interface TestObject {
     VoidCallbackFunction voidCallbackFunctionMethod();
     AnyCallbackFunctionOptionalAnyArg anyCallbackFunctionOptionalAnyArgMethod();
     void voidMethodVoidCallbackFunctionArg(VoidCallbackFunction voidCallbackFunctionArg);
+    void voidMethodOptionalVoidCallbackFunctionArg(optional VoidCallbackFunction voidCallbackFunctionArg);
+    void voidMethodNullableVoidCallbackFunctionArg(VoidCallbackFunction? voidCallbackFunctionArg);
     void voidMethodAnyCallbackFunctionOptionalAnyArg(AnyCallbackFunctionOptionalAnyArg anyCallbackFunctionOptionalAnyArgArg);
     // Custom type conversions
     any anyMethod();

@@ -29,6 +29,8 @@ enum CSSParserTokenType {
     ColumnToken,
     UnicodeRangeToken,
     WhitespaceToken,
+    CDOToken,
+    CDCToken,
     ColonToken,
     SemicolonToken,
     CommaToken,
@@ -42,6 +44,12 @@ enum CSSParserTokenType {
     BadStringToken,
     EOFToken,
     CommentToken,
+};
+
+enum NumericSign {
+    NoSign,
+    PlusSign,
+    MinusSign,
 };
 
 enum NumericValueType {
@@ -66,7 +74,7 @@ public:
     CSSParserToken(CSSParserTokenType, String value, BlockType = NotBlock);
 
     CSSParserToken(CSSParserTokenType, UChar); // for DelimiterToken
-    CSSParserToken(CSSParserTokenType, double, NumericValueType); // for NumberToken
+    CSSParserToken(CSSParserTokenType, double, NumericValueType, NumericSign); // for NumberToken
     CSSParserToken(CSSParserTokenType, UChar32, UChar32); // for UnicodeRangeToken
 
     CSSParserToken(HashTokenType, String);
@@ -81,6 +89,7 @@ public:
     String value() const { return m_value; }
 
     UChar delimiter() const;
+    NumericSign numericSign() const;
     NumericValueType numericValueType() const;
     double numericValue() const;
     HashTokenType hashTokenType() const { ASSERT(m_type == HashToken); return m_hashTokenType; }
@@ -99,6 +108,7 @@ private:
     UChar m_delimiter;
     HashTokenType m_hashTokenType;
     NumericValueType m_numericValueType;
+    NumericSign m_numericSign;
     double m_numericValue;
     CSSPrimitiveValue::UnitType m_unit;
     UChar32 m_unicodeRangeStart;

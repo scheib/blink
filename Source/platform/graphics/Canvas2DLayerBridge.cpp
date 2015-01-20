@@ -176,7 +176,8 @@ void Canvas2DLayerBridge::willAccessPixels()
     // the compositor's behavior. Therefore, we must trigger copy-on-write
     // even though we are not technically writing to the texture, only to its
     // parameters.
-    m_surface->notifyContentWillChange(SkSurface::kRetain_ContentChangeMode);
+    if (m_isSurfaceValid)
+        m_surface->notifyContentWillChange(SkSurface::kRetain_ContentChangeMode);
 }
 
 void Canvas2DLayerBridge::freeTransientResources()
@@ -302,6 +303,14 @@ bool Canvas2DLayerBridge::checkSurfaceValid()
     if (m_contextProvider->context3d()->isContextLost()) {
         m_isSurfaceValid = false;
         m_surface.clear();
+        for (auto mailboxInfo = m_mailboxes.begin(); mailboxInfo != m_mailboxes.end(); ++mailboxInfo) {
+            if (mailboxInfo->m_image) {
+                GrTexture* texture = mailboxInfo->m_image->getTexture();
+                if (texture)
+                    texture->abandon();
+                mailboxInfo->m_image.clear();
+            }
+        }
         if (m_imageBuffer)
             m_imageBuffer->notifySurfaceInvalid();
         setRateLimitingEnabled(false);

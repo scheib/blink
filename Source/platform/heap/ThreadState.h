@@ -174,10 +174,7 @@ template<typename U> class ThreadingTrait<const U> : public ThreadingTrait<U> { 
 #define TypedHeapEnumName(Type) Type##Heap,
 
 enum TypedHeaps {
-    General1Heap = 0,
-    General2Heap,
-    General3Heap,
-    General4Heap,
+    GeneralHeap = 0,
     VectorBackingHeap,
     InlineVectorBackingHeap,
     HashTableBackingHeap,
@@ -634,7 +631,7 @@ private:
     bool m_didV8GCAfterLastGC;
     bool m_sweepForbidden;
     size_t m_noAllocationCount;
-    size_t m_allocatedObjectSizeBeforeSweeping;
+    size_t m_allocatedObjectSizeBeforeGC;
     ThreadHeap* m_heaps[NumberOfHeaps];
 
     Vector<OwnPtr<CleanupTask>> m_cleanupTasks;

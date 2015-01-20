@@ -65,7 +65,11 @@ public:
         V8CacheOptionsNone,
         V8CacheOptionsParseMemory,
         V8CacheOptionsHeuristics,
-        V8CacheOptionsHeuristicsMobile
+        V8CacheOptionsHeuristicsMobile,
+        V8CacheOptionsHeuristicsDefault,
+        V8CacheOptionsHeuristicsDefaultMobile,
+        V8CacheOptionsRecent,
+        V8CacheOptionsRecentSmall
     };
 
     enum V8ScriptStreamingMode {
@@ -150,6 +154,7 @@ public:
     virtual void setDeviceScaleAdjustment(float) = 0;
     virtual void setDeviceSupportsMouse(bool) = 0;
     virtual void setDeviceSupportsTouch(bool) = 0;
+    virtual void setDisableReadingFromCanvas(bool) = 0;
     virtual void setDoubleTapToZoomEnabled(bool) = 0;
     virtual void setDownloadableBinaryFontsEnabled(bool) = 0;
     virtual void setEditingBehavior(EditingBehavior) = 0;

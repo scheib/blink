@@ -30,9 +30,10 @@
 #include "bindings/core/v8/ScheduledAction.h"
 #include "core/frame/SuspendableTimer.h"
 #include "platform/UserGestureIndicator.h"
-#include "wtf/Compiler.h"
+#include "platform/heap/Handle.h"
 #include "wtf/OwnPtr.h"
 #include "wtf/PassOwnPtr.h"
+#include "wtf/RefPtr.h"
 
 namespace blink {
 
@@ -47,8 +48,6 @@ public:
 
     virtual ~DOMTimer();
 
-    int timeoutID() const;
-
     // ActiveDOMObject
     virtual void stop() override;
 
@@ -61,9 +60,8 @@ public:
     void dispose();
 
 private:
-    friend class ExecutionContext; // For create().
+    friend class DOMTimerCoordinator; // For create().
 
-    // Should only be used by ExecutionContext.
     static PassRefPtrWillBeRawPtr<DOMTimer> create(ExecutionContext* context, PassOwnPtr<ScheduledAction> action, int timeout, bool singleShot, int timeoutID)
     {
         return adoptRefWillBeNoop(new DOMTimer(context, action, timeout, singleShot, timeoutID));

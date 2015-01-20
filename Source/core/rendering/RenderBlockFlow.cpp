@@ -684,6 +684,11 @@ void RenderBlockFlow::layoutBlockChild(RenderBox& child, MarginInfo& marginInfo,
         if (newHeight != size().height())
             setLogicalHeight(newHeight);
     }
+
+    if (child.isRenderMultiColumnSpannerPlaceholder()) {
+        // The actual column-span:all element is positioned by this placeholder child.
+        positionSpannerDescendant(toRenderMultiColumnSpannerPlaceholder(child));
+    }
 }
 
 LayoutUnit RenderBlockFlow::adjustBlockChildForPagination(LayoutUnit logicalTopAfterClear, LayoutUnit estimateWithoutPagination, RenderBox& child, bool atBeforeSideOfBlock)
@@ -1061,7 +1066,10 @@ void RenderBlockFlow::layoutBlockChildren(bool relayoutChildren, SubtreeLayoutSc
         }
         if (child->isColumnSpanAll()) {
             // This is not the containing block of the spanner. The spanner's placeholder will lay
-            // it out in due course.
+            // it out in due course. For now we just need to consult our flow thread, so that the
+            // columns (if any) preceding and following the spanner are laid out correctly.
+            LayoutUnit adjustment = flowThreadContainingBlock()->skipColumnSpanner(child, offsetFromLogicalTopOfFirstPage() + logicalHeight());
+            setLogicalHeight(logicalHeight() + adjustment);
             continue;
         }
 
@@ -1754,16 +1762,14 @@ LayoutUnit RenderBlockFlow::applyAfterBreak(RenderBox& child, LayoutUnit logical
     bool checkAfterAlways = (checkColumnBreaks && child.style()->columnBreakAfter() == PBALWAYS)
         || (checkPageBreaks && child.style()->pageBreakAfter() == PBALWAYS);
     if (checkAfterAlways && inNormalFlow(&child)) {
-        LayoutUnit marginOffset = marginInfo.canCollapseWithMarginBefore() ? LayoutUnit() : marginInfo.margin();
-
         // So our margin doesn't participate in the next collapsing steps.
         marginInfo.clearMargin();
 
         if (checkColumnBreaks) {
             if (isInsideMulticolFlowThread) {
                 LayoutUnit offsetBreakAdjustment = 0;
-                if (flowThread->addForcedRegionBreak(offsetFromLogicalTopOfFirstPage() + logicalOffset + marginOffset, &child, false, &offsetBreakAdjustment))
-                    return logicalOffset + marginOffset + offsetBreakAdjustment;
+                if (flowThread->addForcedRegionBreak(offsetFromLogicalTopOfFirstPage() + logicalOffset, &child, false, &offsetBreakAdjustment))
+                    return logicalOffset + offsetBreakAdjustment;
             } else {
                 view()->layoutState()->addForcedColumnBreak(child, logicalOffset);
             }
@@ -1976,6 +1982,15 @@ void RenderBlockFlow::styleDidChange(StyleDifference diff, const RenderStyle* ol
 
     if (diff.needsFullLayout() || !oldStyle)
         createOrDestroyMultiColumnFlowThreadIfNeeded(oldStyle);
+    if (oldStyle) {
+        if (RenderMultiColumnFlowThread* flowThread = multiColumnFlowThread()) {
+            if (!style()->columnRuleEquivalent(oldStyle)) {
+                // Column rules are painted by anonymous column set children of the multicol
+                // container. We need to notify them.
+                flowThread->columnRuleStyleDidChange();
+            }
+        }
+    }
 }
 
 void RenderBlockFlow::updateBlockChildDirtyBitsBeforeLayout(bool relayoutChildren, RenderBox& child)
@@ -2978,6 +2993,15 @@ void RenderBlockFlow::setPaginationStrut(LayoutUnit strut)
         m_rareData = adoptPtrWillBeNoop(new RenderBlockFlowRareData(this));
     }
     m_rareData->m_paginationStrut = strut;
+}
+
+void RenderBlockFlow::positionSpannerDescendant(RenderMultiColumnSpannerPlaceholder& child)
+{
+    RenderBox& spanner = *child.rendererInFlowThread();
+    // FIXME: |spanner| is a descendant, but never a direct child, so the names here are bad, if
+    // nothing else.
+    setLogicalTopForChild(spanner, child.logicalTop());
+    determineLogicalLeftPositionForChild(spanner);
 }
 
 bool RenderBlockFlow::avoidsFloats() const

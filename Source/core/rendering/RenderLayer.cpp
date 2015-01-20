@@ -813,7 +813,7 @@ bool RenderLayer::updateLayerPosition()
         localPoint.moveBy(box->topLeftLocation());
     }
 
-    if (!renderer()->isOutOfFlowPositioned() && renderer()->parent()) {
+    if (!renderer()->isOutOfFlowPositioned() && !renderer()->isColumnSpanAll() && renderer()->parent()) {
         // We must adjust our position by walking up the render tree looking for the
         // nearest enclosing object with a layer.
         RenderObject* curr = renderer()->parent();
@@ -1282,6 +1282,16 @@ void RenderLayer::removeOnlyThisLayer()
     if (!m_parent)
         return;
 
+    {
+        DisableCompositingQueryAsserts disabler; // We need the current compositing status.
+        if (isPaintInvalidationContainer()) {
+            // Our children will be reparented and contained by a new paint invalidation container,
+            // so need paint invalidation. CompositingUpdate can't see this layer (which has been
+            // removed) so won't do this for us.
+            setShouldDoFullPaintInvalidationIncludingNonCompositingDescendants();
+        }
+    }
+
     m_clipper.clearClipRectsIncludingDescendants();
 
     RenderLayer* nextSib = nextSibling();
@@ -1379,7 +1389,17 @@ static inline const RenderLayer* accumulateOffsetTowardsAncestor(const RenderLay
 
             location += (fixedContainerCoords - ancestorCoords);
         } else {
+            // RenderView has been handled in the first top-level 'if' block above.
+            ASSERT(ancestorLayer != renderer->view()->layer());
+            ASSERT(ancestorLayer->hasTransformRelatedProperty());
+
             location += layer->location();
+
+            // The spec (http://dev.w3.org/csswg/css-transforms/#transform-rendering) doesn't say if a
+            // fixed-position element under a scrollable transformed element should scroll. However,
+            // other parts of blink scroll the fixed-position element, and the following keeps the consistency.
+            if (RenderLayerScrollableArea* scrollableArea = ancestorLayer->scrollableArea())
+                location -= LayoutSize(scrollableArea->scrollOffset());
         }
         return ancestorLayer;
     }
@@ -1422,8 +1442,14 @@ static inline const RenderLayer* accumulateOffsetTowardsAncestor(const RenderLay
             location += (thisCoords - ancestorCoords);
             return ancestorLayer;
         }
-    } else
+    } else if (renderer->isColumnSpanAll()) {
+        RenderBlock* multicolContainer = renderer->containingBlock();
+        ASSERT(toRenderBlockFlow(multicolContainer)->multiColumnFlowThread());
+        parentLayer = multicolContainer->layer();
+        ASSERT(parentLayer);
+    } else {
         parentLayer = layer->parent();
+    }
 
     if (!parentLayer)
         return 0;
@@ -1555,7 +1581,8 @@ void RenderLayer::collectFragments(LayerFragments& fragments, const RenderLayer*
     // Make the dirty rect relative to the fragmentation context (multicol container, etc.).
     RenderFlowThread* enclosingFlowThread = toRenderFlowThread(enclosingPaginationLayer()->renderer());
     LayoutPoint offsetOfPaginationLayerFromRoot; // Visual offset from the root layer to the nearest fragmentation context.
-    if (rootLayer->enclosingPaginationLayer() == enclosingPaginationLayer()) {
+    bool rootLayerIsInsidePaginationLayer = rootLayer->enclosingPaginationLayer() == enclosingPaginationLayer();
+    if (rootLayerIsInsidePaginationLayer) {
         // The root layer is in the same fragmentation context as this layer, so we need to look
         // inside it and subtract the offset between the fragmentation context and the root layer.
         offsetOfPaginationLayerFromRoot = -rootLayer->visualOffsetFromAncestor(enclosingPaginationLayer());
@@ -1574,11 +1601,14 @@ void RenderLayer::collectFragments(LayerFragments& fragments, const RenderLayer*
 
     // Get the parent clip rects of the pagination layer, since we need to intersect with that when painting column contents.
     ClipRect ancestorClipRect = dirtyRect;
-    if (enclosingPaginationLayer()->parent()) {
-        ClipRectsContext clipRectsContext(rootLayer, clipRectsCacheSlot, inOverlayScrollbarSizeRelevancy);
+    if (const RenderLayer* paginationParentLayer = enclosingPaginationLayer()->parent()) {
+        const RenderLayer* ancestorLayer = rootLayerIsInsidePaginationLayer ? paginationParentLayer : rootLayer;
+        ClipRectsContext clipRectsContext(ancestorLayer, clipRectsCacheSlot, inOverlayScrollbarSizeRelevancy);
         if (respectOverflowClip == IgnoreOverflowClip)
             clipRectsContext.setIgnoreOverflowClip();
         ancestorClipRect = enclosingPaginationLayer()->clipper().backgroundClipRect(clipRectsContext);
+        if (rootLayerIsInsidePaginationLayer)
+            ancestorClipRect.moveBy(-rootLayer->visualOffsetFromAncestor(ancestorLayer));
         ancestorClipRect.intersect(dirtyRect);
     }
 

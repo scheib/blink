@@ -65,14 +65,14 @@ public:
     virtual HostWindow* hostWindow() const { return 0; };
 
     bool scroll(ScrollDirection, ScrollGranularity, float delta = 1);
-    void scrollToOffsetWithoutAnimation(const FloatPoint&);
+    void scrollToOffsetWithoutAnimation(const FloatPoint&, bool cancelProgrammaticAnimations = true);
     void scrollToOffsetWithoutAnimation(ScrollbarOrientation, float offset);
 
     void programmaticallyScrollSmoothlyToOffset(const FloatPoint&);
 
     // Should be called when the scroll position changes externally, for example if the scroll layer position
     // is updated on the scrolling thread and we need to notify the main thread.
-    void notifyScrollPositionChanged(const IntPoint&);
+    void notifyScrollPositionChanged(const DoublePoint&);
 
     static bool scrollBehaviorFromString(const String&, ScrollBehavior&);
 
@@ -206,8 +206,11 @@ public:
     // animations.
     bool scheduleAnimation();
     void serviceScrollAnimations(double monotonicTime);
+    void updateCompositorScrollAnimations();
     virtual void registerForAnimation() { }
     virtual void deregisterForAnimation() { }
+
+    void notifyCompositorAnimationFinished(int groupId);
 
     virtual bool usesCompositedScrolling() const { return false; }
 

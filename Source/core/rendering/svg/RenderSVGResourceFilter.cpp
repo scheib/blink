@@ -173,12 +173,12 @@ static void drawDeferredFilter(GraphicsContext* context, FilterData* filterData,
             imageFilter = builder.buildTransform(shearAndRotate, imageFilter.get());
         }
     }
-    context->beginLayer(1, CompositeSourceOver, &boundaries, ColorFilterNone, imageFilter.get());
+    context->beginLayer(1, SkXfermode::kSrcOver_Mode, &boundaries, ColorFilterNone, imageFilter.get());
     context->endLayer();
     context->restore();
 }
 
-bool RenderSVGResourceFilter::prepareEffect(RenderObject* object, GraphicsContext*& context)
+bool RenderSVGResourceFilter::prepareEffect(RenderObject* object, GraphicsContext* context)
 {
     ASSERT(object);
     ASSERT(context);
@@ -223,7 +223,7 @@ bool RenderSVGResourceFilter::prepareEffect(RenderObject* object, GraphicsContex
     return true;
 }
 
-void RenderSVGResourceFilter::finishEffect(RenderObject* object, GraphicsContext*& context)
+void RenderSVGResourceFilter::finishEffect(RenderObject* object, GraphicsContext* context)
 {
     ASSERT(object);
     ASSERT(context);

@@ -858,7 +858,7 @@ TEST_F(WebFrameTest, DeviceScaleFactorUsesDefaultWithoutViewportTag)
     EXPECT_EQ(2, webViewHelper.webView()->deviceScaleFactor());
 
     // Device scale factor should be independent of page scale.
-    webViewHelper.webView()->setPageScaleFactorLimits(1, 2);
+    webViewHelper.webView()->setDefaultPageScaleLimits(1, 2);
     webViewHelper.webView()->setPageScaleFactor(0.5);
     webViewHelper.webView()->layout();
     EXPECT_EQ(1, webViewHelper.webView()->pageScaleFactor());
@@ -881,13 +881,15 @@ TEST_F(WebFrameTest, FixedLayoutInitializeAtMinimumScale)
     // Make sure we initialize to minimum scale, even if the window size
     // only becomes available after the load begins.
     FrameTestHelpers::WebViewHelper webViewHelper;
-    webViewHelper.initializeAndLoad(m_baseURL + "fixed_layout.html", true, 0, &client, enableViewportSettings);
+    webViewHelper.initialize(true, 0, &client, enableViewportSettings);
+    webViewHelper.webView()->setDefaultPageScaleLimits(0.25f, 5);
+    FrameTestHelpers::loadFrame(webViewHelper.webView()->mainFrame(), m_baseURL + "fixed_layout.html");
     webViewHelper.webView()->resize(WebSize(viewportWidth, viewportHeight));
 
     int defaultFixedLayoutWidth = 980;
     float minimumPageScaleFactor = viewportWidth / (float) defaultFixedLayoutWidth;
-    EXPECT_EQ(minimumPageScaleFactor, webViewHelper.webView()->pageScaleFactor());
-    EXPECT_EQ(minimumPageScaleFactor, webViewHelper.webView()->minimumPageScaleFactor());
+    EXPECT_EQ(minimumPageScaleFactor, webViewHelper.webViewImpl()->pageScaleFactor());
+    EXPECT_EQ(minimumPageScaleFactor, webViewHelper.webViewImpl()->minimumPageScaleFactor());
 
     // Assume the user has pinch zoomed to page scale factor 2.
     float userPinchPageScaleFactor = 2;
@@ -918,13 +920,15 @@ TEST_F(WebFrameTest, WideDocumentInitializeAtMinimumScale)
     // Make sure we initialize to minimum scale, even if the window size
     // only becomes available after the load begins.
     FrameTestHelpers::WebViewHelper webViewHelper;
-    webViewHelper.initializeAndLoad(m_baseURL + "wide_document.html", true, 0, &client, enableViewportSettings);
+    webViewHelper.initialize(true, 0, &client, enableViewportSettings);
+    webViewHelper.webView()->setDefaultPageScaleLimits(0.25f, 5);
+    FrameTestHelpers::loadFrame(webViewHelper.webView()->mainFrame(), m_baseURL + "wide_document.html");
     webViewHelper.webView()->resize(WebSize(viewportWidth, viewportHeight));
 
     int wideDocumentWidth = 1500;
     float minimumPageScaleFactor = viewportWidth / (float) wideDocumentWidth;
-    EXPECT_EQ(minimumPageScaleFactor, webViewHelper.webView()->pageScaleFactor());
-    EXPECT_EQ(minimumPageScaleFactor, webViewHelper.webView()->minimumPageScaleFactor());
+    EXPECT_EQ(minimumPageScaleFactor, webViewHelper.webViewImpl()->pageScaleFactor());
+    EXPECT_EQ(minimumPageScaleFactor, webViewHelper.webViewImpl()->minimumPageScaleFactor());
 
     // Assume the user has pinch zoomed to page scale factor 2.
     float userPinchPageScaleFactor = 2;
@@ -1068,6 +1072,28 @@ TEST_F(WebFrameTest, WideViewportSetsTo980WithoutViewportTag)
 
     EXPECT_EQ(980, webViewHelper.webViewImpl()->mainFrameImpl()->frameView()->contentsSize().width());
     EXPECT_EQ(980.0 / viewportWidth * viewportHeight, webViewHelper.webViewImpl()->mainFrameImpl()->frameView()->contentsSize().height());
+}
+
+TEST_F(WebFrameTest, WideViewportSetsTo980WithXhtmlMp)
+{
+    UseMockScrollbarSettings mockScrollbarSettings;
+    registerMockedHttpURLLoad("viewport/viewport-legacy-xhtmlmp.html");
+
+    FixedLayoutTestWebViewClient client;
+    client.m_screenInfo.deviceScaleFactor = 1;
+    int viewportWidth = 640;
+    int viewportHeight = 480;
+
+    FrameTestHelpers::WebViewHelper webViewHelper;
+    webViewHelper.initialize(true, 0, &client, enableViewportSettings);
+    applyViewportStyleOverride(&webViewHelper);
+    webViewHelper.webView()->settings()->setWideViewportQuirkEnabled(true);
+    webViewHelper.webView()->settings()->setUseWideViewport(true);
+    FrameTestHelpers::loadFrame(webViewHelper.webView()->mainFrame(), m_baseURL + "viewport/viewport-legacy-xhtmlmp.html");
+
+    webViewHelper.webView()->resize(WebSize(viewportWidth, viewportHeight));
+    EXPECT_EQ(viewportWidth, webViewHelper.webViewImpl()->mainFrameImpl()->frameView()->contentsSize().width());
+    EXPECT_EQ(viewportHeight, webViewHelper.webViewImpl()->mainFrameImpl()->frameView()->contentsSize().height());
 }
 
 TEST_F(WebFrameTest, NoWideViewportAndHeightInMeta)
@@ -1360,8 +1386,8 @@ TEST_F(WebFrameTest, WideViewportAndWideContentWithInitialScale)
 
     int wideDocumentWidth = 800;
     float minimumPageScaleFactor = viewportWidth / (float) wideDocumentWidth;
-    EXPECT_EQ(minimumPageScaleFactor, webViewHelper.webView()->pageScaleFactor());
-    EXPECT_EQ(minimumPageScaleFactor, webViewHelper.webView()->minimumPageScaleFactor());
+    EXPECT_EQ(minimumPageScaleFactor, webViewHelper.webViewImpl()->pageScaleFactor());
+    EXPECT_EQ(minimumPageScaleFactor, webViewHelper.webViewImpl()->minimumPageScaleFactor());
 }
 
 TEST_F(WebFrameTest, WideViewportQuirkClobbersHeight)
@@ -1606,7 +1632,9 @@ TEST_F(WebFrameTest, initialScaleWrittenToHistoryItem)
     int viewportHeight = 480;
 
     FrameTestHelpers::WebViewHelper webViewHelper;
-    webViewHelper.initializeAndLoad(m_baseURL + "fixed_layout.html", true, 0, &client, enableViewportSettings);
+    webViewHelper.initialize(true, 0, &client, enableViewportSettings);
+    webViewHelper.webView()->setDefaultPageScaleLimits(0.25f, 5);
+    FrameTestHelpers::loadFrame(webViewHelper.webView()->mainFrame(), m_baseURL + "fixed_layout.html");
     webViewHelper.webView()->resize(WebSize(viewportWidth, viewportHeight));
     webViewHelper.webView()->layout();
 
@@ -1815,6 +1843,7 @@ TEST_F(WebFrameTest, NoWideViewportAndNoViewportWithInitialPageScaleOverride)
 
     FrameTestHelpers::WebViewHelper webViewHelper;
     webViewHelper.initializeAndLoad(m_baseURL + "large-div.html", true, 0, &client, enableViewportSettings);
+    webViewHelper.webView()->setDefaultPageScaleLimits(0.25f, 5);
     webViewHelper.webView()->settings()->setWideViewportQuirkEnabled(true);
     webViewHelper.webView()->settings()->setUseWideViewport(false);
     webViewHelper.webView()->setInitialPageScaleOverride(enforcedPageScaleFactor);
@@ -1902,13 +1931,14 @@ TEST_F(WebFrameTest, DesktopPageCanBeZoomedInWhenWideViewportIsTurnedOff)
 
     FrameTestHelpers::WebViewHelper webViewHelper;
     webViewHelper.initializeAndLoad(m_baseURL + "no_viewport_tag.html", true, 0, &client, enableViewportSettings);
+    webViewHelper.webView()->setDefaultPageScaleLimits(0.25f, 5);
     webViewHelper.webView()->settings()->setWideViewportQuirkEnabled(true);
     webViewHelper.webView()->settings()->setUseWideViewport(false);
     webViewHelper.webView()->resize(WebSize(viewportWidth, viewportHeight));
 
-    EXPECT_NEAR(1.0f, webViewHelper.webView()->pageScaleFactor(), 0.01f);
-    EXPECT_NEAR(1.0f, webViewHelper.webView()->minimumPageScaleFactor(), 0.01f);
-    EXPECT_NEAR(5.0f, webViewHelper.webView()->maximumPageScaleFactor(), 0.01f);
+    EXPECT_NEAR(1.0f, webViewHelper.webViewImpl()->pageScaleFactor(), 0.01f);
+    EXPECT_NEAR(1.0f, webViewHelper.webViewImpl()->minimumPageScaleFactor(), 0.01f);
+    EXPECT_NEAR(5.0f, webViewHelper.webViewImpl()->maximumPageScaleFactor(), 0.01f);
 }
 
 class WebFrameResizeTest : public WebFrameTest {
@@ -1933,6 +1963,7 @@ protected:
 
         FrameTestHelpers::WebViewHelper webViewHelper;
         webViewHelper.initializeAndLoad(m_baseURL + url, true, 0, 0, enableViewportSettings);
+        webViewHelper.webViewImpl()->setDefaultPageScaleLimits(0.25f, 5);
 
         // Origin scrollOffsets preserved under resize.
         {
@@ -2057,6 +2088,7 @@ TEST_F(WebFrameTest, pageScaleFactorScalesPaintClip)
 
     FrameTestHelpers::WebViewHelper webViewHelper;
     webViewHelper.initializeAndLoad(m_baseURL + "large-div.html", true, 0, &client);
+    webViewHelper.webView()->setDefaultPageScaleLimits(0.25f, 5);
     // FIXME: This test breaks if the viewport is enabled before loading the page due to the paint
     // calls below not working on composited layers. For some reason, enabling the viewport here
     // doesn't cause compositing
@@ -2132,22 +2164,23 @@ TEST_F(WebFrameTest, CanOverrideScaleLimits)
 
     FrameTestHelpers::WebViewHelper webViewHelper;
     webViewHelper.initializeAndLoad(m_baseURL + "no_scale_for_you.html", true, 0, &client, enableViewportSettings);
+    webViewHelper.webView()->setDefaultPageScaleLimits(0.25f, 5);
     webViewHelper.webView()->resize(WebSize(viewportWidth, viewportHeight));
 
-    EXPECT_EQ(2.0f, webViewHelper.webView()->minimumPageScaleFactor());
-    EXPECT_EQ(2.0f, webViewHelper.webView()->maximumPageScaleFactor());
+    EXPECT_EQ(2.0f, webViewHelper.webViewImpl()->minimumPageScaleFactor());
+    EXPECT_EQ(2.0f, webViewHelper.webViewImpl()->maximumPageScaleFactor());
 
     webViewHelper.webView()->setIgnoreViewportTagScaleLimits(true);
     webViewHelper.webView()->layout();
 
-    EXPECT_EQ(1.0f, webViewHelper.webView()->minimumPageScaleFactor());
-    EXPECT_EQ(5.0f, webViewHelper.webView()->maximumPageScaleFactor());
+    EXPECT_EQ(1.0f, webViewHelper.webViewImpl()->minimumPageScaleFactor());
+    EXPECT_EQ(5.0f, webViewHelper.webViewImpl()->maximumPageScaleFactor());
 
     webViewHelper.webView()->setIgnoreViewportTagScaleLimits(false);
     webViewHelper.webView()->layout();
 
-    EXPECT_EQ(2.0f, webViewHelper.webView()->minimumPageScaleFactor());
-    EXPECT_EQ(2.0f, webViewHelper.webView()->maximumPageScaleFactor());
+    EXPECT_EQ(2.0f, webViewHelper.webViewImpl()->minimumPageScaleFactor());
+    EXPECT_EQ(2.0f, webViewHelper.webViewImpl()->maximumPageScaleFactor());
 }
 
 TEST_F(WebFrameTest, updateOverlayScrollbarLayers)
@@ -2163,7 +2196,6 @@ TEST_F(WebFrameTest, updateOverlayScrollbarLayers)
     FrameTestHelpers::WebViewHelper webViewHelper;
     webViewHelper.initialize(true, 0, fakeCompositingWebViewClient.get(), &configueCompositingWebView);
 
-    webViewHelper.webView()->setPageScaleFactorLimits(1, 1);
     webViewHelper.webView()->resize(WebSize(viewWidth, viewHeight));
     FrameTestHelpers::loadFrame(webViewHelper.webView()->mainFrame(), m_baseURL + "large-div.html");
 
@@ -2218,7 +2250,7 @@ TEST_F(WebFrameTest, DivAutoZoomParamsTest_VirtualViewport)
     FrameTestHelpers::WebViewHelper webViewHelper;
     webViewHelper.initializeAndLoad(m_baseURL + "get_scale_for_auto_zoom_into_div_test.html", false, 0, 0, configurePinchVirtualViewport);
     webViewHelper.webView()->setDeviceScaleFactor(deviceScaleFactor);
-    webViewHelper.webView()->setPageScaleFactorLimits(0.01f, 4);
+    webViewHelper.webView()->setDefaultPageScaleLimits(0.01f, 4);
     webViewHelper.webView()->setPageScaleFactor(0.5f);
     webViewHelper.webView()->resize(WebSize(viewportWidth, viewportHeight));
     webViewHelper.webView()->layout();
@@ -2277,7 +2309,6 @@ TEST_F(WebFrameTest, DivAutoZoomWideDivTest_VirtualViewport)
     FrameTestHelpers::WebViewHelper webViewHelper;
     webViewHelper.initializeAndLoad(m_baseURL + "get_wide_div_for_auto_zoom_test.html", false, 0, 0, configurePinchVirtualViewport);
     webViewHelper.webView()->resize(WebSize(viewportWidth, viewportHeight));
-    webViewHelper.webView()->setPageScaleFactorLimits(1.0f, 4);
     webViewHelper.webView()->setDeviceScaleFactor(deviceScaleFactor);
     webViewHelper.webView()->setPageScaleFactor(1.0f);
     webViewHelper.webView()->layout();
@@ -2310,7 +2341,6 @@ TEST_F(WebFrameTest, DivAutoZoomVeryTallTest_VirtualViewport)
     FrameTestHelpers::WebViewHelper webViewHelper;
     webViewHelper.initializeAndLoad(m_baseURL + "very_tall_div.html", true, 0, 0, configurePinchVirtualViewport);
     webViewHelper.webView()->resize(WebSize(viewportWidth, viewportHeight));
-    webViewHelper.webView()->setPageScaleFactorLimits(1.0f, 4);
     webViewHelper.webView()->setDeviceScaleFactor(deviceScaleFactor);
     webViewHelper.webView()->setPageScaleFactor(1.0f);
     webViewHelper.webView()->layout();
@@ -2337,7 +2367,7 @@ TEST_F(WebFrameTest, DivAutoZoomMultipleDivsTest_VirtualViewport)
     FrameTestHelpers::WebViewHelper webViewHelper;
     webViewHelper.initializeAndLoad(m_baseURL + "get_multiple_divs_for_auto_zoom_test.html", false, 0, 0, configurePinchVirtualViewport);
     webViewHelper.webView()->resize(WebSize(viewportWidth, viewportHeight));
-    webViewHelper.webView()->setPageScaleFactorLimits(0.5f, 4);
+    webViewHelper.webView()->setDefaultPageScaleLimits(0.5f, 4);
     webViewHelper.webView()->setDeviceScaleFactor(deviceScaleFactor);
     webViewHelper.webView()->setPageScaleFactor(0.5f);
     webViewHelper.webView()->layout();
@@ -2396,7 +2426,7 @@ TEST_F(WebFrameTest, DivAutoZoomScaleBoundsTest_VirtualViewport)
 
     // Test double tap scale bounds.
     // minimumPageScale < doubleTapZoomAlreadyLegibleScale < 1
-    webViewHelper.webView()->setPageScaleFactorLimits(0.5f, 4);
+    webViewHelper.webView()->setDefaultPageScaleLimits(0.5f, 4);
     webViewHelper.webView()->layout();
     float doubleTapZoomAlreadyLegibleScale = webViewHelper.webViewImpl()->minimumPageScaleFactor() * doubleTapZoomAlreadyLegibleRatio;
     setScaleAndScrollAndLayout(webViewHelper.webViewImpl(), WebPoint(0, 0), (webViewHelper.webViewImpl()->minimumPageScaleFactor()) * (1 + doubleTapZoomAlreadyLegibleRatio) / 2);
@@ -2410,7 +2440,7 @@ TEST_F(WebFrameTest, DivAutoZoomScaleBoundsTest_VirtualViewport)
     // Zoom in to reset double_tap_zoom_in_effect flag.
     webViewHelper.webViewImpl()->applyViewportDeltas(WebSize(), 1.1f, 0);
     // 1 < minimumPageScale < doubleTapZoomAlreadyLegibleScale
-    webViewHelper.webView()->setPageScaleFactorLimits(1.1f, 4);
+    webViewHelper.webView()->setDefaultPageScaleLimits(1.1f, 4);
     webViewHelper.webView()->layout();
     doubleTapZoomAlreadyLegibleScale = webViewHelper.webViewImpl()->minimumPageScaleFactor() * doubleTapZoomAlreadyLegibleRatio;
     setScaleAndScrollAndLayout(webViewHelper.webViewImpl(), WebPoint(0, 0), (webViewHelper.webViewImpl()->minimumPageScaleFactor()) * (1 + doubleTapZoomAlreadyLegibleRatio) / 2);
@@ -2424,7 +2454,7 @@ TEST_F(WebFrameTest, DivAutoZoomScaleBoundsTest_VirtualViewport)
     // Zoom in to reset double_tap_zoom_in_effect flag.
     webViewHelper.webViewImpl()->applyViewportDeltas(WebSize(), 1.1f, 0);
     // minimumPageScale < 1 < doubleTapZoomAlreadyLegibleScale
-    webViewHelper.webView()->setPageScaleFactorLimits(0.95f, 4);
+    webViewHelper.webView()->setDefaultPageScaleLimits(0.95f, 4);
     webViewHelper.webView()->layout();
     doubleTapZoomAlreadyLegibleScale = webViewHelper.webViewImpl()->minimumPageScaleFactor() * doubleTapZoomAlreadyLegibleRatio;
     setScaleAndScrollAndLayout(webViewHelper.webViewImpl(), WebPoint(0, 0), (webViewHelper.webViewImpl()->minimumPageScaleFactor()) * (1 + doubleTapZoomAlreadyLegibleRatio) / 2);
@@ -2462,7 +2492,7 @@ TEST_F(WebFrameTest, DivAutoZoomScaleFontScaleFactorTest_VirtualViewport)
     float legibleScale = accessibilityFontScaleFactor;
     setScaleAndScrollAndLayout(webViewHelper.webViewImpl(), WebPoint(0, 0), (webViewHelper.webViewImpl()->minimumPageScaleFactor()) * (1 + doubleTapZoomAlreadyLegibleRatio) / 2);
     float doubleTapZoomAlreadyLegibleScale = webViewHelper.webViewImpl()->minimumPageScaleFactor() * doubleTapZoomAlreadyLegibleRatio;
-    webViewHelper.webView()->setPageScaleFactorLimits(0.5f, 4);
+    webViewHelper.webView()->setDefaultPageScaleLimits(0.5f, 4);
     webViewHelper.webView()->layout();
     simulateDoubleTap(webViewHelper.webViewImpl(), doubleTapPoint, scale);
     EXPECT_FLOAT_EQ(legibleScale, scale);
@@ -2474,7 +2504,7 @@ TEST_F(WebFrameTest, DivAutoZoomScaleFontScaleFactorTest_VirtualViewport)
     // Zoom in to reset double_tap_zoom_in_effect flag.
     webViewHelper.webViewImpl()->applyViewportDeltas(WebSize(), 1.1f, 0);
     // 1 < accessibilityFontScaleFactor < minimumPageScale < doubleTapZoomAlreadyLegibleScale
-    webViewHelper.webView()->setPageScaleFactorLimits(1.0f, 4);
+    webViewHelper.webView()->setDefaultPageScaleLimits(1.0f, 4);
     webViewHelper.webView()->layout();
     doubleTapZoomAlreadyLegibleScale = webViewHelper.webViewImpl()->minimumPageScaleFactor() * doubleTapZoomAlreadyLegibleRatio;
     setScaleAndScrollAndLayout(webViewHelper.webViewImpl(), WebPoint(0, 0), (webViewHelper.webViewImpl()->minimumPageScaleFactor()) * (1 + doubleTapZoomAlreadyLegibleRatio) / 2);
@@ -2488,7 +2518,7 @@ TEST_F(WebFrameTest, DivAutoZoomScaleFontScaleFactorTest_VirtualViewport)
     // Zoom in to reset double_tap_zoom_in_effect flag.
     webViewHelper.webViewImpl()->applyViewportDeltas(WebSize(), 1.1f, 0);
     // minimumPageScale < 1 < accessibilityFontScaleFactor < doubleTapZoomAlreadyLegibleScale
-    webViewHelper.webView()->setPageScaleFactorLimits(0.95f, 4);
+    webViewHelper.webView()->setDefaultPageScaleLimits(0.95f, 4);
     webViewHelper.webView()->layout();
     doubleTapZoomAlreadyLegibleScale = webViewHelper.webViewImpl()->minimumPageScaleFactor() * doubleTapZoomAlreadyLegibleRatio;
     setScaleAndScrollAndLayout(webViewHelper.webViewImpl(), WebPoint(0, 0), (webViewHelper.webViewImpl()->minimumPageScaleFactor()) * (1 + doubleTapZoomAlreadyLegibleRatio) / 2);
@@ -2502,7 +2532,7 @@ TEST_F(WebFrameTest, DivAutoZoomScaleFontScaleFactorTest_VirtualViewport)
     // Zoom in to reset double_tap_zoom_in_effect flag.
     webViewHelper.webViewImpl()->applyViewportDeltas(WebSize(), 1.1f, 0);
     // minimumPageScale < 1 < doubleTapZoomAlreadyLegibleScale < accessibilityFontScaleFactor
-    webViewHelper.webView()->setPageScaleFactorLimits(0.9f, 4);
+    webViewHelper.webView()->setDefaultPageScaleLimits(0.9f, 4);
     webViewHelper.webView()->layout();
     doubleTapZoomAlreadyLegibleScale = webViewHelper.webViewImpl()->minimumPageScaleFactor() * doubleTapZoomAlreadyLegibleRatio;
     setScaleAndScrollAndLayout(webViewHelper.webViewImpl(), WebPoint(0, 0), (webViewHelper.webViewImpl()->minimumPageScaleFactor()) * (1 + doubleTapZoomAlreadyLegibleRatio) / 2);
@@ -2530,7 +2560,7 @@ TEST_F(WebFrameTest, DivAutoZoomParamsTest_OldPinch)
     FrameTestHelpers::WebViewHelper webViewHelper;
     webViewHelper.initializeAndLoad(m_baseURL + "get_scale_for_auto_zoom_into_div_test.html");
     webViewHelper.webView()->setDeviceScaleFactor(deviceScaleFactor);
-    webViewHelper.webView()->setPageScaleFactorLimits(0.01f, 4);
+    webViewHelper.webView()->setDefaultPageScaleLimits(0.01f, 4);
     webViewHelper.webView()->setPageScaleFactor(0.5f);
     webViewHelper.webView()->resize(WebSize(viewportWidth, viewportHeight));
     webViewHelper.webView()->layout();
@@ -2589,7 +2619,6 @@ TEST_F(WebFrameTest, DivAutoZoomWideDivTest_OldPinch)
     FrameTestHelpers::WebViewHelper webViewHelper;
     webViewHelper.initializeAndLoad(m_baseURL + "get_wide_div_for_auto_zoom_test.html");
     webViewHelper.webView()->resize(WebSize(viewportWidth, viewportHeight));
-    webViewHelper.webView()->setPageScaleFactorLimits(1.0f, 4);
     webViewHelper.webView()->setDeviceScaleFactor(deviceScaleFactor);
     webViewHelper.webView()->setPageScaleFactor(1.0f);
     webViewHelper.webView()->layout();
@@ -2622,7 +2651,6 @@ TEST_F(WebFrameTest, DivAutoZoomVeryTallTest_OldPinch)
     FrameTestHelpers::WebViewHelper webViewHelper;
     webViewHelper.initializeAndLoad(m_baseURL + "very_tall_div.html", true, 0, 0, enableViewportSettings);
     webViewHelper.webView()->resize(WebSize(viewportWidth, viewportHeight));
-    webViewHelper.webView()->setPageScaleFactorLimits(1.0f, 4);
     webViewHelper.webView()->setDeviceScaleFactor(deviceScaleFactor);
     webViewHelper.webView()->setPageScaleFactor(1.0f);
     webViewHelper.webView()->layout();
@@ -2649,7 +2677,7 @@ TEST_F(WebFrameTest, DivAutoZoomMultipleDivsTest_OldPinch)
     FrameTestHelpers::WebViewHelper webViewHelper;
     webViewHelper.initializeAndLoad(m_baseURL + "get_multiple_divs_for_auto_zoom_test.html");
     webViewHelper.webView()->resize(WebSize(viewportWidth, viewportHeight));
-    webViewHelper.webView()->setPageScaleFactorLimits(0.5f, 4);
+    webViewHelper.webView()->setDefaultPageScaleLimits(0.5f, 4);
     webViewHelper.webView()->setDeviceScaleFactor(deviceScaleFactor);
     webViewHelper.webView()->setPageScaleFactor(0.5f);
     webViewHelper.webView()->layout();
@@ -2708,7 +2736,7 @@ TEST_F(WebFrameTest, DivAutoZoomScaleBoundsTest_OldPinch)
 
     // Test double tap scale bounds.
     // minimumPageScale < doubleTapZoomAlreadyLegibleScale < 1
-    webViewHelper.webView()->setPageScaleFactorLimits(0.5f, 4);
+    webViewHelper.webView()->setDefaultPageScaleLimits(0.5f, 4);
     webViewHelper.webView()->layout();
     float doubleTapZoomAlreadyLegibleScale = webViewHelper.webViewImpl()->minimumPageScaleFactor() * doubleTapZoomAlreadyLegibleRatio;
     setScaleAndScrollAndLayout(webViewHelper.webViewImpl(), WebPoint(0, 0), (webViewHelper.webViewImpl()->minimumPageScaleFactor()) * (1 + doubleTapZoomAlreadyLegibleRatio) / 2);
@@ -2722,7 +2750,7 @@ TEST_F(WebFrameTest, DivAutoZoomScaleBoundsTest_OldPinch)
     // Zoom in to reset double_tap_zoom_in_effect flag.
     webViewHelper.webViewImpl()->applyViewportDeltas(WebSize(), 1.1f, 0);
     // 1 < minimumPageScale < doubleTapZoomAlreadyLegibleScale
-    webViewHelper.webView()->setPageScaleFactorLimits(1.1f, 4);
+    webViewHelper.webView()->setDefaultPageScaleLimits(1.1f, 4);
     webViewHelper.webView()->layout();
     doubleTapZoomAlreadyLegibleScale = webViewHelper.webViewImpl()->minimumPageScaleFactor() * doubleTapZoomAlreadyLegibleRatio;
     setScaleAndScrollAndLayout(webViewHelper.webViewImpl(), WebPoint(0, 0), (webViewHelper.webViewImpl()->minimumPageScaleFactor()) * (1 + doubleTapZoomAlreadyLegibleRatio) / 2);
@@ -2736,7 +2764,7 @@ TEST_F(WebFrameTest, DivAutoZoomScaleBoundsTest_OldPinch)
     // Zoom in to reset double_tap_zoom_in_effect flag.
     webViewHelper.webViewImpl()->applyViewportDeltas(WebSize(), 1.1f, 0);
     // minimumPageScale < 1 < doubleTapZoomAlreadyLegibleScale
-    webViewHelper.webView()->setPageScaleFactorLimits(0.95f, 4);
+    webViewHelper.webView()->setDefaultPageScaleLimits(0.95f, 4);
     webViewHelper.webView()->layout();
     doubleTapZoomAlreadyLegibleScale = webViewHelper.webViewImpl()->minimumPageScaleFactor() * doubleTapZoomAlreadyLegibleRatio;
     setScaleAndScrollAndLayout(webViewHelper.webViewImpl(), WebPoint(0, 0), (webViewHelper.webViewImpl()->minimumPageScaleFactor()) * (1 + doubleTapZoomAlreadyLegibleRatio) / 2);
@@ -2774,7 +2802,7 @@ TEST_F(WebFrameTest, DivAutoZoomScaleFontScaleFactorTest_OldPinch)
     float legibleScale = accessibilityFontScaleFactor;
     setScaleAndScrollAndLayout(webViewHelper.webViewImpl(), WebPoint(0, 0), (webViewHelper.webViewImpl()->minimumPageScaleFactor()) * (1 + doubleTapZoomAlreadyLegibleRatio) / 2);
     float doubleTapZoomAlreadyLegibleScale = webViewHelper.webViewImpl()->minimumPageScaleFactor() * doubleTapZoomAlreadyLegibleRatio;
-    webViewHelper.webView()->setPageScaleFactorLimits(0.5f, 4);
+    webViewHelper.webView()->setDefaultPageScaleLimits(0.5f, 4);
     webViewHelper.webView()->layout();
     simulateDoubleTap(webViewHelper.webViewImpl(), doubleTapPoint, scale);
     EXPECT_FLOAT_EQ(legibleScale, scale);
@@ -2786,7 +2814,7 @@ TEST_F(WebFrameTest, DivAutoZoomScaleFontScaleFactorTest_OldPinch)
     // Zoom in to reset double_tap_zoom_in_effect flag.
     webViewHelper.webViewImpl()->applyViewportDeltas(WebSize(), 1.1f, 0);
     // 1 < accessibilityFontScaleFactor < minimumPageScale < doubleTapZoomAlreadyLegibleScale
-    webViewHelper.webView()->setPageScaleFactorLimits(1.0f, 4);
+    webViewHelper.webView()->setDefaultPageScaleLimits(1.0f, 4);
     webViewHelper.webView()->layout();
     doubleTapZoomAlreadyLegibleScale = webViewHelper.webViewImpl()->minimumPageScaleFactor() * doubleTapZoomAlreadyLegibleRatio;
     setScaleAndScrollAndLayout(webViewHelper.webViewImpl(), WebPoint(0, 0), (webViewHelper.webViewImpl()->minimumPageScaleFactor()) * (1 + doubleTapZoomAlreadyLegibleRatio) / 2);
@@ -2800,7 +2828,7 @@ TEST_F(WebFrameTest, DivAutoZoomScaleFontScaleFactorTest_OldPinch)
     // Zoom in to reset double_tap_zoom_in_effect flag.
     webViewHelper.webViewImpl()->applyViewportDeltas(WebSize(), 1.1f, 0);
     // minimumPageScale < 1 < accessibilityFontScaleFactor < doubleTapZoomAlreadyLegibleScale
-    webViewHelper.webView()->setPageScaleFactorLimits(0.95f, 4);
+    webViewHelper.webView()->setDefaultPageScaleLimits(0.95f, 4);
     webViewHelper.webView()->layout();
     doubleTapZoomAlreadyLegibleScale = webViewHelper.webViewImpl()->minimumPageScaleFactor() * doubleTapZoomAlreadyLegibleRatio;
     setScaleAndScrollAndLayout(webViewHelper.webViewImpl(), WebPoint(0, 0), (webViewHelper.webViewImpl()->minimumPageScaleFactor()) * (1 + doubleTapZoomAlreadyLegibleRatio) / 2);
@@ -2814,7 +2842,7 @@ TEST_F(WebFrameTest, DivAutoZoomScaleFontScaleFactorTest_OldPinch)
     // Zoom in to reset double_tap_zoom_in_effect flag.
     webViewHelper.webViewImpl()->applyViewportDeltas(WebSize(), 1.1f, 0);
     // minimumPageScale < 1 < doubleTapZoomAlreadyLegibleScale < accessibilityFontScaleFactor
-    webViewHelper.webView()->setPageScaleFactorLimits(0.9f, 4);
+    webViewHelper.webView()->setDefaultPageScaleLimits(0.9f, 4);
     webViewHelper.webView()->layout();
     doubleTapZoomAlreadyLegibleScale = webViewHelper.webViewImpl()->minimumPageScaleFactor() * doubleTapZoomAlreadyLegibleRatio;
     setScaleAndScrollAndLayout(webViewHelper.webViewImpl(), WebPoint(0, 0), (webViewHelper.webViewImpl()->minimumPageScaleFactor()) * (1 + doubleTapZoomAlreadyLegibleRatio) / 2);
@@ -2839,7 +2867,7 @@ TEST_F(WebFrameTest, DivMultipleTargetZoomMultipleDivsTest)
     FrameTestHelpers::WebViewHelper webViewHelper;
     webViewHelper.initializeAndLoad(m_baseURL + "get_multiple_divs_for_auto_zoom_test.html");
     webViewHelper.webView()->resize(WebSize(viewportWidth, viewportHeight));
-    webViewHelper.webView()->setPageScaleFactorLimits(0.5f, 4);
+    webViewHelper.webView()->setDefaultPageScaleLimits(0.5f, 4);
     webViewHelper.webView()->setDeviceScaleFactor(deviceScaleFactor);
     webViewHelper.webView()->setPageScaleFactor(0.5f);
     webViewHelper.webView()->layout();
@@ -2876,7 +2904,7 @@ TEST_F(WebFrameTest, DivScrollIntoEditableTest)
     webViewHelper.initializeAndLoad(m_baseURL + "get_scale_for_zoom_into_editable_test.html");
     webViewHelper.webViewImpl()->page()->settings().setTextAutosizingEnabled(false);
     webViewHelper.webView()->resize(WebSize(viewportWidth, viewportHeight));
-    webViewHelper.webView()->setPageScaleFactorLimits(0.25f, 4);
+    webViewHelper.webView()->setDefaultPageScaleLimits(0.25f, 4);
     webViewHelper.webView()->setDeviceScaleFactor(1.5f);
     webViewHelper.webView()->layout();
     webViewHelper.webView()->settings()->setAutoZoomFocusedNodeToLegibleScale(true);
@@ -2958,7 +2986,6 @@ TEST_F(WebFrameTest, DivScrollIntoEditablePreservePageScaleTest)
     webViewHelper.initializeAndLoad(m_baseURL + "get_scale_for_zoom_into_editable_test.html");
     webViewHelper.webViewImpl()->page()->settings().setTextAutosizingEnabled(false);
     webViewHelper.webView()->resize(WebSize(viewportWidth, viewportHeight));
-    webViewHelper.webView()->setPageScaleFactorLimits(1.f, 4);
     webViewHelper.webView()->setDeviceScaleFactor(1.5f);
     webViewHelper.webView()->layout();
     webViewHelper.webView()->settings()->setAutoZoomFocusedNodeToLegibleScale(true);
@@ -4170,6 +4197,26 @@ TEST_F(WebFrameTest, MoveRangeSelectionExtentCannotCollapse)
     EXPECT_EQ("This text is initially selected.", selectionAsString(frame));
 }
 
+TEST_F(WebFrameTest, MoveRangeSelectionExtentScollsInputField)
+{
+    WebLocalFrameImpl* frame;
+    WebRect startWebRect;
+    WebRect endWebRect;
+
+    registerMockedHttpURLLoad("move_range_selection_extent_input_field.html");
+
+    FrameTestHelpers::WebViewHelper webViewHelper;
+    initializeTextSelectionWebView(m_baseURL + "move_range_selection_extent_input_field.html", &webViewHelper);
+    frame = toWebLocalFrameImpl(webViewHelper.webView()->mainFrame());
+    EXPECT_EQ("Length", selectionAsString(frame));
+    webViewHelper.webView()->selectionBounds(startWebRect, endWebRect);
+
+    EXPECT_EQ(0, frame->frame()->selection().rootEditableElement()->scrollLeft());
+    frame->moveRangeSelectionExtent(WebPoint(endWebRect.x + 500, endWebRect.y));
+    EXPECT_GE(frame->frame()->selection().rootEditableElement()->scrollLeft(), 1);
+    EXPECT_EQ("Lengthy text goes here.", selectionAsString(frame));
+}
+
 static int computeOffset(RenderObject* renderer, int x, int y)
 {
     return VisiblePosition(renderer->positionForPoint(LayoutPoint(x, y))).deepEquivalent().computeOffsetInContainerNode();
@@ -4340,7 +4387,7 @@ protected:
 
         m_webViewHelper.initialize(true, 0, &m_fakeSelectionWebViewClient);
         m_webViewHelper.webView()->settings()->setDefaultFontSize(12);
-        m_webViewHelper.webView()->setPageScaleFactorLimits(1, 1);
+        m_webViewHelper.webView()->setDefaultPageScaleLimits(1, 1);
         m_webViewHelper.webView()->resize(WebSize(640, 480));
     }
 
@@ -4424,7 +4471,7 @@ TEST_F(WebFrameTest, CompositedSelectionBoundsCleared)
     FrameTestHelpers::WebViewHelper webViewHelper;
     webViewHelper.initialize(true, 0, &fakeSelectionWebViewClient);
     webViewHelper.webView()->settings()->setDefaultFontSize(12);
-    webViewHelper.webView()->setPageScaleFactorLimits(1, 1);
+    webViewHelper.webView()->setDefaultPageScaleLimits(1, 1);
     webViewHelper.webView()->resize(WebSize(viewWidth, viewHeight));
     FrameTestHelpers::loadFrame(webViewHelper.webView()->mainFrame(), m_baseURL + "select_range_basic.html");
 
@@ -6622,7 +6669,7 @@ TEST_F(WebFrameTest, EmbedderTriggeredDetachWithRemoteMainFrame)
     WebView* view = WebView::create(&viewClient);
     view->setMainFrame(WebRemoteFrame::create(&remoteClient));
     FrameTestHelpers::TestWebFrameClient childFrameClient;
-    WebLocalFrame* childFrame = view->mainFrame()->toWebRemoteFrame()->createLocalChild("", &childFrameClient);
+    WebLocalFrame* childFrame = view->mainFrame()->toWebRemoteFrame()->createLocalChild("", WebSandboxFlags::None, &childFrameClient);
 
     // Purposely keep the LocalFrame alive so it's the last thing to be destroyed.
     RefPtrWillBePersistent<Frame> childCoreFrame = toCoreFrame(childFrame);

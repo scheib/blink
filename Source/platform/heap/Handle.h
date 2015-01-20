@@ -301,7 +301,7 @@ class CrossThreadPersistent;
 // We have to construct and destruct Persistent with default RootsAccessor in
 // the same thread.
 template<typename T, typename RootsAccessor /* = ThreadLocalPersistents<ThreadingTrait<T>::Affinity > */ >
-class Persistent : public PersistentBase<RootsAccessor, Persistent<T, RootsAccessor> > {
+class Persistent : public PersistentBase<RootsAccessor, Persistent<T, RootsAccessor>> {
 public:
     Persistent() : m_raw(nullptr) { }
 
@@ -440,7 +440,7 @@ public:
 template<typename Collection, ThreadAffinity Affinity = AnyThread>
 class PersistentHeapCollectionBase
     : public Collection
-    , public PersistentBase<ThreadLocalPersistents<Affinity>, PersistentHeapCollectionBase<Collection, Affinity> > {
+    , public PersistentBase<ThreadLocalPersistents<Affinity>, PersistentHeapCollectionBase<Collection, Affinity>> {
     // We overload the various new and delete operators with using the WTF DefaultAllocator to ensure persistent
     // heap collections are always allocated off-heap. This allows persistent collections to be used in
     // DEFINE_STATIC_LOCAL et. al.
@@ -465,50 +465,50 @@ template<
     typename MappedArg,
     typename HashArg = typename DefaultHash<KeyArg>::Hash,
     typename KeyTraitsArg = HashTraits<KeyArg>,
-    typename MappedTraitsArg = HashTraits<MappedArg> >
-class PersistentHeapHashMap : public PersistentHeapCollectionBase<HeapHashMap<KeyArg, MappedArg, HashArg, KeyTraitsArg, MappedTraitsArg> > { };
+    typename MappedTraitsArg = HashTraits<MappedArg>>
+class PersistentHeapHashMap : public PersistentHeapCollectionBase<HeapHashMap<KeyArg, MappedArg, HashArg, KeyTraitsArg, MappedTraitsArg>> { };
 
 template<
     typename ValueArg,
     typename HashArg = typename DefaultHash<ValueArg>::Hash,
-    typename TraitsArg = HashTraits<ValueArg> >
-class PersistentHeapHashSet : public PersistentHeapCollectionBase<HeapHashSet<ValueArg, HashArg, TraitsArg> > { };
+    typename TraitsArg = HashTraits<ValueArg>>
+class PersistentHeapHashSet : public PersistentHeapCollectionBase<HeapHashSet<ValueArg, HashArg, TraitsArg>> { };
 
 template<
     typename ValueArg,
     typename HashArg = typename DefaultHash<ValueArg>::Hash,
-    typename TraitsArg = HashTraits<ValueArg> >
-class PersistentHeapLinkedHashSet : public PersistentHeapCollectionBase<HeapLinkedHashSet<ValueArg, HashArg, TraitsArg> > { };
+    typename TraitsArg = HashTraits<ValueArg>>
+class PersistentHeapLinkedHashSet : public PersistentHeapCollectionBase<HeapLinkedHashSet<ValueArg, HashArg, TraitsArg>> { };
 
 template<
     typename ValueArg,
     size_t inlineCapacity = 0,
     typename HashArg = typename DefaultHash<ValueArg>::Hash>
-class PersistentHeapListHashSet : public PersistentHeapCollectionBase<HeapListHashSet<ValueArg, inlineCapacity, HashArg> > { };
+class PersistentHeapListHashSet : public PersistentHeapCollectionBase<HeapListHashSet<ValueArg, inlineCapacity, HashArg>> { };
 
 template<typename T, typename U, typename V>
-class PersistentHeapHashCountedSet : public PersistentHeapCollectionBase<HeapHashCountedSet<T, U, V> > { };
+class PersistentHeapHashCountedSet : public PersistentHeapCollectionBase<HeapHashCountedSet<T, U, V>> { };
 
 template<typename T, size_t inlineCapacity = 0>
-class PersistentHeapVector : public PersistentHeapCollectionBase<HeapVector<T, inlineCapacity> > {
+class PersistentHeapVector : public PersistentHeapCollectionBase<HeapVector<T, inlineCapacity>> {
 public:
     PersistentHeapVector() { }
 
     template<size_t otherCapacity>
     PersistentHeapVector(const HeapVector<T, otherCapacity>& other)
-        : PersistentHeapCollectionBase<HeapVector<T, inlineCapacity> >(other)
+        : PersistentHeapCollectionBase<HeapVector<T, inlineCapacity>>(other)
     {
     }
 };
 
 template<typename T, size_t inlineCapacity = 0>
-class PersistentHeapDeque : public PersistentHeapCollectionBase<HeapDeque<T, inlineCapacity> > {
+class PersistentHeapDeque : public PersistentHeapCollectionBase<HeapDeque<T, inlineCapacity>> {
 public:
     PersistentHeapDeque() { }
 
     template<size_t otherCapacity>
     PersistentHeapDeque(const HeapDeque<T, otherCapacity>& other)
-        : PersistentHeapCollectionBase<HeapDeque<T, inlineCapacity> >(other)
+        : PersistentHeapCollectionBase<HeapDeque<T, inlineCapacity>>(other)
     {
     }
 };
@@ -625,12 +625,14 @@ struct TraceIfEnabled;
 
 template<typename T>
 struct TraceIfEnabled<T, false>  {
-    static void trace(Visitor*, T*) { }
+    template<typename VisitorDispatcher>
+    static void trace(VisitorDispatcher, T*) { }
 };
 
 template<typename T>
 struct TraceIfEnabled<T, true> {
-    static void trace(Visitor* visitor, T* t)
+    template<typename VisitorDispatcher>
+    static void trace(VisitorDispatcher visitor, T* t)
     {
         visitor->trace(*t);
     }
@@ -651,11 +653,12 @@ struct TraceIfNeeded : public TraceIfEnabled<T, WTF::NeedsTracing<T>::value || b
 // collected. If you have a collection that contain weakness it does not remove
 // entries from the collection that contain nulled weak members.
 template<typename T, typename U>
-class TraceTrait<std::pair<T, U> > {
+class TraceTrait<std::pair<T, U>> {
 public:
     static const bool firstNeedsTracing = WTF::NeedsTracing<T>::value || WTF::IsWeak<T>::value;
     static const bool secondNeedsTracing = WTF::NeedsTracing<U>::value || WTF::IsWeak<U>::value;
-    static void trace(Visitor* visitor, std::pair<T, U>* pair)
+    template<typename VisitorDispatcher>
+    static void trace(VisitorDispatcher visitor, std::pair<T, U>* pair)
     {
         TraceIfEnabled<T, firstNeedsTracing>::trace(visitor, &pair->first);
         TraceIfEnabled<U, secondNeedsTracing>::trace(visitor, &pair->second);
@@ -938,25 +941,25 @@ public:
 };
 
 template<typename T, typename U, typename V, typename W, typename X>
-class TraceEagerlyTrait<HeapHashMap<T, U, V, W, X> > {
+class TraceEagerlyTrait<HeapHashMap<T, U, V, W, X>> {
 public:
     static const bool value = MARKER_EAGER_TRACING || TraceEagerlyTrait<T>::value || TraceEagerlyTrait<U>::value;
 };
 
 template<typename T, typename U, typename V>
-class TraceEagerlyTrait<HeapHashSet<T, U, V> > {
+class TraceEagerlyTrait<HeapHashSet<T, U, V>> {
 public:
     static const bool value = MARKER_EAGER_TRACING || TraceEagerlyTrait<T>::value;
 };
 
 template<typename T, typename U, typename V>
-class TraceEagerlyTrait<HeapLinkedHashSet<T, U, V> > {
+class TraceEagerlyTrait<HeapLinkedHashSet<T, U, V>> {
 public:
     static const bool value = MARKER_EAGER_TRACING || TraceEagerlyTrait<T>::value;
 };
 
 template<typename T, size_t inlineCapacity, typename U>
-class TraceEagerlyTrait<HeapListHashSet<T, inlineCapacity, U> > {
+class TraceEagerlyTrait<HeapListHashSet<T, inlineCapacity, U>> {
 public:
     static const bool value = MARKER_EAGER_TRACING || TraceEagerlyTrait<T>::value;
 };
@@ -968,7 +971,7 @@ public:
 };
 
 template<typename T, size_t inlineCapacity>
-class TraceEagerlyTrait<HeapVector<T, inlineCapacity> > {
+class TraceEagerlyTrait<HeapVector<T, inlineCapacity>> {
 public:
     static const bool value = MARKER_EAGER_TRACING || TraceEagerlyTrait<T>::value;
 };

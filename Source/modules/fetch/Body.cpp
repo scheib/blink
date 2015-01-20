@@ -14,6 +14,7 @@
 #include "core/fileapi/Blob.h"
 #include "core/fileapi/FileReaderLoader.h"
 #include "core/fileapi/FileReaderLoaderClient.h"
+#include "core/frame/UseCounter.h"
 #include "core/streams/UnderlyingSource.h"
 #include "modules/fetch/BodyStreamBuffer.h"
 
@@ -122,7 +123,7 @@ ScriptPromise Body::readAsync(ScriptState* scriptState, ResponseType type)
         // 'body' attribute was accessed and the stream source started pulling.
         switch (m_stream->state()) {
         case ReadableStream::Readable:
-            readAllFromStream(scriptState);
+            readAllFromStream();
             return promise;
         case ReadableStream::Waiting:
             // m_loader is working and m_resolver will be resolved when it
@@ -195,19 +196,17 @@ void Body::readAsyncFromBlob(PassRefPtr<BlobDataHandle> handle)
     return;
 }
 
-void Body::readAllFromStream(ScriptState* scriptState)
+void Body::readAllFromStream()
 {
-    // With the current loading mechanism, the data is loaded atomically.
+    ASSERT(m_stream->state() == ReadableStream::Readable);
     ASSERT(m_stream->isDraining());
-    TrackExceptionState es;
-    // FIXME: Implement and use another |read| method that doesn't
-    // need an exception state and V8ArrayBuffer.
-    ScriptValue value = m_stream->read(scriptState, es);
-    ASSERT(!es.hadException());
+
+    Deque<std::pair<RefPtr<DOMArrayBuffer>, size_t>> queue;
+    m_stream->read(queue);
     ASSERT(m_stream->state() == ReadableStream::Closed);
-    ASSERT(!value.isEmpty() && V8ArrayBuffer::hasInstance(value.v8Value(), scriptState->isolate()));
-    DOMArrayBuffer* buffer = V8ArrayBuffer::toImpl(value.v8Value().As<v8::Object>());
-    didFinishLoadingViaStream(buffer);
+    // With the current loading mechanism, the data is loaded atomically.
+    ASSERT(queue.size() == 1);
+    didFinishLoadingViaStream(queue[0].first);
     m_resolver.clear();
     m_stream->close();
 }
@@ -239,6 +238,7 @@ ScriptPromise Body::text(ScriptState* scriptState)
 
 ReadableStream* Body::body()
 {
+    UseCounter::count(executionContext(), UseCounter::FetchBodyStream);
     if (!m_streamAccessed) {
         m_streamAccessed = true;
         if (m_stream->isPulling()) {
@@ -339,7 +339,7 @@ void Body::didFinishLoading()
         return;
 
     if (m_streamAccessed) {
-        didFinishLoadingViaStream(m_loader->arrayBufferResult().get());
+        didFinishLoadingViaStream(m_loader->arrayBufferResult());
         m_resolver.clear();
         m_stream->close();
         return;
@@ -374,7 +374,7 @@ void Body::didFinishLoading()
     m_stream->close();
 }
 
-void Body::didFinishLoadingViaStream(DOMArrayBuffer* buffer)
+void Body::didFinishLoadingViaStream(PassRefPtr<DOMArrayBuffer> buffer)
 {
     if (!m_bodyUsed) {
         // |m_stream| is pulling.

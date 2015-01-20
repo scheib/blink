@@ -133,7 +133,7 @@ WebInspector.RequestTimingView.calculateRequestTimeRanges = function(request)
      */
     function addRange(name, start, end)
     {
-        if (start <= end)
+        if (start < Number.MAX_VALUE && start <= end)
             result.push({name: name, start: start, end: end});
     }
 
@@ -208,7 +208,10 @@ WebInspector.RequestTimingView.calculateRequestTimeRanges = function(request)
 WebInspector.RequestTimingView.createTimingTable = function(request, navigationStart)
 {
     var tableElement = createElementWithClass("table", "network-timing-table");
-    tableElement.createChild("colgroup").createChild("col", "labels");
+    var colgroup = tableElement.createChild("colgroup");
+    colgroup.createChild("col", "labels");
+    colgroup.createChild("col", "bars");
+    colgroup.createChild("col", "duration");
 
     var timeRanges = WebInspector.RequestTimingView.calculateRequestTimeRanges(request);
     var startTime = timeRanges[0].start;
@@ -260,7 +263,7 @@ WebInspector.RequestTimingView.createTimingTable = function(request, navigationS
 
     if (!request.finished) {
         var cell = tableElement.createChild("tr").createChild("td", "caution");
-        cell.colSpan = 2;
+        cell.colSpan = 3;
         cell.createTextChild(WebInspector.UIString("CAUTION: request is not finished yet!"));
     }
 

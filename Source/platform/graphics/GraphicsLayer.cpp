@@ -63,7 +63,7 @@
 
 namespace blink {
 
-typedef HashMap<const GraphicsLayer*, Vector<FloatRect> > RepaintMap;
+typedef HashMap<const GraphicsLayer*, Vector<FloatRect>> RepaintMap;
 static RepaintMap& repaintRectMap()
 {
     DEFINE_STATIC_LOCAL(RepaintMap, map, ());
@@ -1085,16 +1085,19 @@ void GraphicsLayer::notifyAnimationStarted(double monotonicTime, int group)
         m_client->notifyAnimationStarted(this, monotonicTime, group);
 }
 
-void GraphicsLayer::notifyAnimationFinished(double, int)
+void GraphicsLayer::notifyAnimationFinished(double, int group)
 {
+    if (m_scrollableArea)
+        m_scrollableArea->notifyCompositorAnimationFinished(group);
 }
 
 void GraphicsLayer::didScroll()
 {
     if (m_scrollableArea) {
         DoublePoint newPosition = m_scrollableArea->minimumScrollPosition() + toDoubleSize(m_layer->layer()->scrollPositionDouble());
+        bool cancelProgrammaticAnimations = false;
         // FIXME: Remove the toFloatPoint(). crbug.com/414283.
-        m_scrollableArea->scrollToOffsetWithoutAnimation(toFloatPoint(newPosition));
+        m_scrollableArea->scrollToOffsetWithoutAnimation(toFloatPoint(newPosition), cancelProgrammaticAnimations);
     }
 }
 

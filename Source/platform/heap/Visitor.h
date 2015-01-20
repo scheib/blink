@@ -35,6 +35,7 @@
 #include "platform/heap/StackFrameDepth.h"
 #include "platform/heap/ThreadState.h"
 #include "wtf/Assertions.h"
+#include "wtf/Atomics.h"
 #include "wtf/Deque.h"
 #include "wtf/Forward.h"
 #include "wtf/HashMap.h"
@@ -323,7 +324,8 @@ struct OffHeapCollectionTraceTrait;
 
 template<typename T>
 struct ObjectAliveTrait {
-    static bool isHeapObjectAlive(Visitor*, T*);
+    template<typename VisitorDispatcher>
+    static bool isHeapObjectAlive(VisitorDispatcher, T*);
 };
 
 // VisitorHelper contains common implementation of Visitor helper methods.
@@ -344,6 +346,7 @@ public:
             return;
 #if ENABLE(ASSERT)
         TraceTrait<T>::checkGCInfo(t);
+        Derived::fromHelper(this)->checkMarkingAllowed();
 #endif
         TraceTrait<T>::mark(Derived::fromHelper(this), t);
 
@@ -430,13 +433,13 @@ public:
     template<typename T, size_t inlineCapacity>
     void trace(const Vector<T, inlineCapacity>& vector)
     {
-        OffHeapCollectionTraceTrait<Vector<T, inlineCapacity, WTF::DefaultAllocator> >::trace(Derived::fromHelper(this), vector);
+        OffHeapCollectionTraceTrait<Vector<T, inlineCapacity, WTF::DefaultAllocator>>::trace(Derived::fromHelper(this), vector);
     }
 
     template<typename T, size_t N>
     void trace(const Deque<T, N>& deque)
     {
-        OffHeapCollectionTraceTrait<Deque<T, N> >::trace(Derived::fromHelper(this), deque);
+        OffHeapCollectionTraceTrait<Deque<T, N>>::trace(Derived::fromHelper(this), deque);
     }
 
 #if !ENABLE(OILPAN)
@@ -626,13 +629,13 @@ public:
     }
 #endif
 
-    inline bool canTraceEagerly() const
+    inline static bool canTraceEagerly()
     {
         ASSERT(m_stackFrameDepth);
         return m_stackFrameDepth->isSafeToRecurse();
     }
 
-    inline void configureEagerTraceLimit()
+    inline static void configureEagerTraceLimit()
     {
         if (!m_stackFrameDepth)
             m_stackFrameDepth = new StackFrameDepth;
@@ -657,6 +660,10 @@ protected:
     String m_hostName;
 #endif
 
+#if ENABLE(ASSERT)
+    virtual void checkMarkingAllowed() { }
+#endif
+
 private:
     static Visitor* fromHelper(VisitorHelper<Visitor>* helper) { return static_cast<Visitor*>(helper); }
     static StackFrameDepth* m_stackFrameDepth;
@@ -668,7 +675,7 @@ private:
 // can have vectors of general objects (not just pointers to objects) that can
 // be traced.
 template<typename T, size_t N>
-struct OffHeapCollectionTraceTrait<WTF::Vector<T, N, WTF::DefaultAllocator> > {
+struct OffHeapCollectionTraceTrait<WTF::Vector<T, N, WTF::DefaultAllocator>> {
     typedef WTF::Vector<T, N, WTF::DefaultAllocator> Vector;
 
     template<typename VisitorDispatcher>
@@ -682,7 +689,7 @@ struct OffHeapCollectionTraceTrait<WTF::Vector<T, N, WTF::DefaultAllocator> > {
 };
 
 template<typename T, size_t N>
-struct OffHeapCollectionTraceTrait<WTF::Deque<T, N> > {
+struct OffHeapCollectionTraceTrait<WTF::Deque<T, N>> {
     typedef WTF::Deque<T, N> Deque;
 
     template<typename VisitorDispatcher>
@@ -695,7 +702,7 @@ struct OffHeapCollectionTraceTrait<WTF::Deque<T, N> > {
     }
 };
 
-template<typename T, typename Traits = WTF::VectorTraits<T> >
+template<typename T, typename Traits = WTF::VectorTraits<T>>
 class HeapVectorBacking;
 
 template<typename Table>
@@ -724,7 +731,10 @@ public:
             // Assert against deep stacks so as to flush them out,
             // but test and appropriately handle them should they occur
             // in release builds.
-            ASSERT(visitor->canTraceEagerly());
+            // FIXME: visitor->isMarked(t) exception is to allow empty trace()
+            // calls from HashTable weak processing. Remove the condition once
+            // it is refactored.
+            ASSERT(visitor->canTraceEagerly() || visitor->isMarked(t));
             if (LIKELY(visitor->canTraceEagerly())) {
                 if (visitor->ensureMarked(t)) {
                     TraceTrait<T>::trace(visitor, const_cast<T*>(t));
@@ -773,7 +783,8 @@ template<typename T, bool = NeedsAdjustAndMark<T>::value> class DefaultObjectAli
 template<typename T>
 class DefaultObjectAliveTrait<T, false> {
 public:
-    static bool isHeapObjectAlive(Visitor* visitor, T* obj)
+    template<typename VisitorDispatcher>
+    static bool isHeapObjectAlive(VisitorDispatcher visitor, T* obj)
     {
         return visitor->isMarked(obj);
     }
@@ -782,13 +793,16 @@ public:
 template<typename T>
 class DefaultObjectAliveTrait<T, true> {
 public:
-    static bool isHeapObjectAlive(Visitor* visitor, T* obj)
+    template<typename VisitorDispatcher>
+    static bool isHeapObjectAlive(VisitorDispatcher visitor, T* obj)
     {
         return obj->isHeapObjectAlive(visitor);
     }
 };
 
-template<typename T> bool ObjectAliveTrait<T>::isHeapObjectAlive(Visitor* visitor, T* obj)
+template<typename T>
+template<typename VisitorDispatcher>
+bool ObjectAliveTrait<T>::isHeapObjectAlive(VisitorDispatcher visitor, T* obj)
 {
     return DefaultObjectAliveTrait<T>::isHeapObjectAlive(visitor, obj);
 }
@@ -883,7 +897,7 @@ private:
 #define RETURN_GCINFO_INDEX()                                  \
     static size_t gcInfoIndex = 0;                             \
     ASSERT(s_gcInfoTable);                                     \
-    if (!gcInfoIndex)                                          \
+    if (!acquireLoad(&gcInfoIndex))                            \
         GCInfoTable::ensureGCInfoIndex(&gcInfo, &gcInfoIndex); \
     ASSERT(gcInfoIndex >= 1);                                  \
     ASSERT(gcInfoIndex < GCInfoTable::maxIndex);               \

@@ -37,7 +37,7 @@
 #include "core/dom/NodeRenderStyle.h"
 #include "core/dom/shadow/ShadowRoot.h"
 #include "core/editing/FrameSelection.h"
-#include "core/editing/TextIterator.h"
+#include "core/editing/iterators/TextIterator.h"
 #include "core/events/BeforeTextInsertedEvent.h"
 #include "core/events/KeyboardEvent.h"
 #include "core/events/TextEvent.h"
@@ -248,7 +248,7 @@ void TextFieldInputType::forwardEvent(Event* event)
     }
 }
 
-void TextFieldInputType::handleFocusEvent(Element* oldFocusedNode, FocusType focusType)
+void TextFieldInputType::handleFocusEvent(Element* oldFocusedNode, WebFocusType focusType)
 {
     InputType::handleFocusEvent(oldFocusedNode, focusType);
     element().beginEditing();

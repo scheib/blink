@@ -27,6 +27,9 @@ WebInspector.AnimationsSidebarPane = function(stylesPane)
 
     this.bodyElement.appendChild(this.headerElement);
     this.bodyElement.appendChild(this.animationsElement);
+
+    this._timeline = new WebInspector.AnimationTimeline();
+    this._timeline.show(this.bodyElement);
 }
 
 /**
@@ -80,6 +83,7 @@ WebInspector.AnimationsSidebarPane.prototype = {
     _animationPlayerCreated: function(event)
     {
         this._addAnimationPlayer(/** @type {!WebInspector.AnimationModel.AnimationPlayer} */ (event.data));
+        this._timeline.addAnimation(/** @type {!WebInspector.AnimationModel.AnimationPlayer} */ (event.data));
     },
 
     /**
@@ -141,6 +145,7 @@ WebInspector.AnimationsSidebarPane.prototype = {
         this._selectedNode = this.node();
         this.node().target().animationModel.getAnimationPlayers(this.node().id, this._showSubtreeSetting.get(), animationPlayersCallback.bind(this));
         this.node().target().animationModel.startListening(this.node().id, this._showSubtreeSetting.get());
+        this._timeline.redraw();
     },
 
     __proto__: WebInspector.ElementsSidebarPane.prototype
@@ -387,7 +392,7 @@ WebInspector.AnimationSection.prototype = {
                 model.setIsAttribute(true);
                 model.setEditable(true);
                 var styleSection = new WebInspector.StylePropertiesSection(this._stylesPane, model);
-                styleSection.expand();
+                styleSection.onpopulate();
                 this._keyframesElement.appendChild(styleSection.element);
             }
         }

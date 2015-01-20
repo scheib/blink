@@ -12,7 +12,9 @@
 #include "core/css/parser/CSSParserFastPaths.h"
 #include "core/css/parser/CSSParserImpl.h"
 #include "core/css/parser/CSSSelectorParser.h"
+#include "core/css/parser/CSSSupportsParser.h"
 #include "core/css/parser/CSSTokenizer.h"
+#include "core/rendering/RenderTheme.h"
 
 namespace blink {
 
@@ -119,6 +121,12 @@ PassRefPtrWillBeRawPtr<StyleRuleKeyframe> CSSParser::parseKeyframeRule(const CSS
 
 bool CSSParser::parseSupportsCondition(const String& condition)
 {
+    if (RuntimeEnabledFeatures::newCSSParserEnabled()) {
+        Vector<CSSParserToken> tokens;
+        CSSTokenizer::tokenize(condition, tokens);
+        CSSParserImpl parser(strictCSSParserContext(), "");
+        return CSSSupportsParser::supportsCondition(tokens, parser) == CSSSupportsParser::Supported;
+    }
     return BisonCSSParser(CSSParserContext(HTMLStandardMode, 0)).parseSupportsCondition(condition);
 }
 
@@ -152,12 +160,25 @@ bool CSSParser::parseColor(RGBA32& color, const String& string, bool strict)
 
 StyleColor CSSParser::colorFromRGBColorString(const String& string)
 {
-    return BisonCSSParser::colorFromRGBColorString(string);
+    // FIXME: Rework css parser so it is more SVG aware.
+    RGBA32 color;
+    if (parseColor(color, string.stripWhiteSpace()))
+        return StyleColor(color);
+    // FIXME: This branch catches the string currentColor, but we should error if we have an illegal color value.
+    return StyleColor::currentColor();
 }
 
 bool CSSParser::parseSystemColor(RGBA32& color, const String& colorString)
 {
-    return BisonCSSParser::parseSystemColor(color, colorString);
+    CSSParserString cssColor;
+    cssColor.init(colorString);
+    CSSValueID id = cssValueKeywordID(cssColor);
+    if (!CSSPropertyParser::isSystemColor(id))
+        return false;
+
+    Color parsedColor = RenderTheme::theme().systemColor(id);
+    color = parsedColor.rgb();
+    return true;
 }
 
 } // namespace blink

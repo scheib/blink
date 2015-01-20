@@ -29,13 +29,10 @@
 #include "platform/graphics/Color.h"
 #include "platform/graphics/ColorSpace.h"
 #include "platform/heap/Handle.h"
-
 #include "third_party/skia/include/core/SkImageFilter.h"
-
 #include "wtf/PassOwnPtr.h"
 #include "wtf/RefCounted.h"
 #include "wtf/RefPtr.h"
-#include "wtf/Uint8ClampedArray.h"
 #include "wtf/Vector.h"
 
 namespace blink {
@@ -46,7 +43,7 @@ class TextStream;
 
 class SkiaImageFilterBuilder;
 
-typedef WillBeHeapVector<RefPtrWillBeMember<FilterEffect> > FilterEffectVector;
+typedef WillBeHeapVector<RefPtrWillBeMember<FilterEffect>> FilterEffectVector;
 
 enum FilterEffectType {
     FilterEffectTypeUnknown,

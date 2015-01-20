@@ -77,7 +77,7 @@ public:
 private:
     explicit MediaControls(HTMLMediaElement&);
 
-    bool initializeControls();
+    void initializeControls();
 
     void makeOpaque();
     void makeTransparent();
@@ -109,9 +109,6 @@ private:
     virtual bool willRespondToMouseMoveEvents() override { return true; }
     virtual void defaultEventHandler(Event*) override;
     bool containsRelatedTarget(Event*);
-
-    // Element
-    virtual const AtomicString& shadowPseudoId() const override;
 
     RawPtrWillBeMember<HTMLMediaElement> m_mediaElement;
 

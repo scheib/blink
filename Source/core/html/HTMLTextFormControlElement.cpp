@@ -36,8 +36,9 @@
 #include "core/dom/shadow/ShadowRoot.h"
 #include "core/editing/Editor.h"
 #include "core/editing/FrameSelection.h"
-#include "core/editing/TextIterator.h"
 #include "core/editing/htmlediting.h"
+#include "core/editing/iterators/CharacterIterator.h"
+#include "core/editing/iterators/TextIterator.h"
 #include "core/events/Event.h"
 #include "core/frame/LocalFrame.h"
 #include "core/frame/UseCounter.h"
@@ -79,7 +80,7 @@ Node::InsertionNotificationRequest HTMLTextFormControlElement::insertedInto(Cont
     return InsertionDone;
 }
 
-void HTMLTextFormControlElement::dispatchFocusEvent(Element* oldFocusedElement, FocusType type)
+void HTMLTextFormControlElement::dispatchFocusEvent(Element* oldFocusedElement, WebFocusType type)
 {
     if (supportsPlaceholder())
         updatePlaceholderVisibility(false);

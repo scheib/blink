@@ -36,7 +36,7 @@ using namespace blink;
 
 namespace blink {
 
-class DummyContext : public LifecycleContext<DummyContext> {
+class DummyContext final : public NoBaseWillBeGarbageCollectedFinalized<DummyContext>, public LifecycleContext<DummyContext> {
 public:
     PassOwnPtr<LifecycleNotifier<DummyContext>> createLifecycleNotifier()
     {
@@ -87,24 +87,26 @@ public:
 
 TEST(LifecycleContextTest, shouldObserveContextDestroyed)
 {
-    OwnPtr<DummyContext> context = adoptPtr(new DummyContext());
-    TestingObserver* observer = new TestingObserver(context.get());
+    OwnPtrWillBeRawPtr<DummyContext> context = adoptPtrWillBeNoop(new DummyContext());
+    Persistent<TestingObserver> observer = new TestingObserver(context.get());
 
     EXPECT_EQ(observer->lifecycleContext(), context.get());
     EXPECT_FALSE(observer->m_contextDestroyedCalled);
     context->notifyContextDestroyed();
-    context.clear();
+    context = nullptr;
+    Heap::collectAllGarbage();
     EXPECT_EQ(observer->lifecycleContext(), static_cast<DummyContext*>(0));
     EXPECT_TRUE(observer->m_contextDestroyedCalled);
 }
 
 TEST(LifecycleContextTest, shouldNotObserveContextDestroyedIfUnobserve)
 {
-    OwnPtr<DummyContext> context = adoptPtr(new DummyContext());
-    TestingObserver* observer = new TestingObserver(context.get());
+    OwnPtrWillBeRawPtr<DummyContext> context = adoptPtrWillBeNoop(new DummyContext());
+    Persistent<TestingObserver> observer = new TestingObserver(context.get());
     observer->unobserve();
     context->notifyContextDestroyed();
-    context.clear();
+    context = nullptr;
+    Heap::collectAllGarbage();
     EXPECT_EQ(observer->lifecycleContext(), static_cast<DummyContext*>(0));
     EXPECT_FALSE(observer->m_contextDestroyedCalled);
 }

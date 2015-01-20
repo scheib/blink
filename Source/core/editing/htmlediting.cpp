@@ -39,10 +39,10 @@
 #include "core/editing/Editor.h"
 #include "core/editing/HTMLInterchange.h"
 #include "core/editing/PlainTextRange.h"
-#include "core/editing/TextIterator.h"
 #include "core/editing/VisiblePosition.h"
 #include "core/editing/VisibleSelection.h"
 #include "core/editing/VisibleUnits.h"
+#include "core/editing/iterators/TextIterator.h"
 #include "core/frame/LocalFrame.h"
 #include "core/frame/UseCounter.h"
 #include "core/html/HTMLBRElement.h"
@@ -75,7 +75,7 @@ int comparePositions(const Position& a, const Position& b)
 {
     ASSERT(a.isNotNull());
     ASSERT(b.isNotNull());
-    TreeScope* commonScope = commonTreeScope(a.containerNode(), b.containerNode());
+    const TreeScope* commonScope = a.containerNode()->treeScope().commonAncestorTreeScope(b.containerNode()->treeScope());
 
     ASSERT(commonScope);
     if (!commonScope)

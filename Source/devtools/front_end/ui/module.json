@@ -62,14 +62,17 @@
         "panelEnablerView.css",
         "pieChart.css",
         "progressIndicator.css",
+        "propertiesSection.css",
         "radioButton.css",
         "searchableView.css",
+        "section.css",
         "softContextMenu.css",
         "splitView.css",
         "statusBar.css",
         "suggestBox.css",
         "tabbedPane.css",
         "textButton.css",
+        "textPrompt.css",
         "xmlView.css"
     ]
 }

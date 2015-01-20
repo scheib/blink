@@ -161,7 +161,7 @@ private:
 
     FontPlatformData m_platformData;
 
-    mutable OwnPtr<GlyphMetricsMap<FloatRect> > m_glyphToBoundsMap;
+    mutable OwnPtr<GlyphMetricsMap<FloatRect>> m_glyphToBoundsMap;
     mutable GlyphMetricsMap<float> m_glyphToWidthMap;
 
     bool m_treatAsFixedPitch;
@@ -200,7 +200,7 @@ private:
     mutable OwnPtr<DerivedFontData> m_derivedFontData;
 
     RefPtr<CustomFontData> m_customFontData;
-    mutable OwnPtr<HashMap<String, bool> > m_combiningCharacterSequenceSupport;
+    mutable OwnPtr<HashMap<String, bool>> m_combiningCharacterSequenceSupport;
 };
 
 ALWAYS_INLINE FloatRect SimpleFontData::boundsForGlyph(Glyph glyph) const
@@ -231,10 +231,7 @@ ALWAYS_INLINE float SimpleFontData::widthForGlyph(Glyph glyph) const
     if (width != cGlyphSizeUnknown)
         return width;
 
-    if (m_verticalData)
-        width = m_verticalData->advanceHeight(this, glyph);
-    else
-        width = platformWidthForGlyph(glyph);
+    width = platformWidthForGlyph(glyph);
 
     m_glyphToWidthMap.setMetricsForGlyph(glyph, width);
     return width;

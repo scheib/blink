@@ -1,3 +1,5 @@
+CONSOLE WARNING: 'webkitOfflineAudioContext' is deprecated. Please use 'OfflineAudioContext' instead.
+CONSOLE WARNING: 'webkitAudioContext' is deprecated. Please use 'AudioContext' instead.
 CONSOLE WARNING: 'window.webkitStorageInfo' is deprecated. Please use 'navigator.webkitTemporaryStorage' or 'navigator.webkitPersistentStorage' instead.
 CONSOLE WARNING: 'webkitIDBTransaction' is deprecated. Please use 'IDBTransaction' instead.
 CONSOLE WARNING: 'webkitIDBRequest' is deprecated. Please use 'IDBRequest' instead.
@@ -312,6 +314,11 @@ interface CredentialsContainer
     method notifySignedIn
     method notifySignedOut
     method request
+interface Crypto
+    method constructor
+    method getRandomValues
+interface CryptoKey
+    method constructor
 interface CustomEvent
     method constructor
     method initCustomEvent
@@ -401,6 +408,11 @@ interface DataTransfer
     method getData
     method setData
     method setDragImage
+interface DataTransferItem
+    method constructor
+    method getAsFile
+    method getAsString
+    method webkitGetAsEntry
 interface DataTransferItemList
     method add
     method clear
@@ -989,10 +1001,13 @@ interface Headers
     method append
     method constructor
     method delete
+    method entries
     method get
     method getAll
     method has
+    method keys
     method set
+    method values
 interface History
     method back
     method constructor
@@ -1172,6 +1187,10 @@ interface MediaList
     method constructor
     method deleteMedium
     method item
+interface MediaQueryList
+    method addListener
+    method constructor
+    method removeListener
 interface MediaQueryListEvent
     method constructor
 interface MediaSource
@@ -1428,10 +1447,12 @@ interface Promise
     method then
 interface PushManager
     method constructor
+    method getSubscription
     method hasPermission
-    method register
-interface PushRegistration
+    method subscribe
+interface PushSubscription
     method constructor
+    method unsubscribe
 interface RTCIceCandidate
     method constructor
 interface RTCSessionDescription
@@ -2159,6 +2180,20 @@ interface StyleSheet
 interface StyleSheetList
     method constructor
     method item
+interface SubtleCrypto
+    method constructor
+    method decrypt
+    method deriveBits
+    method deriveKey
+    method digest
+    method encrypt
+    method exportKey
+    method generateKey
+    method importKey
+    method sign
+    method unwrapKey
+    method verify
+    method wrapKey
 interface Symbol
     method constructor
     method toString
@@ -2796,8 +2831,6 @@ interface WebKitCSSMatrix
     method skewY
     method toString
     method translate
-interface WebKitGamepad
-    method constructor
 interface WebKitMutationObserver
     method constructor
     method disconnect

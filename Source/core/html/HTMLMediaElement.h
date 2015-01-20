@@ -153,7 +153,7 @@ public:
     unsigned webkitVideoDecodedByteCount() const;
 
     // media source extensions
-    void closeMediaSource();
+    void detachMediaSource();
     void durationChanged(double duration, bool requestSeek);
 
     // controls
@@ -175,8 +175,6 @@ public:
     void selectedVideoTrackChanged(blink::WebMediaPlayer::TrackId*);
 
     PassRefPtrWillBeRawPtr<TextTrack> addTextTrack(const AtomicString& kind, const AtomicString& label, const AtomicString& language, ExceptionState&);
-    PassRefPtrWillBeRawPtr<TextTrack> addTextTrack(const AtomicString& kind, const AtomicString& label, ExceptionState& exceptionState) { return addTextTrack(kind, label, emptyAtom, exceptionState); }
-    PassRefPtrWillBeRawPtr<TextTrack> addTextTrack(const AtomicString& kind, ExceptionState& exceptionState) { return addTextTrack(kind, emptyAtom, emptyAtom, exceptionState); }
 
     TextTrackList* textTracks();
     CueList currentlyActiveCues() const { return m_currentlyActiveCues; }
@@ -300,7 +298,7 @@ public:
     // to the media element and signal that it wants to be notified
     // of destruction if it survives a GC, but the media element
     // doesn't.
-    void setCloseMediaSourceWhenFinalizing();
+    void setDetachMediaSourceWhenFinalizing();
 #endif
 
     // Predicates also used when dispatching wrapper creation (cf. [SpecialWrapFor] IDL attribute usage.)
@@ -440,7 +438,7 @@ private:
     void refreshCachedTime() const;
 
     bool hasMediaControls() const;
-    bool createMediaControls();
+    void ensureMediaControls();
     void configureMediaControls();
 
     virtual void* preDispatchEventHandler(Event*) override final;
@@ -577,7 +575,7 @@ private:
     bool m_playingRemotely : 1;
 #if ENABLE(OILPAN)
     bool m_isFinalizing : 1;
-    bool m_closeMediaSourceWhenFinalizing : 1;
+    bool m_detachMediaSourceWhenFinalizing : 1;
 #endif
     double m_lastTextTrackUpdateTime;
     bool m_initialPlayWithoutUserGestures : 1;

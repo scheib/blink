@@ -56,6 +56,18 @@ bool AXTableCell::isTableHeaderCell() const
     return node() && node()->hasTagName(thTag);
 }
 
+bool AXTableCell::isRowHeaderCell() const
+{
+    const AtomicString& scope = getAttribute(scopeAttr);
+    return equalIgnoringCase(scope, "row") || equalIgnoringCase(scope, "rowgroup");
+}
+
+bool AXTableCell::isColumnHeaderCell() const
+{
+    const AtomicString& scope = getAttribute(scopeAttr);
+    return equalIgnoringCase(scope, "col") || equalIgnoringCase(scope, "colgroup");
+}
+
 bool AXTableCell::computeAccessibilityIsIgnored() const
 {
     AXObjectInclusion decision = defaultObjectInclusion();
@@ -113,10 +125,10 @@ AccessibilityRole AXTableCell::scanToDecideHeaderRole()
         return CellRole;
 
     // Check scope attribute first.
-    const AtomicString& scope = getAttribute(scopeAttr);
-    if (equalIgnoringCase(scope, "row"))
+    if (isRowHeaderCell())
         return RowHeaderRole;
-    if (equalIgnoringCase(scope, "col"))
+
+    if (isColumnHeaderCell())
         return ColumnHeaderRole;
 
     // Check the previous cell and the next cell
@@ -195,8 +207,7 @@ AXObject* AXTableCell::titleUIElement() const
 
     // Table cells that are th cannot have title ui elements, since by definition
     // they are title ui elements
-    Node* node = m_renderer->node();
-    if (node && node->hasTagName(thTag))
+    if (isTableHeaderCell())
         return 0;
 
     RenderTableCell* renderCell = toRenderTableCell(m_renderer);

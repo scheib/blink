@@ -42,6 +42,7 @@
 #include "bindings/core/v8/V8Window.h"
 #include "core/dom/Document.h"
 #include "core/dom/ExceptionCode.h"
+#include "core/fetch/AccessControlStatus.h"
 #include "core/frame/ConsoleTypes.h"
 #include "core/frame/LocalDOMWindow.h"
 #include "core/frame/LocalFrame.h"
@@ -55,6 +56,7 @@
 #include "platform/heap/AddressSanitizer.h"
 #include "platform/scheduler/Scheduler.h"
 #include "public/platform/Platform.h"
+#include "wtf/ArrayBufferContents.h"
 #include "wtf/RefPtr.h"
 #include "wtf/ThreadSpecific.h"
 #include "wtf/text/WTFString.h"
@@ -211,6 +213,27 @@ public:
     const int m_lineNumber;
     const int m_columnNumber;
     const RefPtrWillBeMember<ScriptCallStack> m_callStack;
+};
+
+class ArrayBufferAllocator : public v8::ArrayBuffer::Allocator {
+    virtual void* Allocate(size_t size) override
+    {
+        void* data;
+        WTF::ArrayBufferContents::allocateMemory(size, WTF::ArrayBufferContents::ZeroInitialize, data);
+        return data;
+    }
+
+    virtual void* AllocateUninitialized(size_t size) override
+    {
+        void* data;
+        WTF::ArrayBufferContents::allocateMemory(size, WTF::ArrayBufferContents::DontInitialize, data);
+        return data;
+    }
+
+    virtual void Free(void* data, size_t size) override
+    {
+        WTF::ArrayBufferContents::freeMemory(data, size);
+    }
 };
 
 } // namespace
@@ -443,7 +466,8 @@ void V8Initializer::initializeMainThreadIfNeeded()
         return;
     initialized = true;
 
-    gin::IsolateHolder::Initialize(gin::IsolateHolder::kNonStrictMode, v8ArrayBufferAllocator());
+    DEFINE_STATIC_LOCAL(ArrayBufferAllocator, arrayBufferAllocator, ());
+    gin::IsolateHolder::Initialize(gin::IsolateHolder::kNonStrictMode, &arrayBufferAllocator);
 
     v8::Isolate* isolate = V8PerIsolateData::initialize();
 

@@ -280,6 +280,26 @@
         category, name, TRACE_EVENT_FLAG_COPY, arg1_name, arg1_val, \
         arg2_name, arg2_val)
 
+#define TRACE_EVENT_MARK(category_group, name) \
+    INTERNAL_TRACE_EVENT_ADD( \
+        TRACE_EVENT_PHASE_MARK, category_group, name, TRACE_EVENT_FLAG_NONE)
+
+#define TRACE_EVENT__MEASURE(category_group, name, start_mark, end_mark) \
+    INTERNAL_TRACE_EVENT_ADD( \
+        TRACE_EVENT_PHASE_MEASURE, category_group, name, TRACE_EVENT_FLAG_NONE, \
+        "from", static_cast<const char *>(start_mark), \
+        "to", static_cast<const char *>(end_mark))
+
+#define TRACE_EVENT_COPY_MARK(category_group, name) \
+    INTERNAL_TRACE_EVENT_ADD( \
+        TRACE_EVENT_PHASE_MARK, category_group, name, TRACE_EVENT_FLAG_COPY)
+
+#define TRACE_EVENT_COPY_MEASURE(category_group, name, start_mark, end_mark) \
+    INTERNAL_TRACE_EVENT_ADD( \
+        TRACE_EVENT_PHASE_MEASURE, category_group, name, TRACE_EVENT_FLAG_COPY, \
+        "from", static_cast<const char *>(start_mark), \
+        "to", static_cast<const char *>(end_mark))
+
 // Records the value of a counter called "name" immediately. Value
 // must be representable as a 32 bit integer.
 // - category and name strings must have application lifetime (statics or
@@ -350,6 +370,9 @@
         value1_name, static_cast<int>(value1_val), \
         value2_name, static_cast<int>(value2_val))
 
+// ASYNC_STEP_* APIs should be only used by legacy code. New code should
+// consider using NESTABLE_ASYNC_* APIs to describe substeps within an async
+// event.
 // Records a single ASYNC_BEGIN event called "name" immediately, with 0, 1 or 2
 // associated arguments. If the category is not enabled, then this
 // does nothing.
@@ -451,6 +474,70 @@
         category, name, id, TRACE_EVENT_FLAG_COPY, \
         arg1_name, arg1_val, arg2_name, arg2_val)
 
+// NESTABLE_ASYNC_* APIs are used to describe an async operation, which can
+// be nested within a NESTABLE_ASYNC event and/or have inner NESTABLE_ASYNC
+// events.
+// - category and name strings must have application lifetime (statics or
+//   literals). They may not include " chars.
+// - |id| is used to match the NESTABLE_ASYNC_BEGIN event with the
+//   NESTABLE_ASYNC_END event. Events are considered to match if their
+//   category_group, name and id values all match. |id| must either be a
+//   pointer or an integer value up to 64 bits. If it's a pointer, the bits
+//   will be xored with a hash of the process ID so that the same pointer on two
+//   different processes will not collide.
+//
+// Unmatched NESTABLE_ASYNC_END event will be parsed as an instant event,
+// and unmatched NESTABLE_ASYNC_BEGIN event will be parsed as an event that
+// ends at the last NESTABLE_ASYNC_END event of that |id|.
+
+// Records a single NESTABLE_ASYNC_BEGIN event called "name" immediately, with no
+// associated arguments. If the category is not enabled, then this does nothing.
+#define TRACE_EVENT_NESTABLE_ASYNC_BEGIN0(category_group, name, id) \
+    INTERNAL_TRACE_EVENT_ADD_WITH_ID(TRACE_EVENT_PHASE_NESTABLE_ASYNC_BEGIN, \
+        category_group, name, id, TRACE_EVENT_FLAG_NONE)
+// Records a single NESTABLE_ASYNC_BEGIN event called "name" immediately, with 1
+// associated argument. If the category is not enabled, then this does nothing.
+#define TRACE_EVENT_NESTABLE_ASYNC_BEGIN1(category_group, name, id, arg1_name, arg1_val) \
+    INTERNAL_TRACE_EVENT_ADD_WITH_ID(TRACE_EVENT_PHASE_NESTABLE_ASYNC_BEGIN, \
+        category_group, name, id, TRACE_EVENT_FLAG_NONE, arg1_name, arg1_val)
+// Records a single NESTABLE_ASYNC_BEGIN event called "name" immediately, with 2
+// associated arguments. If the category is not enabled, then this does nothing.
+#define TRACE_EVENT_NESTABLE_ASYNC_BEGIN2(category_group, name, id, arg1_name, \
+        arg1_val, arg2_name, arg2_val) \
+    INTERNAL_TRACE_EVENT_ADD_WITH_ID(TRACE_EVENT_PHASE_NESTABLE_ASYNC_BEGIN, \
+        category_group, name, id, TRACE_EVENT_FLAG_NONE, arg1_name, arg1_val, \
+        arg2_name, arg2_val)
+// Records a single NESTABLE_ASYNC_END event called "name" immediately, with no
+// associated arguments. If the category is not enabled, then this does nothing.
+#define TRACE_EVENT_NESTABLE_ASYNC_END0(category_group, name, id) \
+    INTERNAL_TRACE_EVENT_ADD_WITH_ID(TRACE_EVENT_PHASE_NESTABLE_ASYNC_END, \
+        category_group, name, id, TRACE_EVENT_FLAG_NONE)
+// Records a single NESTABLE_ASYNC_END event called "name" immediately, with 1
+// associated argument. If the category is not enabled, then this does nothing.
+#define TRACE_EVENT_NESTABLE_ASYNC_END1(category_group, name, id, arg1_name, arg1_val) \
+    INTERNAL_TRACE_EVENT_ADD_WITH_ID(TRACE_EVENT_PHASE_NESTABLE_ASYNC_END, \
+        category_group, name, id, TRACE_EVENT_FLAG_NONE, arg1_name, arg1_val)
+// Records a single NESTABLE_ASYNC_END event called "name" immediately, with 2
+// associated arguments. If the category is not enabled, then this does nothing.
+#define TRACE_EVENT_NESTABLE_ASYNC_END2(category_group, name, id, arg1_name, \
+        arg1_val, arg2_name, arg2_val) \
+    INTERNAL_TRACE_EVENT_ADD_WITH_ID(TRACE_EVENT_PHASE_NESTABLE_ASYNC_END, \
+        category_group, name, id, TRACE_EVENT_FLAG_NONE, arg1_name, arg1_val, \
+        arg2_name, arg2_val)
+// Records a single NESTABLE_ASYNC_INSTANT event called "name" immediately,
+// with one associated argument. If the category is not enabled, then this
+// does nothing.
+#define TRACE_EVENT_NESTABLE_ASYNC_INSTANT1(category_group, name, id, arg1_name, arg1_val) \
+    INTERNAL_TRACE_EVENT_ADD_WITH_ID(TRACE_EVENT_PHASE_NESTABLE_ASYNC_INSTANT, \
+        category_group, name, id, TRACE_EVENT_FLAG_NONE, arg1_name, arg1_val)
+// Records a single NESTABLE_ASYNC_INSTANT event called "name" immediately,
+// with 2 associated arguments. If the category is not enabled, then this
+// does nothing.
+#define TRACE_EVENT_NESTABLE_ASYNC_INSTANT2(category_group, name, id, \
+        arg1_name, arg1_val, arg2_name, arg2_val) \
+    INTERNAL_TRACE_EVENT_ADD_WITH_ID(TRACE_EVENT_PHASE_NESTABLE_ASYNC_INSTANT, \
+        category_group, name, id, TRACE_EVENT_FLAG_NONE, arg1_name, arg1_val, \
+        arg2_name, arg2_val)
 
 // Records a single FLOW_BEGIN event called "name" immediately, with 0, 1 or 2
 // associated arguments. If the category is not enabled, then this
@@ -737,6 +824,9 @@
 #define TRACE_EVENT_PHASE_ASYNC_STEP_INTO  ('T')
 #define TRACE_EVENT_PHASE_ASYNC_STEP_PAST  ('p')
 #define TRACE_EVENT_PHASE_ASYNC_END   ('F')
+#define TRACE_EVENT_PHASE_NESTABLE_ASYNC_BEGIN ('b')
+#define TRACE_EVENT_PHASE_NESTABLE_ASYNC_END ('e')
+#define TRACE_EVENT_PHASE_NESTABLE_ASYNC_INSTANT ('n')
 #define TRACE_EVENT_PHASE_METADATA ('M')
 #define TRACE_EVENT_PHASE_COUNTER  ('C')
 #define TRACE_EVENT_PHASE_SAMPLE  ('P')
@@ -746,6 +836,8 @@
 #define TRACE_EVENT_PHASE_FLOW_BEGIN ('s')
 #define TRACE_EVENT_PHASE_FLOW_STEP  ('t')
 #define TRACE_EVENT_PHASE_FLOW_END   ('f')
+#define TRACE_EVENT_PHASE_MARK ('R')
+#define TRACE_EVENT_PHASE_MEASURE ('U')
 
 // Flags for changing the behavior of TRACE_EVENT_API_ADD_TRACE_EVENT.
 #define TRACE_EVENT_FLAG_NONE        (static_cast<unsigned char>(0))
@@ -920,7 +1012,7 @@ template<typename T> struct ConvertableToTraceFormatTraits<T*> {
     }
 };
 
-template<typename T> struct ConvertableToTraceFormatTraits<PassRefPtr<T> > {
+template<typename T> struct ConvertableToTraceFormatTraits<PassRefPtr<T>> {
     static const bool isConvertable = WTF::IsSubclass<T, TraceEvent::ConvertableToTraceFormat>::value;
     static void assignIfConvertable(ConvertableToTraceFormat*& left, const PassRefPtr<T>& right)
     {

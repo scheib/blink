@@ -36,7 +36,7 @@
 #include "core/dom/shadow/ShadowRoot.h"
 #include "core/editing/FrameSelection.h"
 #include "core/editing/SpellChecker.h"
-#include "core/editing/TextIterator.h"
+#include "core/editing/iterators/TextIterator.h"
 #include "core/events/BeforeTextInsertedEvent.h"
 #include "core/events/Event.h"
 #include "core/frame/FrameHost.h"
@@ -261,7 +261,7 @@ void HTMLTextAreaElement::defaultEventHandler(Event* event)
     HTMLTextFormControlElement::defaultEventHandler(event);
 }
 
-void HTMLTextAreaElement::handleFocusEvent(Element*, FocusType)
+void HTMLTextAreaElement::handleFocusEvent(Element*, WebFocusType)
 {
     if (LocalFrame* frame = document().frame())
         frame->spellChecker().didBeginEditing(this);

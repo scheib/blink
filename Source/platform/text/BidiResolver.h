@@ -312,7 +312,7 @@ private:
     void applyL1Rule(BidiRunList<Run>&);
 
     Vector<BidiEmbedding, 8> m_currentExplicitEmbeddingSequence;
-    HashMap<Run *, MidpointState<Iterator> > m_midpointStateForIsolatedRun;
+    HashMap<Run *, MidpointState<Iterator>> m_midpointStateForIsolatedRun;
 };
 
 #if ENABLE(ASSERT)
@@ -336,8 +336,20 @@ void BidiResolver<Iterator, Run>::appendRun(BidiRunList<Run>& runs)
             endOffset = m_endOfRunAtEndOfLine.offset();
         }
 
-        if (endOffset >= startOffset)
-            runs.addRun(new Run(startOffset, endOffset + 1, context(), m_direction));
+        // m_eor and m_endOfRunAtEndOfLine are inclusive while BidiRun's stop is
+        // exclusive so offset needs to be increased by one.
+        endOffset += 1;
+
+        // Append BidiRun objects, at most 64K chars at a time, until all
+        // text between |startOffset| and |endOffset| is represented.
+        while (startOffset < endOffset) {
+            unsigned end = endOffset;
+            const int limit = USHRT_MAX; // InlineTextBox stores text length as unsigned short.
+            if (end - startOffset > limit)
+                end = startOffset + limit;
+            runs.addRun(new Run(startOffset, end, context(), m_direction));
+            startOffset = end;
+        }
 
         m_eor.increment();
         m_sor = m_eor;

@@ -30,7 +30,6 @@
 #include "core/events/TextEventInputType.h"
 #include "core/page/DragActions.h"
 #include "core/page/EventWithHitTestResults.h"
-#include "core/page/FocusType.h"
 #include "core/rendering/HitTestRequest.h"
 #include "core/rendering/style/RenderStyleConstants.h"
 #include "platform/Cursor.h"
@@ -40,6 +39,7 @@
 #include "platform/geometry/LayoutPoint.h"
 #include "platform/heap/Handle.h"
 #include "platform/scroll/ScrollTypes.h"
+#include "public/platform/WebFocusType.h"
 #include "wtf/Forward.h"
 #include "wtf/HashMap.h"
 #include "wtf/HashTraits.h"
@@ -110,7 +110,6 @@ public:
         const LayoutSize& padding = LayoutSize());
 
     bool mousePressed() const { return m_mousePressed; }
-    void setMousePressed(bool pressed) { m_mousePressed = pressed; }
 
     void setCapturingMouseEventsNode(PassRefPtrWillBeRawPtr<Node>); // A caller is responsible for resetting capturing node to 0.
 
@@ -282,7 +281,6 @@ private:
 
     bool dispatchDragSrcEvent(const AtomicString& eventType, const PlatformMouseEvent&);
 
-    bool dragHysteresisExceeded(const FloatPoint&) const;
     bool dragHysteresisExceeded(const IntPoint&) const;
 
     bool passMousePressEventToSubframe(MouseEventWithHitTestResults&, LocalFrame* subframe);
@@ -298,7 +296,7 @@ private:
     void defaultBackspaceEventHandler(KeyboardEvent*);
     void defaultTabEventHandler(KeyboardEvent*);
     void defaultEscapeEventHandler(KeyboardEvent*);
-    void defaultArrowEventHandler(FocusType, KeyboardEvent*);
+    void defaultArrowEventHandler(WebFocusType, KeyboardEvent*);
 
     void updateSelectionForMouseDrag(const HitTestResult&);
 

@@ -247,8 +247,12 @@ InspectorTest.dumpSelectedElementStyles = function(excludeComputed, excludeMatch
                 continue;
             if (section.element && section.element.classList.contains("user-rule") && !WebInspector.settings.showUserAgentStyles.get())
                 continue;
-            if (section.element.previousSibling && section.element.previousSibling.className === "sidebar-separator")
-                InspectorTest.addResult("======== " + section.element.previousSibling.textContent + " ========");
+            if (section.element.previousSibling && section.element.previousSibling.className === "sidebar-separator") {
+                var nodeDescription = "";
+                if (section.element.previousSibling.firstElementChild)
+                    nodeDescription = section.element.previousSibling.firstElementChild.shadowRoot.lastChild.textContent;
+                InspectorTest.addResult("======== " + section.element.previousSibling.textContent + nodeDescription + " ========");
+            }
             printStyleSection(section, omitLonghands, includeSelectorGroupMarks);
         }
         InspectorTest.addResult("");
@@ -259,7 +263,7 @@ function printStyleSection(section, omitLonghands, includeSelectorGroupMarks)
 {
     if (!section)
         return;
-    InspectorTest.addResult((section.expanded ? "[expanded] " : "[collapsed] ") + (section.element.classList.contains("no-affect") ? "[no-affect] " : ""));
+    InspectorTest.addResult("[expanded] " + (section.element.classList.contains("no-affect") ? "[no-affect] " : ""));
     var chainEntries = section.titleElement.querySelectorAll(".media-list .media");
     chainEntries = Array.prototype.slice.call(chainEntries);
     if (section.titleElement.children[1])
@@ -273,7 +277,6 @@ function printStyleSection(section, omitLonghands, includeSelectorGroupMarks)
         entryLine += " (" + extractText(chainEntry.children[0]) + ")";
         InspectorTest.addResult(entryLine);
     }
-    section.expand();
     InspectorTest.dumpStyleTreeOutline(section.propertiesTreeOutline, omitLonghands ? 1 : 2);
     InspectorTest.addResult("");
 }
@@ -367,7 +370,8 @@ InspectorTest.expandAndDumpSelectedElementEventListeners = function(callback)
 InspectorTest.dumpObjectPropertySection = function(section, formatters)
 {
     var expandedSubstring = section.expanded ? "[expanded]" : "[collapsed]";
-    InspectorTest.addResult(expandedSubstring + " " + section.titleElement.textContent + " " + section.subtitleAsTextForTest);
+    var titleElement = section.titleElement.firstElementChild ? section.titleElement.firstElementChild.shadowRoot.lastChild.textContent : section.titleElement.textContent;
+    InspectorTest.addResult(expandedSubstring + " " + titleElement + " " + section.subtitleAsTextForTest);
     if (!section.propertiesForTest)
         return;
 

@@ -44,7 +44,7 @@
 #include "core/editing/FrameSelection.h"
 #include "core/editing/HTMLInterchange.h"
 #include "core/editing/InputMethodController.h"
-#include "core/editing/TextIterator.h"
+#include "core/editing/iterators/TextIterator.h"
 #include "core/editing/markup.h"
 #include "core/events/KeyboardEvent.h"
 #include "core/events/WheelEvent.h"
@@ -1654,8 +1654,10 @@ void WebViewImpl::performResize()
     // and thus will not be invalidated in |FrameView::performPreLayoutTasks|.
     // Therefore we should force explicit media queries invalidation here.
     if (page()->inspectorController().deviceEmulationEnabled()) {
-        if (Document* document = localFrameRootTemporary()->frame()->document())
+        if (Document* document = localFrameRootTemporary()->frame()->document()) {
+            document->styleResolverChanged();
             document->mediaQueryAffectingValueChanged();
+        }
     }
 }
 
@@ -2756,7 +2758,7 @@ void WebViewImpl::setInitialFocus(bool reverse)
         if (Document* document = toLocalFrame(frame)->document())
             document->setFocusedElement(nullptr);
     }
-    page()->focusController().setInitialFocus(reverse ? FocusTypeBackward : FocusTypeForward);
+    page()->focusController().setInitialFocus(reverse ? WebFocusTypeBackward : WebFocusTypeForward);
 }
 
 void WebViewImpl::clearFocusedElement()
@@ -2888,7 +2890,7 @@ void WebViewImpl::computeScaleAndScrollForFocusedNode(Node* focusedNode, float& 
 
 void WebViewImpl::advanceFocus(bool reverse)
 {
-    page()->focusController().advanceFocus(reverse ? FocusTypeBackward : FocusTypeForward);
+    page()->focusController().advanceFocus(reverse ? WebFocusTypeBackward : WebFocusTypeForward);
 }
 
 double WebViewImpl::zoomLevel()
@@ -3078,7 +3080,7 @@ void WebViewImpl::setPageScaleFactor(float scaleFactor)
 
 void WebViewImpl::setMainFrameScrollOffset(const WebPoint& origin)
 {
-    updateMainFrameScrollPosition(origin, false);
+    updateMainFrameScrollPosition(DoublePoint(origin.x, origin.y), false);
 }
 
 void WebViewImpl::setPageScaleFactor(float scaleFactor, const WebPoint& origin)
@@ -3163,6 +3165,25 @@ void WebViewImpl::setUserAgentPageScaleConstraints(PageScaleConstraints newConst
     mainFrameImpl()->frameView()->setNeedsLayout();
 }
 
+void WebViewImpl::setDefaultPageScaleLimits(float minScale, float maxScale)
+{
+    PageScaleConstraints newDefaults = m_pageScaleConstraintsSet.defaultConstraints();
+    newDefaults.minimumScale = minScale;
+    newDefaults.maximumScale = maxScale;
+
+    if (newDefaults == m_pageScaleConstraintsSet.defaultConstraints())
+        return;
+
+    m_pageScaleConstraintsSet.setDefaultConstraints(newDefaults);
+    m_pageScaleConstraintsSet.computeFinalConstraints();
+    m_pageScaleConstraintsSet.setNeedsReset(true);
+
+    if (!mainFrameImpl() || !mainFrameImpl()->frameView())
+        return;
+
+    mainFrameImpl()->frameView()->setNeedsLayout();
+}
+
 void WebViewImpl::setInitialPageScaleOverride(float initialPageScaleFactorOverride)
 {
     PageScaleConstraints constraints = m_pageScaleConstraintsSet.userAgentConstraints();
@@ -3172,14 +3193,6 @@ void WebViewImpl::setInitialPageScaleOverride(float initialPageScaleFactorOverri
         return;
 
     m_pageScaleConstraintsSet.setNeedsReset(true);
-    setUserAgentPageScaleConstraints(constraints);
-}
-
-void WebViewImpl::setPageScaleFactorLimits(float minPageScale, float maxPageScale)
-{
-    PageScaleConstraints constraints = m_pageScaleConstraintsSet.userAgentConstraints();
-    constraints.minimumScale = minPageScale;
-    constraints.maximumScale = maxPageScale;
     setUserAgentPageScaleConstraints(constraints);
 }
 
@@ -3198,20 +3211,10 @@ void WebViewImpl::setIgnoreViewportTagScaleLimits(bool ignore)
 
 IntSize WebViewImpl::mainFrameSize()
 {
-    if (!pinchVirtualViewportEnabled() || !localFrameRootTemporary())
+    if (!pinchVirtualViewportEnabled())
         return m_size;
 
-    FrameView* view = localFrameRootTemporary()->frameView();
-
-    if (!view)
-        return m_size;
-
-    int contentAndScrollbarWidth = contentsSize().width();
-
-    if (view && view->verticalScrollbar() && !view->verticalScrollbar()->isOverlayScrollbar())
-        contentAndScrollbarWidth += view->verticalScrollbar()->width();
-
-    return m_pageScaleConstraintsSet.mainFrameSize(contentAndScrollbarWidth);
+    return m_pageScaleConstraintsSet.mainFrameSize();
 }
 
 void WebViewImpl::refreshPageScaleFactorAfterLayout()
@@ -3223,12 +3226,10 @@ void WebViewImpl::refreshPageScaleFactorAfterLayout()
     updatePageDefinedViewportConstraints(mainFrameImpl()->frame()->document()->viewportDescription());
     m_pageScaleConstraintsSet.computeFinalConstraints();
 
-    if (settings()->shrinksViewportContentToFit()) {
-        int verticalScrollbarWidth = 0;
-        if (view->verticalScrollbar() && !view->verticalScrollbar()->isOverlayScrollbar())
-            verticalScrollbarWidth = view->verticalScrollbar()->width();
-        m_pageScaleConstraintsSet.adjustFinalConstraintsToContentsSize(contentsSize(), verticalScrollbarWidth);
-    }
+    int verticalScrollbarWidth = 0;
+    if (view->verticalScrollbar() && !view->verticalScrollbar()->isOverlayScrollbar())
+        verticalScrollbarWidth = view->verticalScrollbar()->width();
+    m_pageScaleConstraintsSet.adjustFinalConstraintsToContentsSize(contentsSize(), verticalScrollbarWidth, settings()->shrinksViewportContentToFit());
 
     float newPageScaleFactor = pageScaleFactor();
     if (m_pageScaleConstraintsSet.needsReset() && m_pageScaleConstraintsSet.finalConstraints().initialScale != -1) {
@@ -3337,6 +3338,16 @@ WebSize WebViewImpl::contentsPreferredMinimumSize()
     return IntSize(widthScaled, heightScaled);
 }
 
+float WebViewImpl::defaultMinimumPageScaleFactor() const
+{
+    return m_pageScaleConstraintsSet.defaultConstraints().minimumScale;
+}
+
+float WebViewImpl::defaultMaximumPageScaleFactor() const
+{
+    return m_pageScaleConstraintsSet.defaultConstraints().maximumScale;
+}
+
 float WebViewImpl::minimumPageScaleFactor() const
 {
     return m_pageScaleConstraintsSet.finalConstraints().minimumScale;
@@ -3443,10 +3454,7 @@ void WebViewImpl::copyImageAt(const WebPoint& point)
         return;
 
     HitTestResult result = hitTestResultForWindowPos(point);
-    Node* node = result.innerNonSharedNode();
-    ASSERT(node);
-
-    if (!isHTMLCanvasElement(*node) && result.absoluteImageURL().isEmpty()) {
+    if (!isHTMLCanvasElement(result.innerNonSharedNode()) && result.absoluteImageURL().isEmpty()) {
         // There isn't actually an image at these coordinates.  Might be because
         // the window scrolled while the context menu was open or because the page
         // changed itself between when we thought there was an image here and when
@@ -4278,7 +4286,7 @@ void WebViewImpl::setIsAcceleratedCompositingActive(bool active)
         page()->deprecatedLocalMainFrame()->view()->setClipsRepaints(!m_isAcceleratedCompositingActive);
 }
 
-void WebViewImpl::updateMainFrameScrollPosition(const IntPoint& scrollPosition, bool programmaticScroll)
+void WebViewImpl::updateMainFrameScrollPosition(const DoublePoint& scrollPosition, bool programmaticScroll)
 {
     if (!page()->mainFrame()->isLocalFrame())
         return;
@@ -4288,7 +4296,7 @@ void WebViewImpl::updateMainFrameScrollPosition(const IntPoint& scrollPosition, 
     if (!frameView)
         return;
 
-    if (frameView->scrollPosition() == scrollPosition)
+    if (frameView->scrollPositionDouble() == scrollPosition)
         return;
 
     bool oldProgrammaticScroll = frameView->inProgrammaticScroll();
@@ -4297,7 +4305,7 @@ void WebViewImpl::updateMainFrameScrollPosition(const IntPoint& scrollPosition, 
     frameView->setInProgrammaticScroll(oldProgrammaticScroll);
 }
 
-void WebViewImpl::updateRootLayerScrollPosition(const IntPoint& scrollPosition)
+void WebViewImpl::updateRootLayerScrollPosition(const DoublePoint& scrollPosition)
 {
     if (!page()->mainFrame()->isLocalFrame())
         return;
@@ -4308,7 +4316,7 @@ void WebViewImpl::updateRootLayerScrollPosition(const IntPoint& scrollPosition)
         return;
 
     ScrollableArea* scrollableArea = frameView->renderView()->layer()->scrollableArea();
-    if (scrollableArea->scrollPosition() == scrollPosition)
+    if (scrollableArea->scrollPositionDouble() == scrollPosition)
         return;
     scrollableArea->notifyScrollPositionChanged(scrollPosition);
 }
@@ -4346,8 +4354,9 @@ void WebViewImpl::applyViewportDeltas(
     else
         outerViewport = frameView;
 
-    IntPoint outerViewportOffset = outerViewport->scrollPosition();
-    outerViewportOffset.move(outerViewportDelta.width, outerViewportDelta.height);
+    DoublePoint outerViewportOffset = outerViewport->scrollPositionDouble() +
+        IntSize(outerViewportDelta.width, outerViewportDelta.height);
+
     if (rootLayerScrolls)
         updateRootLayerScrollPosition(outerViewportOffset);
     else

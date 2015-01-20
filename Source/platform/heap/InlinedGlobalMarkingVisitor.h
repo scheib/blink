@@ -52,7 +52,7 @@ public:
 
     using Impl::ensureMarked;
 
-    inline bool canTraceEagerly() const { return m_visitor->canTraceEagerly(); }
+    inline bool canTraceEagerly() { return Visitor::canTraceEagerly(); }
 
     Visitor* getUninlined() { return m_visitor; }
 
@@ -77,6 +77,10 @@ private:
     {
         return *static_cast<InlinedGlobalMarkingVisitor*>(helper);
     }
+
+#if ENABLE(ASSERT)
+    inline void checkMarkingAllowed() { m_visitor->checkMarkingAllowed(); }
+#endif
 
     Visitor* m_visitor;
 };

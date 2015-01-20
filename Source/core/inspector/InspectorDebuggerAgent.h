@@ -172,11 +172,11 @@ public:
 
     // Async call stacks implementation
     PassRefPtrWillBeRawPtr<ScriptAsyncCallStack> currentAsyncStackTraceForConsole();
-    PassRefPtrWillBeRawPtr<AsyncCallChain> createAsyncCallChain(const String& description);
-    void setCurrentAsyncCallChain(v8::Isolate*, PassRefPtrWillBeRawPtr<AsyncCallChain>);
+    PassRefPtrWillBeRawPtr<AsyncCallChain> traceAsyncOperationStarting(const String& description);
+    void traceAsyncCallbackStarting(v8::Isolate*, PassRefPtrWillBeRawPtr<AsyncCallChain>);
     const AsyncCallChain* currentAsyncCallChain() const;
-    void clearCurrentAsyncCallChain();
-    void didCompleteAsyncOperation(AsyncCallChain*);
+    void traceAsyncCallbackCompleted();
+    void traceAsyncOperationCompleted(AsyncCallChain*);
     bool trackingAsyncCalls() const { return m_maxAsyncCallStackDepth; }
 
     class AsyncCallTrackingListener : public WillBeGarbageCollectedMixin {
@@ -209,7 +209,6 @@ protected:
 private:
     SkipPauseRequest shouldSkipExceptionPause();
     SkipPauseRequest shouldSkipStepPause();
-    bool isTopCallFrameInFramework();
 
     void schedulePauseOnNextStatementIfSteppingInto();
     void cancelPauseOnNextStatement();
@@ -241,7 +240,8 @@ private:
     String sourceMapURLForScript(const Script&, CompileResult);
 
     bool isCallStackEmptyOrBlackboxed();
-    PassRefPtrWillBeRawPtr<JavaScriptCallFrame> topCallFrameSkipUnknownSources(String* scriptURL, bool* isBlackboxed, int* index = nullptr);
+    bool isTopCallFrameBlackboxed();
+    bool isCallFrameWithUnknownScriptOrBlackboxed(PassRefPtrWillBeRawPtr<JavaScriptCallFrame>);
     PromiseTracker& promiseTracker() const { return *m_promiseTracker; }
 
     void internalSetAsyncCallStackDepth(int);

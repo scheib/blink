@@ -66,7 +66,6 @@ private:
     virtual void computePreferredLogicalWidths() override;
 
     virtual void addChild(RenderObject* newChild, RenderObject* beforeChild = 0) override;
-    void addChildToIndexesMap(RenderBox&);
     virtual void removeChild(RenderObject*) override;
 
     virtual void styleDidChange(StyleDifference, const RenderStyle*) override;
@@ -104,6 +103,7 @@ private:
     typedef const LayoutUnit& (GridTrack::* AccumulatorGetter)() const;
     typedef void (GridTrack::* AccumulatorGrowFunction)(LayoutUnit);
     typedef bool (GridTrackSize::* FilterFunction)() const;
+    void resolveContentBasedTrackSizingFunctionsForNonSpanningItems(GridTrackSizingDirection, const GridCoordinate&, RenderBox& gridItem, GridTrack&, Vector<GridTrack>& columnTracks);
     void resolveContentBasedTrackSizingFunctionsForItems(GridTrackSizingDirection, GridSizingData&, GridItemWithSpan&, FilterFunction, SizingFunction, AccumulatorGetter, AccumulatorGrowFunction, FilterFunction growAboveMaxBreadthFilterFunction = nullptr);
     void distributeSpaceToTracks(Vector<GridTrack*>&, Vector<size_t>* tracksForGrowthAboveMaxBreadth, AccumulatorGetter, AccumulatorGrowFunction, GridSizingData&, LayoutUnit& availableLogicalSpace);
 
@@ -125,6 +125,7 @@ private:
     LayoutUnit centeredRowPositionForChild(const RenderBox&) const;
     LayoutUnit rowPositionForChild(const RenderBox&) const;
     LayoutUnit contentPositionAndDistributionColumnOffset(LayoutUnit availableFreeSpace, ContentPosition, ContentDistributionType, unsigned numberOfItems) const;
+    LayoutUnit contentPositionAndDistributionRowOffset(LayoutUnit availableFreeSpace, ContentPosition, ContentDistributionType, unsigned numberOfItems) const;
     LayoutPoint findChildLogicalPosition(const RenderBox&, LayoutSize contentAlignmentOffset) const;
     GridCoordinate cachedGridCoordinate(const RenderBox&) const;
 

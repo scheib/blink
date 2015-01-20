@@ -27,8 +27,8 @@
 
 #include "core/dom/AXObjectCache.h"
 #include "core/dom/Text.h"
-#include "core/editing/TextIterator.h"
 #include "core/editing/VisiblePosition.h"
+#include "core/editing/iterators/TextIterator.h"
 #include "core/frame/FrameView.h"
 #include "core/frame/Settings.h"
 #include "core/html/parser/TextResourceDecoder.h"
@@ -764,20 +764,18 @@ ALWAYS_INLINE float RenderText::widthFromCache(const Font& f, int start, int len
     TextRun run = constructTextRun(const_cast<RenderText*>(this), f, this, start, len, style(), textDirection);
     run.setCharactersLength(textLength() - start);
     ASSERT(run.charactersLength() >= run.length());
-
-    run.setCharacterScanForCodePath(!canUseSimpleFontCodePath());
-    run.setUseComplexCodePath(!canUseSimpleFontCodePath());
+    run.setCodePath(canUseSimpleFontCodePath() ? TextRun::ForceSimple : TextRun::ForceComplex);
     run.setTabSize(!style()->collapseWhiteSpace(), style()->tabSize());
     run.setXPos(xPos);
     return f.width(run, fallbackFonts, glyphOverflow);
 }
 
-void RenderText::trimmedPrefWidths(float leadWidth,
-    float& firstLineMinWidth, bool& hasBreakableStart,
-    float& lastLineMinWidth, bool& hasBreakableEnd,
+void RenderText::trimmedPrefWidths(FloatWillBeLayoutUnit leadWidth,
+    FloatWillBeLayoutUnit& firstLineMinWidth, bool& hasBreakableStart,
+    FloatWillBeLayoutUnit& lastLineMinWidth, bool& hasBreakableEnd,
     bool& hasBreakableChar, bool& hasBreak,
-    float& firstLineMaxWidth, float& lastLineMaxWidth,
-    float& minWidth, float& maxWidth, bool& stripFrontSpaces,
+    FloatWillBeLayoutUnit& firstLineMaxWidth, FloatWillBeLayoutUnit& lastLineMaxWidth,
+    FloatWillBeLayoutUnit& minWidth, FloatWillBeLayoutUnit& maxWidth, bool& stripFrontSpaces,
     TextDirection direction)
 {
     bool collapseWhiteSpace = style()->collapseWhiteSpace();
@@ -793,12 +791,12 @@ void RenderText::trimmedPrefWidths(float leadWidth,
     int len = textLength();
 
     if (!len || (stripFrontSpaces && text().impl()->containsOnlyWhitespace())) {
-        firstLineMinWidth = 0;
-        lastLineMinWidth = 0;
-        firstLineMaxWidth = 0;
-        lastLineMaxWidth = 0;
-        minWidth = 0;
-        maxWidth = 0;
+        firstLineMinWidth = FloatWillBeLayoutUnit();
+        lastLineMinWidth = FloatWillBeLayoutUnit();
+        firstLineMaxWidth = FloatWillBeLayoutUnit();
+        lastLineMaxWidth = FloatWillBeLayoutUnit();
+        minWidth = FloatWillBeLayoutUnit();
+        maxWidth = FloatWillBeLayoutUnit();
         hasBreak = false;
         return;
     }
@@ -819,7 +817,7 @@ void RenderText::trimmedPrefWidths(float leadWidth,
         if (stripFrontSpaces) {
             const UChar spaceChar = space;
             TextRun run = constructTextRun(this, font, &spaceChar, 1, style(), direction);
-            run.setUseComplexCodePath(!canUseSimpleFontCodePath());
+            run.setCodePath(canUseSimpleFontCodePath() ? TextRun::ForceSimple : TextRun::ForceComplex);
             float spaceWidth = font.width(run);
             maxWidth -= spaceWidth;
         } else {
@@ -847,20 +845,20 @@ void RenderText::trimmedPrefWidths(float leadWidth,
                 lastLineMaxWidth = widthFromCache(f, i, linelen, leadWidth + lastLineMaxWidth, direction, 0, 0);
                 if (firstLine) {
                     firstLine = false;
-                    leadWidth = 0;
+                    leadWidth = FloatWillBeLayoutUnit();
                     firstLineMaxWidth = lastLineMaxWidth;
                 }
                 i += linelen;
             } else if (firstLine) {
-                firstLineMaxWidth = 0;
+                firstLineMaxWidth = FloatWillBeLayoutUnit();
                 firstLine = false;
-                leadWidth = 0;
+                leadWidth = FloatWillBeLayoutUnit();
             }
 
             if (i == len - 1) {
                 // A <pre> run that ends with a newline, as in, e.g.,
                 // <pre>Some text\n\n<span>More text</pre>
-                lastLineMaxWidth = 0;
+                lastLineMaxWidth = FloatWillBeLayoutUnit();
             }
         }
     }
@@ -1118,7 +1116,7 @@ void RenderText::computePreferredLogicalWidths(float leadWidth, HashSet<const Si
             } else {
                 TextRun run = constructTextRun(this, f, this, i, 1, styleToUse, textDirection);
                 run.setCharactersLength(len - i);
-                run.setUseComplexCodePath(!canUseSimpleFontCodePath());
+                run.setCodePath(canUseSimpleFontCodePath() ? TextRun::ForceSimple : TextRun::ForceComplex);
                 ASSERT(run.charactersLength() >= run.length());
                 run.setTabSize(!style()->collapseWhiteSpace(), style()->tabSize());
                 run.setXPos(leadWidth + currMaxWidth);
@@ -1530,8 +1528,7 @@ float RenderText::width(unsigned from, unsigned len, const Font& f, float xPos, 
         run.setCharactersLength(textLength() - from);
         ASSERT(run.charactersLength() >= run.length());
 
-        run.setCharacterScanForCodePath(!canUseSimpleFontCodePath());
-        run.setUseComplexCodePath(!canUseSimpleFontCodePath());
+        run.setCodePath(canUseSimpleFontCodePath() ? TextRun::ForceSimple : TextRun::ForceComplex);
         run.setTabSize(!style()->collapseWhiteSpace(), style()->tabSize());
         run.setXPos(xPos);
         w = f.width(run, fallbackFonts, glyphOverflow);

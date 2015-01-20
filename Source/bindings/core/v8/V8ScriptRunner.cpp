@@ -38,6 +38,7 @@
 #include "platform/ScriptForbiddenScope.h"
 #include "platform/TraceEvent.h"
 #include "third_party/snappy/src/snappy.h"
+#include "wtf/CurrentTime.h"
 
 #if defined(WTF_OS_WIN)
 #include <malloc.h>
@@ -105,6 +106,17 @@ v8::Local<v8::Script> compileAndConsumeCache(ScriptResource* resource, unsigned 
         v8::ScriptCompiler::Source source(code, origin, cachedData);
         script = v8::ScriptCompiler::Compile(isolate, &source, compileOptions);
         invalidCache = cachedData->rejected;
+        if (invalidCache && compileOptions == v8::ScriptCompiler::kConsumeParserCache) {
+            // Debug code for a bug where streaming produces invalid parser
+            // cache. Crash on purpose, but write the the URL of the script and
+            // cached data on the stack before it. They can then be extracted
+            // from the crash dump. FIXME: Remove after debugging is done.
+            size_t urlLength = resource->url().string().ascii().length();
+            char* ptr = reinterpret_cast<char*>(alloca(urlLength + length));
+            memcpy(ptr, resource->url().string().ascii().data(), urlLength);
+            memcpy(ptr + urlLength, data, length);
+            RELEASE_ASSERT_NOT_REACHED();
+        }
     }
     if (invalidCache)
         resource->clearCachedMetadata();
@@ -145,7 +157,7 @@ enum CacheTagKind {
     CacheTagParser = 0,
     CacheTagCode = 1,
     CacheTagCodeCompressed = 2,
-
+    CacheTagTimeStamp = 3,
     CacheTagLast
 };
 
@@ -165,6 +177,29 @@ unsigned cacheTag(CacheTagKind kind, Resource* resource)
     return (v8CacheDataVersion | kind) + StringHash::hash(resource->encoding());
 }
 
+// Store a timestamp to the cache as hint.
+void setCacheTimeStamp(ScriptResource* resource)
+{
+    double now = currentTime();
+    unsigned tag = cacheTag(CacheTagTimeStamp, resource);
+    resource->setCachedMetadata(tag, reinterpret_cast<char*>(&now), sizeof(now), Resource::SendToPlatform);
+}
+
+// Check previously stored timestamp.
+bool isResourceHotForCaching(ScriptResource* resource)
+{
+    const double kCacheWithinSeconds = 36 * 60 * 60;
+    unsigned tag = cacheTag(CacheTagTimeStamp, resource);
+    CachedMetadata* cachedMetadata = resource->cachedMetadata(tag);
+    if (!cachedMetadata)
+        return false;
+    double timeStamp;
+    const int size = sizeof(timeStamp);
+    ASSERT(cachedMetadata->size() == size);
+    memcpy(&timeStamp, cachedMetadata->data(), size);
+    return (currentTime() - timeStamp) < kCacheWithinSeconds;
+}
+
 // Final compile call for a streamed compilation. Most decisions have already
 // been made, but we need to write back data into the cache.
 v8::Local<v8::Script> postStreamCompile(ScriptResource* resource, ScriptStreamer* streamer, v8::Isolate* isolate, v8::Handle<v8::String> code, v8::ScriptOrigin origin)
@@ -175,26 +210,6 @@ v8::Local<v8::Script> postStreamCompile(ScriptResource* resource, ScriptStreamer
     // streamer is started. Here we only need to get the data out.
     const v8::ScriptCompiler::CachedData* newCachedData = streamer->source()->GetCachedData();
     if (newCachedData) {
-        // Sanity check: when we associate cached data with the Resource, the
-        // encoding (which is also stored in the cache) must match the
-        // Streamer's view. For debugging purposes: If this is not true, produce
-        // a crash. FIXME: Remove debugging code after investigating why this
-        // happens.
-        v8::ScriptCompiler::StreamedSource::Encoding encoding;
-        if (!ScriptStreamer::convertEncoding(resource->encoding().ascii().data(), &encoding)
-            || streamer->encoding() != encoding) {
-            // For debugging, write the resource URL, the current encoding and
-            // the previous encoding on stack so that it can be read from the
-            // crash dump.
-            size_t urlLength = resource->url().string().ascii().length();
-            size_t encodingLength = resource->encoding().ascii().length();
-            char* ptr = reinterpret_cast<char*>(alloca(urlLength + encodingLength + 1));
-            memcpy(ptr, resource->url().string().ascii().data(), urlLength);
-            memcpy(ptr + urlLength, resource->encoding().ascii().data(), encodingLength);
-            *(ptr + urlLength + encodingLength) = static_cast<char>(streamer->encoding());
-            RELEASE_ASSERT_NOT_REACHED();
-        }
-
         resource->clearCachedMetadata();
         v8::ScriptCompiler::CompileOptions options = streamer->compileOptions();
         switch (options) {
@@ -265,7 +280,9 @@ PassOwnPtr<CompileFn> selectCompileFunction(V8CacheOptions cacheOptions, ScriptR
         break;
 
     case V8CacheOptionsHeuristics:
-    case V8CacheOptionsHeuristicsMobile: {
+    case V8CacheOptionsHeuristicsMobile:
+    case V8CacheOptionsHeuristicsDefault:
+    case V8CacheOptionsHeuristicsDefaultMobile: {
         // We expect compression to win on mobile devices, due to relatively
         // slow storage.
         bool compress = cacheOptions == V8CacheOptionsHeuristicsMobile;
@@ -278,10 +295,26 @@ PassOwnPtr<CompileFn> selectCompileFunction(V8CacheOptions cacheOptions, ScriptR
             return bind(compileAndConsumeCache, resource, codeCacheTag, v8::ScriptCompiler::kConsumeCodeCache, compress);
         if (code->Length() < mediumCodeLength)
             return bind(compileAndProduceCache, resource, codeCacheTag, v8::ScriptCompiler::kProduceCodeCache, compress, Resource::SendToPlatform);
-        unsigned parserCacheTag = cacheTag(CacheTagParser, resource);
-        if (resource->cachedMetadata(parserCacheTag))
-            return bind(compileAndConsumeCache, resource, parserCacheTag, v8::ScriptCompiler::kConsumeParserCache, false);
-        return bind(compileAndProduceCache, resource, parserCacheTag, v8::ScriptCompiler::kProduceParserCache, false, Resource::SendToPlatform);
+        Resource::MetadataCacheType cacheType = Resource::CacheLocally;
+        if (cacheOptions == V8CacheOptionsHeuristics || cacheOptions == V8CacheOptionsHeuristicsMobile)
+            cacheType = Resource::SendToPlatform;
+        return bind(compileAndConsumeOrProduce, resource, cacheTag(CacheTagParser, resource), v8::ScriptCompiler::kConsumeParserCache, v8::ScriptCompiler::kProduceParserCache, false, cacheType);
+        break;
+    }
+
+    case V8CacheOptionsRecent:
+    case V8CacheOptionsRecentSmall: {
+        if (cacheOptions == V8CacheOptionsRecentSmall && code->Length() >= mediumCodeLength)
+            return bind(compileAndConsumeOrProduce, resource, cacheTag(CacheTagParser, resource), v8::ScriptCompiler::kConsumeParserCache, v8::ScriptCompiler::kProduceParserCache, false, Resource::CacheLocally);
+        unsigned codeCacheTag = cacheTag(CacheTagCode, resource);
+        CachedMetadata* codeCache = resource->cachedMetadata(codeCacheTag);
+        if (codeCache)
+            return bind(compileAndConsumeCache, resource, codeCacheTag, v8::ScriptCompiler::kConsumeCodeCache, false);
+        if (!isResourceHotForCaching(resource)) {
+            setCacheTimeStamp(resource);
+            return bind(compileWithoutOptions);
+        }
+        return bind(compileAndProduceCache, resource, codeCacheTag, v8::ScriptCompiler::kProduceCodeCache, false, Resource::SendToPlatform);
         break;
     }
 

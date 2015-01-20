@@ -37,6 +37,7 @@
 #include "core/dom/ExceptionCode.h"
 #include "core/events/AnimationPlayerEvent.h"
 #include "core/frame/UseCounter.h"
+#include "core/inspector/InspectorTraceEvents.h"
 #include "platform/TraceEvent.h"
 #include "wtf/MathExtras.h"
 
@@ -52,12 +53,20 @@ static unsigned nextSequenceNumber()
 
 }
 
-PassRefPtrWillBeRawPtr<AnimationPlayer> AnimationPlayer::create(ExecutionContext* executionContext, AnimationTimeline& timeline, AnimationNode* content)
+PassRefPtrWillBeRawPtr<AnimationPlayer> AnimationPlayer::create(AnimationNode* source, AnimationTimeline* timeline)
 {
-    RefPtrWillBeRawPtr<AnimationPlayer> player = adoptRefWillBeNoop(new AnimationPlayer(executionContext, timeline, content));
-    player->play();
-    timeline.document()->compositorPendingAnimations().add(player.get());
+    if (!timeline) {
+        // FIXME: Support creating players without a timeline.
+        return nullptr;
+    }
+
+    RefPtrWillBeRawPtr<AnimationPlayer> player = adoptRefWillBeNoop(new AnimationPlayer(timeline->document()->contextDocument().get(), *timeline, source));
     player->suspendIfNeeded();
+
+    if (timeline) {
+        timeline->playerAttached(*player);
+    }
+
     return player.release();
 }
 
@@ -73,10 +82,10 @@ AnimationPlayer::AnimationPlayer(ExecutionContext* executionContext, AnimationTi
     , m_paused(false)
     , m_held(true)
     , m_isPausedForTesting(false)
-    , m_outdated(true)
+    , m_outdated(false)
     , m_finished(true)
     , m_compositorState(nullptr)
-    , m_compositorPending(true)
+    , m_compositorPending(false)
     , m_compositorGroup(0)
     , m_currentTimePending(false)
     , m_stateIsBeingUpdated(false)
@@ -120,9 +129,6 @@ void AnimationPlayer::setCurrentTime(double newCurrentTime)
 
     m_currentTimePending = false;
     setCurrentTimeInternal(newCurrentTime / 1000, TimingUpdateOnDemand);
-
-    if (calculatePlayState() == Finished)
-        m_startTime = calculateStartTime(newCurrentTime);
 }
 
 void AnimationPlayer::setCurrentTimeInternal(double newCurrentTime, TimingUpdateReason reason)
@@ -158,11 +164,6 @@ void AnimationPlayer::setCurrentTimeInternal(double newCurrentTime, TimingUpdate
 void AnimationPlayer::updateCurrentTimingState(TimingUpdateReason reason)
 {
     if (m_held) {
-        if (!isNull(m_startTime) && m_timeline && !limited(calculateCurrentTime()) && playStateInternal() == Finished) {
-            m_held = false;
-            setCurrentTimeInternal(calculateCurrentTime(), reason);
-            return;
-        }
         setCurrentTimeInternal(m_holdTime, reason);
         return;
     }
@@ -337,6 +338,7 @@ double AnimationPlayer::calculateStartTime(double currentTime) const
 
 double AnimationPlayer::calculateCurrentTime() const
 {
+    ASSERT(!m_held);
     if (isNull(m_startTime) || !m_timeline)
         return 0;
     return (m_timeline->effectiveTime() - m_startTime) * m_playbackRate;
@@ -542,6 +544,26 @@ void AnimationPlayer::finish(ExceptionState& exceptionState)
     m_currentTimePending = false;
     ASSERT(playStateInternal() != Idle);
     ASSERT(limited());
+}
+
+ScriptPromise AnimationPlayer::finished(ScriptState* scriptState)
+{
+    if (!m_finishedPromise) {
+        m_finishedPromise = new AnimationPlayerPromise(scriptState->executionContext(), this, AnimationPlayerPromise::Finished);
+        if (playStateInternal() == Finished)
+            m_finishedPromise->resolve(this);
+    }
+    return m_finishedPromise->promise(scriptState->world());
+}
+
+ScriptPromise AnimationPlayer::ready(ScriptState* scriptState)
+{
+    if (!m_readyPromise) {
+        m_readyPromise = new AnimationPlayerPromise(scriptState->executionContext(), this, AnimationPlayerPromise::Ready);
+        if (playStateInternal() != Pending)
+            m_readyPromise->resolve(this);
+    }
+    return m_readyPromise->promise(scriptState->world());
 }
 
 const AtomicString& AnimationPlayer::interfaceName() const
@@ -768,7 +790,7 @@ void AnimationPlayer::endUpdatingState()
 
 AnimationPlayer::PlayStateUpdateScope::PlayStateUpdateScope(AnimationPlayer& player, TimingUpdateReason reason, CompositorPendingChange compositorPendingChange)
     : m_player(player)
-    , m_initial(m_player->playStateInternal())
+    , m_initialPlayState(m_player->playStateInternal())
     , m_compositorPendingChange(compositorPendingChange)
 {
     m_player->beginUpdatingState();
@@ -777,32 +799,55 @@ AnimationPlayer::PlayStateUpdateScope::PlayStateUpdateScope(AnimationPlayer& pla
 
 AnimationPlayer::PlayStateUpdateScope::~PlayStateUpdateScope()
 {
-    AnimationPlayState oldPlayState = m_initial;
+    AnimationPlayState oldPlayState = m_initialPlayState;
     AnimationPlayState newPlayState = m_player->calculatePlayState();
+
+    m_player->m_playState = newPlayState;
     if (oldPlayState != newPlayState) {
         bool wasActive = oldPlayState == Pending || oldPlayState == Running;
         bool isActive = newPlayState == Pending || newPlayState == Running;
-        if (!wasActive && isActive) {
-            if (m_player->m_content) {
-                TRACE_EVENT_ASYNC_BEGIN1("blink", "Animation", &m_player, "Name", TRACE_STR_COPY(m_player->m_content->name().utf8().data()));
-            } else {
-                TRACE_EVENT_ASYNC_BEGIN0("blink", "Animation", &m_player);
+
+        if (!wasActive && isActive)
+            TRACE_EVENT_NESTABLE_ASYNC_BEGIN1("blink.animations," TRACE_DISABLED_BY_DEFAULT("devtools.timeline"), "Animation", m_player, "data", InspectorAnimationEvent::data(*m_player));
+        else if (wasActive && !isActive)
+            TRACE_EVENT_NESTABLE_ASYNC_END1("blink.animations," TRACE_DISABLED_BY_DEFAULT("devtools.timeline"), "Animation", m_player, "endData", InspectorAnimationStateEvent::data(*m_player));
+        else
+            TRACE_EVENT_NESTABLE_ASYNC_INSTANT1("blink.animations," TRACE_DISABLED_BY_DEFAULT("devtools.timeline"), "Animation", m_player, "data", InspectorAnimationStateEvent::data(*m_player));
+    }
+
+    // Ordering is important, the ready promise should resolve/reject before
+    // the finished promise.
+    if (m_player->m_readyPromise && newPlayState != oldPlayState) {
+        if (newPlayState == Idle) {
+            if (m_player->m_readyPromise->state() == AnimationPlayerPromise::Pending) {
+                m_player->m_readyPromise->reject(DOMException::create(AbortError));
             }
-        } else if (wasActive && !isActive) {
-            if (oldPlayState != Idle && oldPlayState != Finished) {
-                TRACE_EVENT_ASYNC_END0("blink", "Animation", &m_player);
-            }
+            m_player->m_readyPromise->reset();
+            m_player->m_readyPromise->resolve(m_player);
+        } else if (oldPlayState == Pending) {
+            m_player->m_readyPromise->resolve(m_player);
+        } else if (newPlayState == Pending) {
+            ASSERT(m_player->m_readyPromise->state() != AnimationPlayerPromise::Pending);
+            m_player->m_readyPromise->reset();
         }
-        if (isActive) {
-            TRACE_EVENT_ASYNC_STEP_INTO0("blink", "Animation", &m_player, playStateString(newPlayState));
+    }
+
+    if (m_player->m_finishedPromise && newPlayState != oldPlayState) {
+        if (newPlayState == Idle) {
+            if (m_player->m_finishedPromise->state() == AnimationPlayerPromise::Pending) {
+                m_player->m_finishedPromise->reject(DOMException::create(AbortError));
+            }
+            m_player->m_finishedPromise->reset();
+        } else if (newPlayState == Finished) {
+            m_player->m_finishedPromise->resolve(m_player);
+        } else if (oldPlayState == Finished) {
+            m_player->m_finishedPromise->reset();
         }
     }
 
     if (oldPlayState != newPlayState && (oldPlayState == Idle || newPlayState == Idle)) {
         m_player->setOutdated();
     }
-
-    m_player->m_playState = newPlayState;
 
 #if ENABLE(ASSERT)
     // Verify that current time is up to date.
@@ -856,6 +901,8 @@ void AnimationPlayer::trace(Visitor* visitor)
     visitor->trace(m_content);
     visitor->trace(m_timeline);
     visitor->trace(m_pendingFinishedEvent);
+    visitor->trace(m_finishedPromise);
+    visitor->trace(m_readyPromise);
     EventTargetWithInlineData::trace(visitor);
     ActiveDOMObject::trace(visitor);
 }

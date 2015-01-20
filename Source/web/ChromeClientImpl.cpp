@@ -180,18 +180,18 @@ void ChromeClientImpl::focus()
         m_webView->client()->didFocus();
 }
 
-bool ChromeClientImpl::canTakeFocus(FocusType)
+bool ChromeClientImpl::canTakeFocus(WebFocusType)
 {
     // For now the browser can always take focus if we're not running layout
     // tests.
     return !layoutTestMode();
 }
 
-void ChromeClientImpl::takeFocus(FocusType type)
+void ChromeClientImpl::takeFocus(WebFocusType type)
 {
     if (!m_webView->client())
         return;
-    if (type == FocusTypeBackward)
+    if (type == WebFocusTypeBackward)
         m_webView->client()->focusPrevious();
     else
         m_webView->client()->focusNext();
@@ -803,11 +803,6 @@ void ChromeClientImpl::requestPointerUnlock()
     return m_webView->requestPointerUnlock();
 }
 
-bool ChromeClientImpl::shouldDisableDesktopWorkarounds()
-{
-    return m_webView->shouldDisableDesktopWorkarounds();
-}
-
 void ChromeClientImpl::annotatedRegionsChanged()
 {
     WebViewClient* client = m_webView->client();
@@ -844,6 +839,12 @@ void ChromeClientImpl::showImeIfNeeded()
 {
     if (m_webView->client())
         m_webView->client()->showImeIfNeeded();
+}
+
+void ChromeClientImpl::showUnhandledTapUIIfNeeded(IntPoint tappedPosition, Node* tappedNode, bool pageChanged)
+{
+    if (m_webView->client())
+        m_webView->client()->showUnhandledTapUIIfNeeded(WebPoint(tappedPosition), WebNode(tappedNode), pageChanged);
 }
 
 void ChromeClientImpl::handleKeyboardEventOnTextField(HTMLInputElement& inputElement, KeyboardEvent& event)

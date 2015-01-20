@@ -75,8 +75,8 @@
 #include "core/dom/shadow/InsertionPoint.h"
 #include "core/dom/shadow/ShadowRoot.h"
 #include "core/editing/FrameSelection.h"
-#include "core/editing/TextIterator.h"
 #include "core/editing/htmlediting.h"
+#include "core/editing/iterators/TextIterator.h"
 #include "core/editing/markup.h"
 #include "core/events/EventDispatcher.h"
 #include "core/events/FocusEvent.h"
@@ -2148,7 +2148,7 @@ bool Element::hasAttributeNS(const AtomicString& namespaceURI, const AtomicStrin
     return elementData()->attributes().find(qName);
 }
 
-void Element::focus(bool restorePreviousSelection, FocusType type)
+void Element::focus(bool restorePreviousSelection, WebFocusType type)
 {
     if (!inDocument())
         return;
@@ -2267,7 +2267,7 @@ bool Element::isMouseFocusable() const
     return isFocusable();
 }
 
-void Element::dispatchFocusEvent(Element* oldFocusedElement, FocusType type)
+void Element::dispatchFocusEvent(Element* oldFocusedElement, WebFocusType type)
 {
     RefPtrWillBeRawPtr<FocusEvent> event = FocusEvent::create(EventTypeNames::focus, false, false, document().domWindow(), 0, oldFocusedElement);
     EventDispatcher::dispatchEvent(*this, FocusEventDispatchMediator::create(event.release()));
@@ -2279,7 +2279,7 @@ void Element::dispatchBlurEvent(Element* newFocusedElement)
     EventDispatcher::dispatchEvent(*this, BlurEventDispatchMediator::create(event.release()));
 }
 
-void Element::dispatchFocusInEvent(const AtomicString& eventType, Element* oldFocusedElement, FocusType)
+void Element::dispatchFocusInEvent(const AtomicString& eventType, Element* oldFocusedElement, WebFocusType)
 {
     ASSERT(!EventDispatchForbiddenScope::isEventDispatchForbidden());
     ASSERT(eventType == EventTypeNames::focusin || eventType == EventTypeNames::DOMFocusIn);
@@ -2652,8 +2652,7 @@ void Element::updatePseudoElement(PseudoId pseudoId, StyleRecalcChange change)
 bool Element::updateFirstLetter(Element* element)
 {
     RenderObject* remainingTextRenderer = FirstLetterPseudoElement::firstLetterTextRenderer(*element);
-    if (!remainingTextRenderer || remainingTextRenderer != toFirstLetterPseudoElement(element)->remainingTextRenderer()
-        || toFirstLetterPseudoElement(element)->needsUpdate()) {
+    if (!remainingTextRenderer || remainingTextRenderer != toFirstLetterPseudoElement(element)->remainingTextRenderer()) {
         // We have to clear out the old first letter here because when it is
         // disposed it will set the original text back on the remaining text
         // renderer. If we dispose after creating the new one we will get
@@ -3258,7 +3257,7 @@ void Element::styleAttributeChanged(const AtomicString& newStyleString, Attribut
 
     if (newStyleString.isNull()) {
         ensureUniqueElementData().m_inlineStyle.clear();
-    } else if (modificationReason == ModifiedByCloning || document().contentSecurityPolicy()->allowInlineStyle(document().url(), startLineNumber)) {
+    } else if (modificationReason == ModifiedByCloning || document().contentSecurityPolicy()->allowInlineStyle(document().url(), startLineNumber, newStyleString)) {
         setInlineStyleFromString(newStyleString);
     }
 

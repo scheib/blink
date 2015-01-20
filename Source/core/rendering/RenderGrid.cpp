@@ -46,11 +46,15 @@ public:
     {
     }
 
-    const LayoutUnit& baseSize() const { return m_baseSize; }
+    const LayoutUnit& baseSize() const
+    {
+        ASSERT(isGrowthLimitBiggerThanBaseSize());
+        return m_baseSize;
+    }
 
     const LayoutUnit& growthLimit() const
     {
-        ASSERT(m_growthLimit >= m_baseSize);
+        ASSERT(isGrowthLimitBiggerThanBaseSize());
         return m_growthLimit;
     }
 
@@ -75,6 +79,7 @@ public:
 
     void growGrowthLimit(LayoutUnit growth)
     {
+        ASSERT(growth >= 0);
         if (m_growthLimit == infinity)
             m_growthLimit = m_baseSize + growth;
         else
@@ -90,10 +95,13 @@ public:
 
     const LayoutUnit& growthLimitIfNotInfinite() const
     {
+        ASSERT(isGrowthLimitBiggerThanBaseSize());
         return (m_growthLimit == infinity) ? m_baseSize : m_growthLimit;
     }
 
 private:
+    bool isGrowthLimitBiggerThanBaseSize() const { return growthLimitIsInfinite() || m_growthLimit >= m_baseSize; }
+
     void ensureGrowthLimitIsBiggerThanBaseSize()
     {
         if (m_growthLimit != infinity && m_growthLimit < m_baseSize)
@@ -240,73 +248,14 @@ RenderGrid::~RenderGrid()
 
 void RenderGrid::addChild(RenderObject* newChild, RenderObject* beforeChild)
 {
-    // If the new requested beforeChild is not one of our children is because it's wrapped by an anonymous container. If
-    // we do not special case this situation we could end up calling addChild() twice for the newChild, one with the
-    // initial beforeChild and another one with its parent.
-    if (beforeChild && beforeChild->parent() != this) {
-        ASSERT(beforeChild->parent()->isAnonymous());
-        beforeChild = splitAnonymousBoxesAroundChild(beforeChild);
-        dirtyGrid();
-    }
-
     RenderBlock::addChild(newChild, beforeChild);
 
     if (gridIsDirty())
         return;
 
-    if (!newChild->isBox()) {
-        dirtyGrid();
-        return;
-    }
-
-    // Positioned items shouldn't take up space or otherwise participate in the layout of the grid.
-    if (newChild->isOutOfFlowPositioned())
-        return;
-
-    // If the new child has been inserted inside an existent anonymous block, we can simply ignore it as the anonymous
-    // block is an already known grid item.
-    if (newChild->parent() != this)
-        return;
-
-    // FIXME: Implement properly "stack" value in auto-placement algorithm.
-    if (!style()->isGridAutoFlowAlgorithmStack()) {
-        // The grid needs to be recomputed as it might contain auto-placed items that will change their position.
-        dirtyGrid();
-        return;
-    }
-
-    RenderBox* newChildBox = toRenderBox(newChild);
-    OwnPtr<GridSpan> rowPositions = GridResolvedPosition::resolveGridPositionsFromStyle(*style(), *newChildBox, ForRows);
-    OwnPtr<GridSpan> columnPositions = GridResolvedPosition::resolveGridPositionsFromStyle(*style(), *newChildBox, ForColumns);
-    if (!rowPositions || !columnPositions) {
-        // The new child requires the auto-placement algorithm to run so we need to recompute the grid fully.
-        dirtyGrid();
-        return;
-    } else {
-        insertItemIntoGrid(*newChildBox, GridCoordinate(*rowPositions, *columnPositions));
-        addChildToIndexesMap(*newChildBox);
-    }
-}
-
-void RenderGrid::addChildToIndexesMap(RenderBox& child)
-{
-    ASSERT(!m_gridItemsIndexesMap.contains(&child));
-    RenderBox* sibling = child.nextInFlowSiblingBox();
-    bool lastSibling = !sibling;
-
-    if (lastSibling)
-        sibling = child.previousInFlowSiblingBox();
-
-    size_t index = 0;
-    if (sibling)
-        index = lastSibling ? m_gridItemsIndexesMap.get(sibling) + 1 : m_gridItemsIndexesMap.get(sibling);
-
-    if (sibling && !lastSibling) {
-        for (; sibling; sibling = sibling->nextInFlowSiblingBox())
-            m_gridItemsIndexesMap.set(sibling, m_gridItemsIndexesMap.get(sibling) + 1);
-    }
-
-    m_gridItemsIndexesMap.set(&child, index);
+    // The grid needs to be recomputed as it might contain auto-placed items that will change their position.
+    dirtyGrid();
+    return;
 }
 
 void RenderGrid::removeChild(RenderObject* child)
@@ -316,29 +265,9 @@ void RenderGrid::removeChild(RenderObject* child)
     if (gridIsDirty())
         return;
 
-    ASSERT(child->isBox());
-
-    // FIXME: Implement properly "stack" value in auto-placement algorithm.
-    if (!style()->isGridAutoFlowAlgorithmStack()) {
-        // The grid needs to be recomputed as it might contain auto-placed items that will change their position.
-        dirtyGrid();
-        return;
-    }
-
-    if (child->isOutOfFlowPositioned())
-        return;
-
-    const RenderBox* childBox = toRenderBox(child);
-    GridCoordinate coordinate = m_gridItemCoordinate.take(childBox);
-
-    for (GridSpan::iterator row = coordinate.rows.begin(); row != coordinate.rows.end(); ++row) {
-        for (GridSpan::iterator column = coordinate.columns.begin(); column != coordinate.columns.end(); ++column) {
-            GridCell& cell = m_grid[row.toInt()][column.toInt()];
-            cell.remove(cell.find(childBox));
-        }
-    }
-
-    m_gridItemsIndexesMap.remove(childBox);
+    // The grid needs to be recomputed as it might contain auto-placed items that will change their position.
+    dirtyGrid();
+    return;
 }
 
 void RenderGrid::styleDidChange(StyleDifference diff, const RenderStyle* oldStyle)
@@ -729,6 +658,9 @@ public:
 
     RenderBox& gridItem() const { return *m_gridItem; }
     GridCoordinate coordinate() const { return m_coordinate; }
+#if ENABLE(ASSERT)
+    size_t span() const { return m_span; }
+#endif
 
     bool operator<(const GridItemWithSpan other) const { return m_span < other.m_span; }
 
@@ -768,12 +700,15 @@ void RenderGrid::resolveContentBasedTrackSizingFunctions(GridTrackSizingDirectio
     HashSet<RenderBox*> itemsSet;
     for (const auto& trackIndex : sizingData.contentSizedTracksIndex) {
         GridIterator iterator(m_grid, direction, trackIndex);
+        GridTrack& track = (direction == ForColumns) ? sizingData.columnTracks[trackIndex] : sizingData.rowTracks[trackIndex];
         while (RenderBox* gridItem = iterator.nextGridItem()) {
             if (itemsSet.add(gridItem).isNewEntry) {
                 const GridCoordinate& coordinate = cachedGridCoordinate(*gridItem);
-                // We should not include items spanning more than one track that span tracks with flexible sizing functions.
-                if (integerSpanForDirection(coordinate, direction) == 1 || !spanningItemCrossesFlexibleSizedTracks(coordinate, direction))
+                if (integerSpanForDirection(coordinate, direction) == 1) {
+                    resolveContentBasedTrackSizingFunctionsForNonSpanningItems(direction, coordinate, *gridItem, track, sizingData.columnTracks);
+                } else if (!spanningItemCrossesFlexibleSizedTracks(coordinate, direction)) {
                     sizingData.itemsSortedByIncreasingSpan.append(GridItemWithSpan(*gridItem, coordinate, direction));
+                }
             }
         }
     }
@@ -795,8 +730,25 @@ void RenderGrid::resolveContentBasedTrackSizingFunctions(GridTrackSizingDirectio
     }
 }
 
+void RenderGrid::resolveContentBasedTrackSizingFunctionsForNonSpanningItems(GridTrackSizingDirection direction, const GridCoordinate& coordinate, RenderBox& gridItem, GridTrack& track, Vector<GridTrack>& columnTracks)
+{
+    const GridResolvedPosition trackPosition = (direction == ForColumns) ? coordinate.columns.resolvedInitialPosition : coordinate.rows.resolvedInitialPosition;
+    GridTrackSize trackSize = gridTrackSize(direction, trackPosition.toInt());
+
+    if (trackSize.hasMinContentMinTrackBreadth())
+        track.setBaseSize(std::max(track.baseSize(), minContentForChild(gridItem, direction, columnTracks)));
+    else if (trackSize.hasMaxContentMinTrackBreadth())
+        track.setBaseSize(std::max(track.baseSize(), maxContentForChild(gridItem, direction, columnTracks)));
+
+    if (trackSize.hasMinContentMaxTrackBreadth())
+        track.setGrowthLimit(std::max(track.growthLimit(), minContentForChild(gridItem, direction, columnTracks)));
+    else if (trackSize.hasMaxContentMaxTrackBreadth())
+        track.setGrowthLimit(std::max(track.growthLimit(), maxContentForChild(gridItem, direction, columnTracks)));
+}
+
 void RenderGrid::resolveContentBasedTrackSizingFunctionsForItems(GridTrackSizingDirection direction, GridSizingData& sizingData, GridItemWithSpan& gridItemWithSpan, FilterFunction filterFunction, SizingFunction sizingFunction, AccumulatorGetter trackGetter, AccumulatorGrowFunction trackGrowthFunction, FilterFunction growAboveMaxBreadthFilterFunction)
 {
+    ASSERT(gridItemWithSpan.span() > 1);
     const GridCoordinate coordinate = gridItemWithSpan.coordinate();
     const GridResolvedPosition initialTrackPosition = (direction == ForColumns) ? coordinate.columns.resolvedInitialPosition : coordinate.rows.resolvedInitialPosition;
     const GridResolvedPosition finalTrackPosition = (direction == ForColumns) ? coordinate.columns.resolvedFinalPosition : coordinate.rows.resolvedFinalPosition;
@@ -961,14 +913,6 @@ void RenderGrid::placeItemsOnGrid()
 
     ASSERT(gridRowCount() >= GridResolvedPosition::explicitGridRowCount(*style()));
     ASSERT(gridColumnCount() >= GridResolvedPosition::explicitGridColumnCount(*style()));
-
-    // FIXME: Implement properly "stack" value in auto-placement algorithm.
-    if (style()->isGridAutoFlowAlgorithmStack()) {
-        // If we did collect some grid items, they won't be placed thus never laid out.
-        ASSERT(!autoMajorAxisAutoGridItems.size());
-        ASSERT(!specifiedMajorAxisAutoGridItems.size());
-        return;
-    }
 
     placeSpecifiedMajorAxisItemsOnGrid(specifiedMajorAxisAutoGridItems);
     placeAutoMajorAxisItemsOnGrid(autoMajorAxisAutoGridItems);
@@ -1144,15 +1088,19 @@ void RenderGrid::layoutGridItems()
     populateGridPositions(sizingData, availableSpaceForColumns, availableSpaceForRows);
     m_gridItemsOverflowingGridArea.resize(0);
 
-    unsigned numberOfColumnTracks = m_columnPositions.size() - 1;
-    LayoutUnit columnOffset = contentPositionAndDistributionColumnOffset(availableSpaceForColumns, style()->justifyContent(), style()->justifyContentDistribution(), numberOfColumnTracks);
-    LayoutSize contentPositionOffset(columnOffset, 0);
+    LayoutUnit columnOffset = contentPositionAndDistributionColumnOffset(availableSpaceForColumns, style()->justifyContent(), style()->justifyContentDistribution(), m_columnPositions.size() - 1);
+    LayoutUnit rowOffset = contentPositionAndDistributionRowOffset(availableSpaceForRows, style()->alignContent(), style()->alignContentDistribution(), m_rowPositions.size() - 1);
+    LayoutSize contentPositionOffset(columnOffset, rowOffset);
 
     for (RenderBox* child = firstChildBox(); child; child = child->nextSiblingBox()) {
         if (child->isOutOfFlowPositioned()) {
             child->containingBlock()->insertPositionedObject(child);
             continue;
         }
+
+        // FIXME: This logic is part of the RenderBlockFlow::layoutBlockChild, which probably
+        // should be part of the refactor to be done for RenderGrid::layoutBlock.
+        child->computeAndSetBlockDirectionMargins(this);
 
         // Because the grid area cannot be styled, we don't need to adjust
         // the grid breadth to account for 'box-sizing'.
@@ -1298,14 +1246,16 @@ LayoutUnit RenderGrid::gridAreaBreadthForChild(const RenderBox& child, GridTrack
 void RenderGrid::populateGridPositions(const GridSizingData& sizingData, LayoutUnit availableSpaceForColumns, LayoutUnit availableSpaceForRows)
 {
     unsigned numberOfColumnTracks = sizingData.columnTracks.size();
+    unsigned numberOfRowTracks = sizingData.rowTracks.size();
+
     m_columnPositions.resize(numberOfColumnTracks + 1);
     m_columnPositions[0] = borderAndPaddingStart();
     for (unsigned i = 0; i < numberOfColumnTracks; ++i)
         m_columnPositions[i + 1] = m_columnPositions[i] + sizingData.columnTracks[i].baseSize();
 
-    m_rowPositions.resize(sizingData.rowTracks.size() + 1);
+    m_rowPositions.resize(numberOfRowTracks + 1);
     m_rowPositions[0] = borderAndPaddingBefore();
-    for (size_t i = 0; i < m_rowPositions.size() - 1; ++i)
+    for (unsigned i = 0; i < numberOfRowTracks; ++i)
         m_rowPositions[i + 1] = m_rowPositions[i] + sizingData.rowTracks[i].baseSize();
 }
 
@@ -1680,6 +1630,48 @@ LayoutUnit RenderGrid::contentPositionAndDistributionColumnOffset(LayoutUnit ava
         // FIXME: Implement the previous values. For now, we always 'start' align.
         // crbug.com/234191
         return offsetToStartEdge(style()->isLeftToRightDirection(), availableFreeSpace);
+    case ContentPositionAuto:
+        break;
+    }
+
+    ASSERT_NOT_REACHED();
+    return 0;
+}
+
+LayoutUnit RenderGrid::contentPositionAndDistributionRowOffset(LayoutUnit availableFreeSpace, ContentPosition position, ContentDistributionType distribution, unsigned numberOfGridTracks) const
+{
+    if (availableFreeSpace <= 0)
+        return 0;
+
+    // FIXME: for the time being, spec states that it will always fallback for Grids, but
+    // discussion is ongoing.
+    if (distribution != ContentDistributionDefault && position == ContentPositionAuto)
+        position = resolveContentDistributionFallback(distribution);
+
+    // FIXME: still pending of implementing support for the <overflow-position> keyword
+    // in justify-content and align-content properties.
+    switch (position) {
+    case ContentPositionLeft:
+        // The align-content's axis is always orthogonal to the inline-axis.
+        return 0;
+    case ContentPositionRight:
+        // The align-content's axis is always orthogonal to the inline-axis.
+        return 0;
+    case ContentPositionCenter:
+        return availableFreeSpace / 2;
+    case ContentPositionFlexEnd:
+        // Only used in flex layout, for other layout, it's equivalent to 'End'.
+    case ContentPositionEnd:
+        return availableFreeSpace;
+    case ContentPositionFlexStart:
+        // Only used in flex layout, for other layout, it's equivalent to 'Start'.
+    case ContentPositionStart:
+        return 0;
+    case ContentPositionBaseline:
+    case ContentPositionLastBaseline:
+        // FIXME: Implement the previous values. For now, we always start align.
+        // crbug.com/234191
+        return 0;
     case ContentPositionAuto:
         break;
     }

@@ -265,7 +265,7 @@ void LocalFrame::detach()
     // detached, so protect a reference to it.
     RefPtrWillBeRawPtr<LocalFrame> protect(this);
     m_loader.stopAllLoaders();
-    m_loader.closeURL();
+    m_loader.dispatchUnloadEvent();
     detachChildren();
     // stopAllLoaders() needs to be called after detachChildren(), because detachChildren()
     // will trigger the unload event handlers of any child frames, and those event
@@ -293,11 +293,6 @@ SecurityContext* LocalFrame::securityContext() const
     return document();
 }
 
-bool LocalFrame::checkLoadComplete()
-{
-    return loader().checkLoadCompleteForThisFrame();
-}
-
 void LocalFrame::printNavigationErrorMessage(const Frame& targetFrame, const char* reason)
 {
     if (!targetFrame.isLocalFrame())
@@ -308,6 +303,11 @@ void LocalFrame::printNavigationErrorMessage(const Frame& targetFrame, const cha
 
     // FIXME: should we print to the console of the document performing the navigation instead?
     targetLocalFrame.localDOMWindow()->printErrorMessage(message);
+}
+
+bool LocalFrame::isLoadingAsChild() const
+{
+    return isLoading() || !document()->isLoadCompleted();
 }
 
 void LocalFrame::disconnectOwnerElement()

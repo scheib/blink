@@ -474,8 +474,11 @@ static bool anyAttributeMatches(Element& element, CSSSelector::Match match, cons
         if (attributeValueMatches(attributeItem, match, selectorValue, !caseInsensitive))
             return true;
 
-        if (caseInsensitive)
+        if (caseInsensitive) {
+            if (selectorAttr.namespaceURI() != starAtom)
+                return false;
             continue;
+        }
 
         // Legacy dictates that values of some attributes should be compared in
         // a case-insensitive manner regardless of whether the case insensitive
@@ -488,6 +491,8 @@ static bool anyAttributeMatches(Element& element, CSSSelector::Match match, cons
             UseCounter::count(element.document(), UseCounter::CaseInsensitiveAttrSelectorMatch);
             return true;
         }
+        if (selectorAttr.namespaceURI() != starAtom)
+            return false;
     }
 
     return false;
@@ -779,9 +784,7 @@ bool SelectorChecker::checkPseudoClass(const SelectorCheckingContext& context, c
         }
         return matchesFocusPseudoClass(element);
     case CSSSelector::PseudoHover:
-        // If we're in quirks mode, then hover should never match anchors with no
-        // href and *:hover should not match anything. This is important for sites like wsj.com.
-        if (m_strictParsing || context.isSubSelector || element.isLink()) {
+        if (shouldMatchHoverOrActive(context)) {
             if (m_mode == ResolvingStyle) {
                 if (context.elementStyle)
                     context.elementStyle->setAffectedByHover();
@@ -793,9 +796,7 @@ bool SelectorChecker::checkPseudoClass(const SelectorCheckingContext& context, c
         }
         break;
     case CSSSelector::PseudoActive:
-        // If we're in quirks mode, then :active should never match anchors with no
-        // href and *:active should not match anything.
-        if (m_strictParsing || context.isSubSelector || element.isLink()) {
+        if (shouldMatchHoverOrActive(context)) {
             if (m_mode == ResolvingStyle) {
                 if (context.elementStyle)
                     context.elementStyle->setAffectedByActive();

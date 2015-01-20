@@ -605,6 +605,7 @@ bool RenderStyle::diffNeedsFullLayout(const RenderStyle& other) const
 
     if (rareNonInheritedData.get() != other.rareNonInheritedData.get()) {
         if (rareNonInheritedData->m_alignContent != other.rareNonInheritedData->m_alignContent
+            || rareNonInheritedData->m_alignContentDistribution != other.rareNonInheritedData->m_alignContentDistribution
             || rareNonInheritedData->m_alignItems != other.rareNonInheritedData->m_alignItems
             || rareNonInheritedData->m_alignSelf != other.rareNonInheritedData->m_alignSelf)
             return true;
@@ -1507,6 +1508,13 @@ void RenderStyle::setMotionPath(PassRefPtr<StyleMotionPath> path)
 void RenderStyle::resetMotionPath()
 {
     rareNonInheritedData.access()->m_transform.access()->m_motion.m_path = nullptr;
+}
+
+bool RenderStyle::columnRuleEquivalent(const RenderStyle* otherStyle) const
+{
+    return columnRuleStyle() == otherStyle->columnRuleStyle()
+        && columnRuleWidth() == otherStyle->columnRuleWidth()
+        && visitedDependentColor(CSSPropertyWebkitColumnRuleColor) == otherStyle->visitedDependentColor(CSSPropertyWebkitColumnRuleColor);
 }
 
 TextEmphasisMark RenderStyle::textEmphasisMark() const

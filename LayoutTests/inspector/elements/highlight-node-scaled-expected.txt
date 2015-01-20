@@ -20,7 +20,13 @@ div: {
     }
   ],
   "showRulers": true,
-  "showExtensionLines": true
+  "showExtensionLines": true,
+  "elementInfo": {
+    "tagName": "div",
+    "idValue": "div",
+    "nodeWidth": "69",
+    "nodeHeight": "80"
+  }
 }
 
 

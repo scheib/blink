@@ -178,9 +178,11 @@ public:
     void setImageInterpolationQuality(InterpolationQuality quality) { mutableState()->setInterpolationQuality(quality); }
     InterpolationQuality imageInterpolationQuality() const { return immutableState()->interpolationQuality(); }
 
+    void setCompositeOperation(SkXfermode::Mode);
+    // TODO(dshwang): remove these method. crbug.com/425656
     void setCompositeOperation(CompositeOperator, WebBlendMode = WebBlendModeNormal);
-    CompositeOperator compositeOperation() const { return immutableState()->compositeOperator(); }
-    WebBlendMode blendModeOperation() const { return immutableState()->blendMode(); }
+    CompositeOperator compositeOperation() const;
+    WebBlendMode blendModeOperation() const;
 
     // Specify the device scale factor which may change the way document markers
     // and fonts are rendered.
@@ -321,9 +323,9 @@ public:
 
     // beginLayer()/endLayer() behaves like save()/restore() for only CTM and clip states.
     void beginTransparencyLayer(float opacity, const FloatRect* = 0);
-    // Apply CompositeOperator when the layer is composited on the backdrop (i.e. endLayer()).
-    // Don't change the current CompositeOperator state.
-    void beginLayer(float opacity, CompositeOperator, const FloatRect* = 0, ColorFilter = ColorFilterNone, ImageFilter* = 0);
+    // Apply SkXfermode::Mode when the layer is composited on the backdrop (i.e. endLayer()).
+    // Don't change the current SkXfermode::Mode states.
+    void beginLayer(float opacity, SkXfermode::Mode, const FloatRect* = 0, ColorFilter = ColorFilterNone, ImageFilter* = 0);
     void endLayer();
 
     // Instead of being dispatched to the active canvas, draw commands following beginRecording()
@@ -376,29 +378,14 @@ public:
     void setURLFragmentForRect(const String& name, const IntRect&);
     void addURLTargetAtPoint(const String& name, const IntPoint&);
 
-    // Create an image buffer compatible with this context, with suitable resolution
-    // for drawing into the buffer and then into this context.
-    PassOwnPtr<ImageBuffer> createRasterBuffer(const IntSize&, OpacityMode = NonOpaque) const;
-
     static void adjustLineToPixelBoundaries(FloatPoint& p1, FloatPoint& p2, float strokeWidth, StrokeStyle);
 
     void beginAnnotation(const AnnotationList&);
     void endAnnotation();
 
-    class AutoCanvasRestorer {
-    public:
-        AutoCanvasRestorer(SkCanvas* canvas, int restoreCount)
-            : m_canvas(canvas)
-            , m_restoreCount(restoreCount)
-        { }
-
-        ~AutoCanvasRestorer();
-    private:
-        SkCanvas* m_canvas;
-        int m_restoreCount;
-    };
-
-    WARN_UNUSED_RETURN PassOwnPtr<AutoCanvasRestorer> preparePaintForDrawRectToRect(
+    // This method can potentially push saves onto the canvas. It returns the initial save count,
+    // and should be balanced with a call to context->canvas()->restoreToCount(initialSaveCount).
+    WARN_UNUSED_RETURN int preparePaintForDrawRectToRect(
         SkPaint*,
         const SkRect& srcRect,
         const SkRect& destRect,
@@ -501,7 +488,7 @@ private:
     // Paint states stack. Enables local drawing state change with save()/restore() calls.
     // This state controls the appearance of drawn content.
     // We do not delete from this stack to avoid memory churn.
-    Vector<OwnPtr<GraphicsContextState> > m_paintStateStack;
+    Vector<OwnPtr<GraphicsContextState>> m_paintStateStack;
     // Current index on the stack. May not be the last thing on the stack.
     unsigned m_paintStateIndex;
     // Raw pointer to the current state.
@@ -509,7 +496,7 @@ private:
 
     AnnotationModeFlags m_annotationMode;
 
-    Vector<OwnPtr<RecordingState> > m_recordingStateStack;
+    Vector<OwnPtr<RecordingState>> m_recordingStateStack;
 
 #if ENABLE(ASSERT)
     unsigned m_annotationCount;

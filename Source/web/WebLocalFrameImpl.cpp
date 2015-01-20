@@ -107,8 +107,8 @@
 #include "core/editing/PlainTextRange.h"
 #include "core/editing/SpellChecker.h"
 #include "core/editing/TextAffinity.h"
-#include "core/editing/TextIterator.h"
 #include "core/editing/htmlediting.h"
+#include "core/editing/iterators/TextIterator.h"
 #include "core/editing/markup.h"
 #include "core/fetch/ResourceFetcher.h"
 #include "core/frame/Console.h"
@@ -153,7 +153,6 @@
 #include "modules/push_messaging/PushController.h"
 #include "modules/screen_orientation/ScreenOrientationController.h"
 #include "modules/speech/SpeechRecognitionController.h"
-#include "platform/ScriptForbiddenScope.h"
 #include "platform/TraceEvent.h"
 #include "platform/UserGestureIndicator.h"
 #include "platform/clipboard/ClipboardUtilities.h"
@@ -703,12 +702,12 @@ void WebLocalFrameImpl::dispatchUnloadEvent()
 {
     if (!frame())
         return;
-    frame()->loader().closeURL();
+    frame()->loader().dispatchUnloadEvent();
 }
 
 NPObject* WebLocalFrameImpl::windowObject() const
 {
-    if (!frame() || ScriptForbiddenScope::isScriptForbidden())
+    if (!frame())
         return 0;
     return frame()->script().windowScriptNPObject();
 }
@@ -1212,7 +1211,7 @@ void WebLocalFrameImpl::moveRangeSelectionExtent(const WebPoint& point)
         return;
 
     VisibleSelection newSelection = VisibleSelection(basePosition, extentPosition);
-    frame()->selection().setSelection(newSelection, CharacterGranularity);
+    frame()->selection().setSelection(newSelection, FrameSelection::CloseTyping | FrameSelection::ClearTypingStyle | UserTriggered, FrameSelection::AlignCursorOnScrollIfNeeded, CharacterGranularity);
 }
 
 void WebLocalFrameImpl::moveRangeSelection(const WebPoint& base, const WebPoint& extent)

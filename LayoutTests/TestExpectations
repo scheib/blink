@@ -1,3 +1,4 @@
+
 crbug.com/443780 [ Mac ] virtual/slimmingpaint/fast/events/scale-and-scroll-iframe-body.html [ ImageOnlyFailure ]
 crbug.com/443780 [ Mac ] virtual/slimmingpaint/fast/events/scale-and-scroll-iframe-window.html [ ImageOnlyFailure ]
 crbug.com/443780 [ Mac ] virtual/slimmingpaint/fast/events/menu-key-context-menu-document.html [ Failure ]
@@ -13,6 +14,9 @@ crbug.com/434560 [ Mac Win ] virtual/slimmingpaint/fast/table/td-width-fifty-per
 
 crbug.com/445100 virtual/slimmingpaint/fast/block/float/marquee-shrink-to-avoid-floats.html [ Pass Failure ]
 crbug.com/445100 fast/block/float/marquee-shrink-to-avoid-floats.html [ Pass Failure ]
+
+# Failing since Android viewport limits are hard-coded in HTMLMetaElement-in.cpp
+crbug.com/448148 inspector/device-emulation/device-emulation-restore.html [ Failure ]
 
 # This directly has manual tests that don't have to run with run-webkit-tests
 crbug.com/359838 http/tests/ManualTests/ [ Skip ]
@@ -139,6 +143,11 @@ crbug.com/338794 crbug.com/192172 compositing/rtl/rtl-iframe-fixed-overflow.html
 
 crbug.com/239811 crbug.com/229113 http/tests/history/redirect-js-location-assign-0-seconds.html [ Failure Pass ]
 
+crbug.com/449242 [ Win Linux ] fast/css/word-spacing-characters-complex-text.html [ Pass ImageOnlyFailure ]
+crbug.com/449242 [ Mac Release ] fast/css/word-spacing-characters-complex-text.html [ Pass ImageOnlyFailure ]
+crbug.com/449242 [ Mac Debug ] fast/css/word-spacing-characters-complex-text.html [ Pass ImageOnlyFailure Crash ]
+crbug.com/449242 virtual/slimmingpaint/fast/css/word-spacing-characters-complex-text.html [ Pass ImageOnlyFailure Crash ]
+
 crbug.com/438589 fast/repaint/obscured-background-no-repaint.html [ Failure Pass ]
 
 # Crashing after V8 roll to 3.28.43.1.
@@ -148,6 +157,7 @@ crbug.com/234069 [ Mac Release ] fast/events/touch/gesture/long-press-drag-drop-
 
 crbug.com/330083 imported/web-platform-tests/shadow-dom/elements-and-dom-objects/extensions-to-element-interface/methods/elements-001.html [ Failure ]
 crbug.com/330083 imported/web-platform-tests/shadow-dom/elements-and-dom-objects/extensions-to-element-interface/methods/non-element-nodes-001.html [ Failure ]
+crbug.com/442632 imported/web-platform-tests/shadow-dom/elements-and-dom-objects/extensions-to-event-interface/event-path-001.html [ Failure ]
 crbug.com/330083 imported/web-platform-tests/shadow-dom/elements-and-dom-objects/shadowroot-object/shadowroot-methods/test-004.html [ Failure ]
 crbug.com/330083 imported/web-platform-tests/shadow-dom/events/event-dispatch/test-001.html [ Failure ]
 crbug.com/330083 imported/web-platform-tests/shadow-dom/events/event-dispatch/test-003.html [ Failure ]
@@ -183,7 +193,6 @@ crbug.com/387740 imported/web-platform-tests/mediacapture-streams/stream-api/med
 
 crbug.com/443804 virtual/slimmingpaint/fast/css/ZeroOpacityLayers.html [ ImageOnlyFailure ]
 crbug.com/443804 virtual/slimmingpaint/fast/css/ZeroOpacityLayers2.html [ ImageOnlyFailure ]
-crbug.com/443804 [ SnowLeopard Linux ] virtual/slimmingpaint/fast/css/word-spacing-characters-complex-text.html [ ImageOnlyFailure Crash ]
 crbug.com/242735 virtual/slimmingpaint/fast/css/ex-unit-with-no-x-height.html [ Failure ]
 crbug.com/444591 virtual/slimmingpaint/fast/css/mask-missing-image-crash.html [ Pass Failure ]
 crbug.com/444591 [ Win ] virtual/slimmingpaint/fast/css/css3-ch-unit.html [ Failure ]
@@ -194,8 +203,21 @@ crbug.com/404303 imported/web-platform-tests/mediacapture-streams/obtaining-loca
 crbug.com/404303 imported/web-platform-tests/mediacapture-streams/obtaining-local-multimedia-content/navigatorusermedia/getusermedia-trivial-constraint.html [ Failure ]
 crbug.com/404303 imported/web-platform-tests/mediacapture-streams/obtaining-local-multimedia-content/navigatorusermedia/unknownkey-option-param.html [ Failure ]
 
-# V8 Allowed eval in contexts after navigation, which changed the error of the test.
-crbug.com/439458 http/tests/security/xss-eval.html [ NeedsManualRebaseline ]
+# V8 Changed error message when calling non-function
+crbug.com/259443 fast/forms/selection-wrongtype.html [ NeedsManualRebaseline ]
+crbug.com/259443 fast/js/exception-thrown-from-new.html [ NeedsManualRebaseline ]
+crbug.com/259443 fast/regex/cross-frame-callable.html [ NeedsManualRebaseline ]
+crbug.com/259443 fast/selectors/element-closest-general.html [ NeedsManualRebaseline ]
+crbug.com/259443 http/tests/serviceworker/cache-add.html [ NeedsManualRebaseline ]
+crbug.com/259443 http/tests/serviceworker/cache-match.html [ NeedsManualRebaseline ]
+crbug.com/259443 svg/dom/svgpath-out-of-bounds-getPathSeg.html [ NeedsManualRebaseline ]
+crbug.com/259443 css3/selectors3/xhtml/css3-modsel-15c.xml [ NeedsManualRebaseline ]
+crbug.com/259443 css3/selectors3/xml/css3-modsel-15c.xml [ NeedsManualRebaseline ]
+crbug.com/259443 dom/svg/level3/xpath/XPathEvaluator_evaluate_NOT_SUPPORTED_ERR.svg [ NeedsManualRebaseline ]
+crbug.com/259443 dom/svg/level3/xpath/XPathExpression_evaluate_NOT_SUPPORTED_ERR.svg [ NeedsManualRebaseline ]
+crbug.com/259443 dom/xhtml/level1/core/hc_attrgetvalue2.xhtml [ NeedsManualRebaseline ]
+crbug.com/259443 dom/xhtml/level1/core/hc_nodevalue03.xhtml [ NeedsManualRebaseline ]
+crbug.com/259443 fast/dom/NodeList/nodelist-item-call-as-function.html [ NeedsManualRebaseline ]
 
 # Requires subpixel precision for offset/client/scroll properties
 crbug.com/360889 fast/sub-pixel/cssom-subpixel-precision.html [ ImageOnlyFailure ]
@@ -205,8 +227,6 @@ crbug.com/360889 [ Win ] fast/css/css3-ch-unit.html [ Failure ]
 crbug.com/360889 [ Win ] fast/text/whitespace/nowrap-line-break-after-white-space.html [ Failure ]
 crbug.com/360889 [ Win ] virtual/antialiasedtext/fast/text/whitespace/nowrap-line-break-after-white-space.html [ Failure ]
 crbug.com/360889 [ Win ] virtual/slimmingpaint/fast/text/whitespace/nowrap-line-break-after-white-space.html [ Failure ]
-
-crbug.com/410461 [ Linux ] fast/css/word-spacing-characters-complex-text.html [ ImageOnlyFailure ]
 
 crbug.com/325673 imported/web-platform-tests/custom-elements/concepts/custom-elements-type-allowed-chars-first-char.html [ Failure Timeout ]
 crbug.com/325673 imported/web-platform-tests/custom-elements/concepts/custom-elements-type-allowed-chars.html [ Failure Timeout ]
@@ -434,7 +454,6 @@ crbug.com/397232 [ XP ] css2.1/20110323/vertical-align-boxes-001.htm [ ImageOnly
 crbug.com/378610 [ Win7 ] css3/flexbox/auto-margins.html [ ImageOnlyFailure ]
 crbug.com/397255 [ Linux XP ] css3/masking/clip-path-reference-userSpaceOnUse.html [ ImageOnlyFailure ]
 crbug.com/378610 [ Win7 ] fast/table/td-width-fifty-percent-regression.html [ ImageOnlyFailure ]
-crbug.com/232061 [ Linux ] fast/text/zero-font-size-2.html [ ImageOnlyFailure ]
 crbug.com/378610 [ Win7 ] fast/writing-mode/table-vertical-child-width.html [ ImageOnlyFailure ]
 crbug.com/396940 ietestcenter/css3/multicolumn/column-containing-block-001.htm [ ImageOnlyFailure ]
 crbug.com/396940 ietestcenter/css3/multicolumn/column-containing-block-002.htm [ ImageOnlyFailure ]
@@ -473,6 +492,8 @@ crbug.com/254332 [ XP ] fast/forms/submit/submit-focus-by-mouse.html [ ImageOnly
 
 crbug.com/265650 compositing/repaint/transform-style-change.html [ Pass ImageOnlyFailure ]
 
+crbug.com/444944 compositing/repaint/end-of-opacity-transition.html [ Failure Pass ]
+
 crbug.com/266754 fast/ruby/ruby-svg-crash.html [ ImageOnlyFailure Pass ]
 
 crbug.com/267206 [ Lion MountainLion Retina ] fast/scrolling/scrollbar-tickmarks-hittest.html [ Timeout ]
@@ -490,8 +511,6 @@ crbug.com/316148 [ Win ] http/tests/w3c/webperf/approved/UserTiming/idlharness.h
 crbug.com/398295 [ Debug ] http/tests/w3c/webperf/submission/Intel/user-timing/test_user_timing_mark.html [ Failure Pass ]
 crbug.com/398295 [ Win Release ] http/tests/w3c/webperf/submission/Intel/user-timing/test_user_timing_mark.html [ Failure Pass ]
 crbug.com/398295 [ Win ] http/tests/w3c/webperf/submission/Intel/user-timing/test_user_timing_clearMarks.html [ Failure Pass ]
-
-crbug.com/268832 [ SnowLeopard Debug ] virtual/regionbasedmulticol/fast/multicol/newmulticol/direct-child-column-span-all.html [ Crash Pass ]
 
 #crbug.com/271243 [ Win ] http/tests/misc/acid3.html [ Failure ]
 
@@ -519,8 +538,6 @@ crbug.com/302729 [ Android ] http/tests/media/media-source/mediasource-seek-beyo
 
 # Pixel captures are currently totally broken on Android Nexus4's at the moment.
 crbug.com/293932 [ Android ] css3/images/optimize-contrast-image.html [ ImageOnlyFailure Timeout Pass ]
-
-crbug.com/436766 [ Mac ] fast/transforms/transform-on-inline.html [ Pass ImageOnlyFailure ]
 
 # Flaky timeouts on android
 crbug.com/307777 [ Android ] accessibility/aria-labelledby-on-input.html [ Timeout Pass ]
@@ -564,6 +581,8 @@ crbug.com/307777 [ Android ] tables/hittesting/filltable-levels.html [ Timeout P
 crbug.com/307777 [ Android ] webaudio/stereo2mono-down-mixing.html [ Timeout Pass ]
 crbug.com/307777 [ Android ] webexposed/custom-elements.html [ Timeout Pass ]
 
+crbug.com/449949 [ Android ] inspector-protocol/input/dispatchMouseEvent.html [ Failure Pass ]
+
 crbug.com/363280 [ Debug ] inspector-protocol/debugger/debugger-terminate-dedicated-worker-while-paused.html [ Crash Pass ]
 
 crbug.com/309675 compositing/gestures/gesture-tapHighlight-simple-longPress.html [ ImageOnlyFailure ]
@@ -573,8 +592,8 @@ crbug.com/309675 compositing/gestures/gesture-tapHighlight-simple-longPress.html
 # As such:
 #
 #  (a) Support for RSA is not guaranteed as the system NSS may be ancient.
-#  (b) RSA-PSS, AES-CTR, ECDH and ECDSA have only been implemented for BoringSSL
-#      based WebCrypto.
+#  (b) RSA-PSS, AES-CTR, ECDH, ECDSA, and HKDF have only been implemented for
+#      BoringSSL based WebCrypto.
 #
 # These issue will be resolved once Linux switches to BoringSSL
 # (http://crbug.com/338887).
@@ -607,6 +626,15 @@ crbug.com/338883 [ Linux ] crypto/subtle/ecdh-import-jwk.html [ Failure Pass ]
 crbug.com/338883 [ Linux ] crypto/subtle/ecdh-deriveKey-aes.html [ Failure Pass ]
 crbug.com/338883 [ Linux ] crypto/subtle/ecdh-deriveKey-failures.html [ Failure Pass ]
 crbug.com/338883 [ Linux ] crypto/subtle/ecdh-deriveKey-hmac.html [ Failure Pass ]
+crbug.com/338887 [ Linux ] crypto/subtle/clone-hkdfKey.html [ Failure Pass ]
+crbug.com/338887 [ Linux ] crypto/subtle/derive-hkdf-keys.html [ Failure Pass ]
+crbug.com/338887 [ Linux ] crypto/subtle/hkdf-deriveBits-failures.html [ Failure Pass ]
+crbug.com/338887 [ Linux ] crypto/subtle/hkdf-deriveBits.html [ Failure Pass ]
+crbug.com/338887 [ Linux ] crypto/subtle/hkdf-deriveBits-rfc5869-test-vectors.html [ Failure Pass ]
+crbug.com/338887 [ Linux ] crypto/subtle/hkdf-deriveKey.html [ Failure Pass ]
+crbug.com/338887 [ Linux ] crypto/subtle/hkdf-exportKey.html [ Failure Pass ]
+crbug.com/338887 [ Linux ] crypto/subtle/hkdf-importKey-failures.html [ Failure Pass ]
+crbug.com/338887 [ Linux ] crypto/subtle/hkdf-unwrapKey.html [ Failure Pass ]
 
 # There are some unresolved problems with the teardown of WebWorkers that make
 # the "abandon" WebCrypto tests flaky-crash. This flakiness can also affect the
@@ -618,7 +646,18 @@ crbug.com/409767 crypto/subtle/worker-subtle-crypto-concurrent.html [ Crash Pass
 crbug.com/438403 crypto/subtle/aes-cbc-decrypt-failure.html [ Crash Pass ]
 crbug.com/438403 crypto/subtle/aes-cbc-encrypt-decrypt.html [ Crash Pass ]
 
+#These tests are temporary failures until the chromium-side of PBKDF2 lands
+crbug.com/399099 crypto/subtle/clone-pbkdf2Key.html [ Failure ]
+crbug.com/399099 crypto/subtle/pbkdf2-deriveBits.html [ Failure ]
+crbug.com/399099 crypto/subtle/pbkdf2-deriveBits-empty-password-failure.html [ Failure ]
+crbug.com/399099 crypto/subtle/pbkdf2-deriveBits-failures.html [ Failure ]
+crbug.com/399099 crypto/subtle/pbkdf2-deriveBits-rfc6070-test-vectors.html [ Failure ]
+crbug.com/399099 crypto/subtle/pbkdf2-deriveKey-aes.html [ Failure ]
+crbug.com/399099 crypto/subtle/pbkdf2-deriveKey-failures.html [ Failure ]
+
 crbug.com/443566 http/tests/misc/image-error.html [ Failure Pass ]
+
+crbug.com/449264 svg/transforms/animated-path-inside-transformed-html.xhtml [ NeedsManualRebaseline ]
 
 # This test needs to be updated to use a non-svg font.
 crbug.com/242735 fast/css/ex-unit-with-no-x-height.html [ ImageOnlyFailure Failure ]
@@ -697,8 +736,6 @@ crbug.com/316730 canvas/synchronous-create-pattern.html [ ImageOnlyFailure Pass 
 crbug.com/390125 media/video-frame-accurate-seek.html [ NeedsManualRebaseline ]
 
 crbug.com/245556 compositing/transitions/transform-on-large-layer.html [ ImageOnlyFailure ]
-
-crbug.com/369008 [ Mac ] fast/writing-mode/flipped-blocks-inline-map-local-to-container.html [ Crash Pass ]
 
 crbug.com/321787 [ Win ] virtual/gpu/fast/canvas/webgl/premultiplyalpha-test.html [ Pass Failure ]
 crbug.com/321793 [ Win ] fast/frames/sandboxed-iframe-navigation-windowopen.html [ Pass Timeout ]
@@ -809,7 +846,6 @@ crbug.com/334269 [ Mac ] svg/text/tspan-multiple-outline.svg [ ImageOnlyFailure 
 crbug.com/334269 [ Mac ] svg/transforms/transformed-text-fill-gradient.html [ ImageOnlyFailure ]
 crbug.com/334269 [ Mac ] virtual/antialiasedtext/fast/text/international/complex-text-missing-glyph-fallback.html [ ImageOnlyFailure ]
 crbug.com/334269 [ Mac ] virtual/antialiasedtext/fast/text/international/vertical-positioning-with-combining-marks.html [ ImageOnlyFailure ]
-crbug.com/334269 [ Mac ] fast/css/word-spacing-characters-complex-text.html [ Skip ]
 crbug.com/334269 [ Mac ] fast/multicol/multicol-with-child-renderLayer-for-input.html [ ImageOnlyFailure Crash ]
 
 crbug.com/334269 [ SnowLeopard Debug ] fast/text/zero-width-characters-complex-script.html [ Crash ]
@@ -818,9 +854,6 @@ crbug.com/334269 [ SnowLeopard Debug ] virtual/antialiasedtext/fast/text/zero-wi
 
 crbug.com/334269 [ Mac ] editing/spelling/spellcheck-editable-on-focus-sync.html [ NeedsManualRebaseline ]
 crbug.com/334269 [ Mac ] fast/repaint/4776765.html [ NeedsManualRebaseline ]
-
-crbug.com/437078 fast/text/text-letter-spacing.html [ Pass Failure ImageOnlyFailure ]
-crbug.com/437078 fast/text/international/rtl-negative-letter-spacing.html [ Pass ImageOnlyFailure ]
 
 crbug.com/392046 [ Win ] fast/inline/justify-emphasis-inline-box.html [ Pass Failure ]
 crbug.com/446406 [ Win ] fast/repaint/quotes.html [ Pass Failure ]
@@ -834,6 +867,9 @@ crbug.com/347365 [ Linux ] dom/xhtml/level3/core/canonicalform09.xhtml [ Crash P
 crbug.com/356777 http/tests/history/frameset-repeated-name.html [ Pass Failure ]
 
 crbug.com/390377 [ Release ] fast/dom/private_script_unittest.html [ Skip ]
+
+crbug.com/450160 svg/transforms/svg-css-transforms.xhtml [ NeedsRebaseline ]
+crbug.com/450160 transforms/svg-vs-css.xhtml [ NeedsRebaseline ]
 
 crbug.com/350543 [ Linux ] svg/animations/reset-animation-crash.html [ Crash Pass ]
 crbug.com/350828 svg/custom/animate-initial-pause-unpause.html [ Failure Pass ]
@@ -877,7 +913,6 @@ crbug.com/357075 [ Win Release ] http/tests/security/contentSecurityPolicy/repor
 crbug.com/357082 [ Win Debug ] virtual/threaded/animations/animation-hit-test.html [ Failure Pass ]
 crbug.com/357084 [ Linux Win Debug ] virtual/threaded/animations/keyframe-timing-functions2.html [ Pass Timeout ]
 crbug.com/357085 [ Win Debug ] virtual/threaded/animations/unanimated-style.html [ Pass Timeout ]
-crbug.com/357088 [ Debug ] web-animations-api/timeline-updates-players.html [ Failure Pass ]
 crbug.com/357088 [ Linux Release ] web-animations-api/timeline-updates-players.html [ Failure Pass ]
 crbug.com/357427 http/tests/workers/terminate-during-sync-operation-file.html [ Crash Pass Slow Timeout ]
 crbug.com/357427 http/tests/workers/terminate-during-sync-operation-filesystem.html [ Crash Pass Slow Timeout ]
@@ -896,10 +931,8 @@ crbug.com/432129 fast/html/marquee-scroll.html [ Pass Failure ]
 crbug.com/432129 fast/inline/whitespace-reattaching.html [ Pass Failure ]
 crbug.com/432129 [ Win Debug ] inspector-protocol/timeline/timeline-raf.html [ Pass Failure ]
 crbug.com/432129 inspector/elements/styles/styles-change-node-while-editing.html [ Pass Failure ]
-crbug.com/432129 virtual/antialiasedtext/fast/text/justify-ideograph.html [ Pass ImageOnlyFailure ]
 crbug.com/432129 virtual/slimmingpaint/fast/inline-block/003.html [ Pass Failure ]
 crbug.com/432129 virtual/slimmingpaint/fast/inline/whitespace-reattaching.html [ Pass Failure ]
-crbug.com/432129 virtual/slimmingpaint/fast/text/justify-ideograph.html [ Pass ImageOnlyFailure ]
 crbug.com/432129 virtual/slimmingpaint/fast/text/descent-clip-in-scaled-page.html [ Pass ImageOnlyFailure ]
 
 crbug.com/353087 imported/web-platform-tests/shadow-dom/elements-and-dom-objects/the-content-html-element/test-004.html [ Failure ]
@@ -963,12 +996,12 @@ crbug.com/361729 fast/multicol/pagination-h-horizontal-bt.html [ Pass Failure ]
 crbug.com/361729 fast/multicol/pagination-h-horizontal-tb.html [ Pass Failure ]
 
 crbug.com/437112 virtual/gpu/fast/canvas/canvas-scale-drawImage-shadow.html [ Pass Failure ]
+crbug.com/437112 virtual/slimmingpaint/fast/canvas/canvas-scale-drawImage-shadow.html [ Pass Failure ]
 
 # Old multicol tests that currently have no baseline in the virtual test suite
 # for the new multicol implementation.
 crbug.com/386567 virtual/regionbasedmulticol/fast/multicol/border-padding-pagination.html [ Skip ]
 crbug.com/386567 virtual/regionbasedmulticol/fast/multicol/column-rules-stacking.html [ Skip ]
-crbug.com/386567 virtual/regionbasedmulticol/fast/multicol/fixed-column-percent-logical-height-orthogonal-writing-mode.html [ Skip ]
 crbug.com/386567 virtual/regionbasedmulticol/fast/multicol/flipped-blocks-hit-test.html [ Skip ]
 crbug.com/386567 virtual/regionbasedmulticol/fast/multicol/hit-test-above-or-below.html [ Skip ]
 crbug.com/386567 virtual/regionbasedmulticol/fast/multicol/hit-test-end-of-column-with-line-height.html [ Skip ]
@@ -989,10 +1022,8 @@ crbug.com/386567 virtual/regionbasedmulticol/fast/multicol/pagination-v-horizont
 crbug.com/386567 virtual/regionbasedmulticol/fast/multicol/pagination-v-vertical-lr.html [ Skip ]
 crbug.com/386567 virtual/regionbasedmulticol/fast/multicol/pagination-v-vertical-rl.html [ Skip ]
 crbug.com/386567 virtual/regionbasedmulticol/fast/multicol/positive-leading.html [ Skip ]
-crbug.com/386567 virtual/regionbasedmulticol/fast/multicol/scrolling-overflow.html [ Skip ]
 crbug.com/386567 virtual/regionbasedmulticol/fast/multicol/shadow-breaking.html [ Skip ]
 crbug.com/386567 virtual/regionbasedmulticol/fast/multicol/shrink-to-column-height-for-pagination.html [ Skip ]
-crbug.com/386567 virtual/regionbasedmulticol/fast/multicol/single-line.html [ Skip ]
 crbug.com/386567 virtual/regionbasedmulticol/fast/multicol/span/anonymous-style-inheritance.html [ Skip ]
 crbug.com/386567 virtual/regionbasedmulticol/fast/multicol/span/before-child-anonymous-column-block.html [ Skip ]
 crbug.com/386567 virtual/regionbasedmulticol/fast/multicol/span/clone-summary.html [ Skip ]
@@ -1021,7 +1052,6 @@ crbug.com/386567 virtual/regionbasedmulticol/fast/multicol/vertical-rl/nested-co
 # duplicate all expectations that virtual/regionbasedmulticol/fast/multicol has:
 crbug.com/386567 virtual/slimmingpaint/fast/multicol/border-padding-pagination.html [ Skip ]
 crbug.com/386567 virtual/slimmingpaint/fast/multicol/column-rules-stacking.html [ Skip ]
-crbug.com/386567 virtual/slimmingpaint/fast/multicol/fixed-column-percent-logical-height-orthogonal-writing-mode.html [ Skip ]
 crbug.com/386567 virtual/slimmingpaint/fast/multicol/flipped-blocks-hit-test.html [ Skip ]
 crbug.com/386567 virtual/slimmingpaint/fast/multicol/hit-test-above-or-below.html [ Skip ]
 crbug.com/386567 virtual/slimmingpaint/fast/multicol/hit-test-end-of-column-with-line-height.html [ Skip ]
@@ -1042,10 +1072,8 @@ crbug.com/386567 virtual/slimmingpaint/fast/multicol/pagination-v-horizontal-tb.
 crbug.com/386567 virtual/slimmingpaint/fast/multicol/pagination-v-vertical-lr.html [ Skip ]
 crbug.com/386567 virtual/slimmingpaint/fast/multicol/pagination-v-vertical-rl.html [ Skip ]
 crbug.com/386567 virtual/slimmingpaint/fast/multicol/positive-leading.html [ Skip ]
-crbug.com/386567 virtual/slimmingpaint/fast/multicol/scrolling-overflow.html [ Skip ]
 crbug.com/386567 virtual/slimmingpaint/fast/multicol/shadow-breaking.html [ Skip ]
 crbug.com/386567 virtual/slimmingpaint/fast/multicol/shrink-to-column-height-for-pagination.html [ Skip ]
-crbug.com/386567 virtual/slimmingpaint/fast/multicol/single-line.html [ Skip ]
 crbug.com/386567 virtual/slimmingpaint/fast/multicol/span/anonymous-style-inheritance.html [ Skip ]
 crbug.com/386567 virtual/slimmingpaint/fast/multicol/span/before-child-anonymous-column-block.html [ Skip ]
 crbug.com/386567 virtual/slimmingpaint/fast/multicol/span/clone-summary.html [ Skip ]
@@ -1083,6 +1111,7 @@ crbug.com/350853 fast/multicol/change-height.html [ Skip ]
 crbug.com/408123 fast/multicol/composited-inner-multicol.html [ Skip ]
 crbug.com/408123 fast/multicol/composited-opacity-2nd-and-3rd-column.html [ Skip ]
 crbug.com/408123 fast/multicol/composited-relpos-clipped.html [ Skip ]
+crbug.com/408123 fast/multicol/composited-relpos-in-clipped.html [ Skip ]
 crbug.com/408123 fast/multicol/composited-relpos-overlapping-will-change.html [ Skip ]
 crbug.com/408123 fast/multicol/composited-relpos-resize.html [ Skip ]
 crbug.com/408123 fast/multicol/composited-relpos.html [ Skip ]
@@ -1119,7 +1148,6 @@ crbug.com/350853 fast/multicol/newmulticol/breaks-3-columns-3.html [ Skip ]
 crbug.com/350853 fast/multicol/newmulticol/clipping-overflow-hidden.html [ Skip ]
 crbug.com/350853 fast/multicol/newmulticol/clipping-top-overflow.html [ Skip ]
 crbug.com/350853 fast/multicol/newmulticol/clipping.html [ Skip ]
-crbug.com/350853 fast/multicol/newmulticol/direct-child-column-span-all.html [ Skip ]
 crbug.com/350853 fast/multicol/newmulticol/fixed-height-fill-auto.html [ Skip ]
 crbug.com/350853 fast/multicol/newmulticol/fixed-height-fill-balance-2.html [ Skip ]
 crbug.com/350853 fast/multicol/newmulticol/fixed-height-fill-balance.html [ Skip ]
@@ -1131,7 +1159,6 @@ crbug.com/350853 fast/multicol/newmulticol/leading-margin.html [ Skip ]
 crbug.com/350853 fast/multicol/newmulticol/list-item.html [ Skip ]
 crbug.com/350853 fast/multicol/newmulticol/orphans-and-widows-balance.html [ Skip ]
 crbug.com/350853 fast/multicol/newmulticol/positioned-with-constrained-height.html [ Skip ]
-crbug.com/350853 fast/multicol/newmulticol/single-line.html [ Skip ]
 crbug.com/350853 fast/multicol/newmulticol/spanner-inside-child-crash.html [ Skip ]
 crbug.com/350853 fast/multicol/newmulticol/table-cell.html [ Skip ]
 crbug.com/350853 fast/multicol/newmulticol/unresolvable-percent-height-2.html [ Skip ]
@@ -1142,6 +1169,25 @@ crbug.com/350853 fast/multicol/one-column-with-break.html [ Skip ]
 crbug.com/350853 fast/multicol/paged-becomes-multicol-with-spanner.html [ Skip ]
 crbug.com/350853 fast/multicol/percent-height.html [ Skip ]
 crbug.com/350853 fast/multicol/positioned-outside-of-columns.html [ Skip ]
+crbug.com/408123 fast/multicol/span/balance-after-spanner-exact-fit.html [ Skip ]
+crbug.com/408123 fast/multicol/span/balance-after-spanner-extra-height.html [ Skip ]
+crbug.com/408123 fast/multicol/span/balance-after-spanner-some-extra-height.html [ Skip ]
+crbug.com/408123 fast/multicol/span/balance-before-and-after-spanner.html [ Skip ]
+crbug.com/408123 fast/multicol/span/balance-before-spanner-extra-height.html [ Skip ]
+crbug.com/408123 fast/multicol/span/fill-after-spanner-exact-fit.html [ Skip ]
+crbug.com/408123 fast/multicol/span/fill-after-spanner-extra-height.html [ Skip ]
+crbug.com/408123 fast/multicol/span/multicol-with-padding.html [ Skip ]
+crbug.com/408123 fast/multicol/span/multicol-with-spanner-becomes-regular-block.html [ Skip ]
+crbug.com/408123 fast/multicol/span/overflow-on-multicol.html [ Skip ]
+crbug.com/408123 fast/multicol/span/pseudo-after.html [ Skip ]
+crbug.com/408123 fast/multicol/span/pseudo-after-then-content.html [ Skip ]
+crbug.com/408123 fast/multicol/span/pseudo-before-after.html [ Skip ]
+crbug.com/408123 fast/multicol/span/pseudo-before-after-in-content.html [ Skip ]
+crbug.com/408123 fast/multicol/span/pseudo-before.html [ Skip ]
+crbug.com/408123 fast/multicol/span/pseudo-before-following-content.html [ Skip ]
+crbug.com/408123 fast/multicol/span/remaining-space-in-last-column.html [ Skip ]
+crbug.com/408123 fast/multicol/span/spanner-table.html [ Skip ]
+crbug.com/408123 fast/multicol/span/with-border.html [ Skip ]
 crbug.com/350853 fast/multicol/tall-float1.html [ Skip ]
 crbug.com/350853 fast/multicol/tall-float2.html [ Skip ]
 crbug.com/350853 fast/multicol/transform-inside-opacity.html [ Skip ]
@@ -1322,6 +1368,9 @@ crbug.com/399507 inspector/tracing/update-layer-tree.html [ Failure Pass ]
 crbug.com/399507 virtual/deferred/inspector/tracing/update-layer-tree.html [ Failure Pass ]
 crbug.com/407915 inspector/tracing/timeline-event-dispatch.html [ Failure Pass ]
 crbug.com/407915 virtual/deferred/inspector/tracing/timeline-event-dispatch.html [ Failure Pass ]
+crbug.com/448440 virtual/deferred/inspector/tracing/timeline-script-tag-1.html [ Failure Pass ]
+crbug.com/448440 inspector/tracing/timeline-script-tag-1.html [ Failure Pass ]
+crbug.com/448461 http/tests/loading/simple-subframe.html [ Failure Pass ]
 
 crbug.com/407993 [ Win ] media/encrypted-media/prefixed/encrypted-media-events.html [ Crash Pass ]
 # Will be converted to requestMediaKeySystemAccess() tests.
@@ -1347,6 +1396,7 @@ crbug.com/420749 virtual/threaded/compositing/visibility/visibility-image-layers
 crbug.com/419993 [ Debug ] fast/css/giant-stylesheet-crash.html [ Pass Slow ]
 
 crbug.com/248969 printing/page-count-with-one-word.html [ Pass Timeout ]
+crbug.com/248969 [ Debug ] virtual/threaded/printing/page-count-with-one-word.html [ Pass Timeout ]
 
 # Part of a larger issue referenced in the bug. This specific issue will be fixed shortly.
 crbug.com/408159 accessibility/is-ignored-change-sends-notification.html [ Timeout ]
@@ -1358,7 +1408,6 @@ crbug.com/412570 [ Win7 ] virtual/gpu/fast/canvas/setWidthResetAfterForcedRender
 crbug.com/413604 http/tests/loading/script-priorities.html [ Failure Pass ]
 
 crbug.com/415620 media/media-controller-media-fragment-uri-initial-playback-position.html [ Pass Failure ]
-
 crbug.com/415872 http/tests/xmlhttprequest/xmlhttprequest-responseXML-abort.html [ Pass Timeout ]
 
 crbug.com/417174 compositing/scaling/tiled-layer-recursion.html [ Pass ImageOnlyFailure ]
@@ -1431,8 +1480,6 @@ crbug.com/429128 [ Linux ] virtual/gpu/fast/canvas/yuv-video-on-accelerated-canv
 # By about a quarter or less of a pixel.
 crbug.com/421412 [ Mac ] virtual/antialiasedtext/fast/text/international/bdo-bidi-width.html [ ImageOnlyFailure ]
 
-crbug.com/435870 fast/loader/open-in-srcdoc-unload.html [ Pass Failure ]
-
 crbug.com/432822 [ SnowLeopard ] virtual/slimmingpaint/fast/block/basic/016.html [ Failure ImageOnlyFailure ]
 crbug.com/432822 [ SnowLeopard ] virtual/slimmingpaint/fast/block/basic/fieldset-stretch-to-legend.html [ Failure ImageOnlyFailure ]
 crbug.com/432822 [ SnowLeopard ] virtual/slimmingpaint/fast/block/float/008.html [ Failure ImageOnlyFailure ]
@@ -1453,7 +1500,6 @@ crbug.com/432822 [ SnowLeopard ] virtual/slimmingpaint/fast/block/margin-collaps
 crbug.com/432822 [ SnowLeopard ] virtual/slimmingpaint/fast/block/positioning/047.html [ Failure ImageOnlyFailure ]
 crbug.com/432822 [ SnowLeopard ] virtual/slimmingpaint/fast/block/positioning/051.html [ Failure ImageOnlyFailure ]
 #crbug.com/432822 [ SnowLeopard ] virtual/slimmingpaint/fast/block/positioning/055.html [ ImageOnlyFailure ]
-crbug.com/432822 [ SnowLeopard ] virtual/slimmingpaint/fast/block/positioning/auto/007.html [ Failure ImageOnlyFailure ]
 crbug.com/432822 [ SnowLeopard ] virtual/slimmingpaint/fast/block/positioning/fixed-positioning-scrollbar-bug.html [ Failure ImageOnlyFailure ]
 crbug.com/432822 [ SnowLeopard ] virtual/slimmingpaint/fast/block/positioning/vertical-lr/002.html [ Failure ImageOnlyFailure ]
 crbug.com/432822 [ SnowLeopard ] virtual/slimmingpaint/fast/block/positioning/vertical-rl/002.html [ Failure ImageOnlyFailure ]
@@ -1489,6 +1535,8 @@ crbug.com/438281 [ Mac ] virtual/slimmingpaint/fast/text/aat-morx.html [ Failure
 crbug.com/417782 [ Debug ] virtual/rootlayerscrolls/fast/scrolling/scrolling-apis-subpixel.html [ Crash ]
 crbug.com/417782 [ Debug ] virtual/rootlayerscrolls/fast/scrolling/scrolling-apis-nan-scroll-position.html [ Crash ]
 crbug.com/417782 virtual/rootlayerscrolls/fast/scrolling/scrollbar-prevent-default.html [ Failure Pass Crash ]
+crbug.com/417782 [ Release Mac ] virtual/rootlayerscrolls/fast/scrolling/scrolling-apis-subpixel.html [ Crash Pass ]
+crbug.com/417782 [ Release Mac ] virtual/rootlayerscrolls/fast/scrolling/scrolling-apis-nan-scroll-position.html [ Crash Pass ]
 
 crbug.com/417782 virtual/rootlayerscrolls/fast/scrolling/fractional-scroll-offset-document.html [ Failure ]
 crbug.com/417782 virtual/rootlayerscrolls/fast/scrolling/hover-during-scroll.html [ Failure ]
@@ -1504,6 +1552,8 @@ crbug.com/417782 virtual/rootlayerscrolls/fast/scrolling/scrollable-area-frame.h
 crbug.com/417782 virtual/rootlayerscrolls/fast/scrolling/scrollbar-tickmarks-styled.html [ ImageOnlyFailure ]
 crbug.com/417782 [ Mac ] virtual/rootlayerscrolls/fast/scrolling/scrollbar-tickmarks-hittest.html [ Pass Timeout ]
 
+crbug.com/448442 [ XP ] virtual/slimmingpaint/fast/borders/border-image-side-reduction.html [ ImageOnlyFailure ]
+
 crbug.com/438888 http/tests/misc/acid3.html [ NeedsManualRebaseline ]
 crbug.com/438888 virtual/slimmingpaint/fast/block/positioning/055.html [ NeedsManualRebaseline ]
 
@@ -1511,12 +1561,12 @@ crbug.com/385014 accessibility/canvas-fallback-content-2.html [ Failure ]
 
 crbug.com/432790 [ XP ] virtual/prefer_compositing_to_lcd_text/compositing/overflow/update-widget-positions-on-nested-frames-and-scrollers.html  [ Failure ]
 
-crbug.com/447085 [ XP ] virtual/slimmingpaint/fast/borders/border-image-rotate-transform.html [ ImageOnlyFailure ]
+# Bug(fmalita): re-enable after crbug.com/449873
+# crbug.com/447085 [ XP ] virtual/slimmingpaint/fast/borders/border-image-rotate-transform.html [ ImageOnlyFailure ]
 crbug.com/447085 [ XP ] virtual/slimmingpaint/fast/borders/table-borders.html [ ImageOnlyFailure ]
-crbug.com/447085 [ XP ] virtual/slimmingpaint/fast/css/resize-corner-tracking-transformed-iframe.html [ ImageOnlyFailure ]
-crbug.com/447085 [ XP ] virtual/slimmingpaint/fast/css/resize-corner-tracking-transformed.html [ ImageOnlyFailure ]
+# crbug.com/447085 [ XP ] virtual/slimmingpaint/fast/css/resize-corner-tracking-transformed-iframe.html [ ImageOnlyFailure ]
+# crbug.com/447085 [ XP ] virtual/slimmingpaint/fast/css/resize-corner-tracking-transformed.html [ ImageOnlyFailure ]
 
-crbug.com/431152 inspector/audits/audits-panel-functional.html [ Pass Failure ]
 crbug.com/435864 http/tests/security/shape-image-cors-port.html [ Pass Crash ]
 crbug.com/435864 http/tests/security/shape-image-cors-same-origin.html [ Pass Crash ]
 crbug.com/435864 http/tests/security/shape-image-cors-data-url.html [ Pass Crash ]
@@ -1533,6 +1583,7 @@ crbug.com/364225 virtual/gpu/fast/canvas/canvas-composite-text-alpha.html [ Pass
 crbug.com/440452 virtual/display_list_2d_canvas/fast/canvas/canvas-partial-invalidation-zoomed.html [ Pass Slow Timeout ]
 crbug.com/446740 [ Debug ] virtual/display_list_2d_canvas/fast/canvas/canvas-measure-text-rtl.html [ Pass Timeout Crash ]
 crbug.com/446740 [ Release ] virtual/display_list_2d_canvas/fast/canvas/canvas-measure-text-rtl.html [ Pass Timeout ]
+crbug.com/446740 virtual/slimmingpaint/fast/canvas/canvas-measure-text-rtl.html [ Pass Timeout ]
 
 crbug.com/439840 [ Win Linux Debug ] svg/custom/relative-sized-image.xhtml [ Pass ImageOnlyFailure ]
 
@@ -1592,8 +1643,6 @@ crbug.com/446420 [ Mac Debug ] virtual/gpu/fast/canvas/canvas-transform-multiply
 
 crbug.com/441705 fast/media/media-svg-crash.html [ Pass Failure ]
 
-crbug.com/445969 http/tests/serviceworker/register-wait-forever-in-install-worker.html [ Pass Crash ]
-
 crbug.com/441736 svg/as-image/svg-invalid-image-1.html [ Pass Failure ]
 crbug.com/441738 inspector/extensions/extensions-network.html [ Pass Failure ]
 
@@ -1606,18 +1655,7 @@ crbug.com/444020 fast/dom/shadow/import-rule-in-shadow-tree-needs-document-style
 crbug.com/444022 svg/wicd/test-scalable-background-image1.xhtml [ Pass Failure ]
 crbug.com/444095 svg/wicd/test-rightsizing-b.xhtml [ Pass Failure ]
 
-# Rebaseline after ES6 classes are in.
-crbug.com/442340 webexposed/global-interface-listing.html [ NeedsManualRebaseline ]
-crbug.com/442340 virtual/stable/webexposed/global-interface-listing-dedicated-worker.html [ NeedsManualRebaseline ]
-crbug.com/442340 fast/js/reserved-words-as-property.html [ NeedsManualRebaseline ]
-crbug.com/442340 virtual/stable/webexposed/global-interface-listing.html [ NeedsManualRebaseline ]
-crbug.com/442340 webexposed/global-interface-listing-shared-worker.html [ NeedsManualRebaseline ]
-crbug.com/442340 webexposed/global-interface-listing-dedicated-worker.html [ NeedsManualRebaseline ]
-crbug.com/442340 virtual/stable/webexposed/global-interface-listing-shared-worker.html [ NeedsManualRebaseline ]
-
 crbug.com/390488 [ Mac Debug ] svg/custom/foreign-object-skew.svg [ ImageOnlyFailure ]
-
-crbug.com/445097 inspector-protocol/timeline/timeline-dispatchEvent.html [ Pass Failure ]
 
 crbug.com/445889 virtual/slimmingpaint/fast/inline/fixed-pos-moves-with-abspos-inline-parent.html [ Pass Failure ]
 crbug.com/445889 fast/inline/fixed-pos-moves-with-abspos-inline-parent.html [ Pass Failure ]
@@ -1625,4 +1663,18 @@ crbug.com/445955 [ Mac ] web-animations-api/player-cancel-finishes.html [ Pass F
 
 crbug.com/447425 [ Win Mac Linux ] fast/dynamic/011.html [ Pass Failure ]
 
-crbug.com/448045 fast/dom/defaultView-on-detached-document.html [ Pass Failure ]
+crbug.com/448274 [ Win Mac Linux ] http/tests/misc/prefetch-purpose.html [ Failure ]
+
+crbug.com/448641 [ Debug ] web-animations-api/timeline-updates-players.html [ Crash Pass ]
+crbug.com/448931 permissionclient/image-permissions.html [ Pass Failure ]
+crbug.com/448980 fast/forms/select/styling-option-checked.html [ Pass ImageOnlyFailure ]
+
+crbug.com/449021 http/tests/misc/script-after-slow-stylesheet-removed.html [ Pass Failure ]
+
+crbug.com/449023 http/tests/security/mixedContent/strict-mode-via-pref-image-blocked.https.html [ Pass Failure ]
+crbug.com/449023 http/tests/security/mixedContent/insecure-srcset-in-main-frame-blocked.html [ Pass Failure ]
+crbug.com/449023 http/tests/security/mixedContent/insecure-empty-srcset-in-main-frame-blocked.html [ Pass Failure ]
+crbug.com/449023 http/tests/security/mixedContent/insecure-image-in-main-frame-blocked.html [ Pass Failure ]
+crbug.com/449023 http/tests/security/mixedContent/insecure-image-in-main-frame-allowed.html [ Pass Failure ]
+
+crbug.com/449081 [ Mac Linux Debug ] virtual/gpu/fast/canvas/canvas-lose-restore-max-int-size.html [ Pass Failure ]

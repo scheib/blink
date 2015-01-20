@@ -293,7 +293,7 @@ Node.prototype.isComponentSelectionCollapsed = function()
 {
     // FIXME: crbug.com/447523, use selection.isCollapsed when it is fixed for shadow dom.
     var selection = this.getComponentSelection();
-    return selection && selection.rangeCount ? selection.getRangeAt(0).collapsed : false;
+    return selection && selection.rangeCount ? selection.getRangeAt(0).collapsed : true;
 }
 
 /**
@@ -487,6 +487,20 @@ Element.prototype.scrollOffset = function()
         curTop += element.scrollTop;
     }
     return { left: curLeft, top: curTop };
+}
+
+/**
+ * @param {string} childType
+ * @param {string=} className
+ * @return {!Element}
+ */
+Element.prototype.createSVGChild = function(childType, className)
+{
+    var child = this.ownerDocument.createElementNS("http://www.w3.org/2000/svg", childType);
+    this.appendChild(child);
+    if (className)
+        child.setAttribute("class", className);
+    return child;
 }
 
 /**

@@ -43,7 +43,6 @@
 #include "core/StyleBuilderFunctions.h"
 #include "core/StylePropertyShorthand.h"
 #include "core/css/BasicShapeFunctions.h"
-#include "core/css/CSSContentDistributionValue.h"
 #include "core/css/CSSCursorImageValue.h"
 #include "core/css/CSSFontValue.h"
 #include "core/css/CSSGradientValue.h"
@@ -183,6 +182,9 @@ void StyleBuilderFunctions::applyInheritCSSPropertyJustifyItems(StyleResolverSta
 
 void StyleBuilderFunctions::applyValueCSSPropertyJustifyItems(StyleResolverState& state, CSSValue* value)
 {
+    state.style()->setJustifyItems(RenderStyle::initialJustifyItems());
+    state.style()->setJustifyItemsOverflowAlignment(RenderStyle::initialJustifyItemsOverflowAlignment());
+    state.style()->setJustifyItemsPositionType(RenderStyle::initialJustifyItemsPositionType());
 
     CSSPrimitiveValue* primitiveValue = toCSSPrimitiveValue(value);
     if (Pair* pairValue = primitiveValue->getPairValue()) {
@@ -196,31 +198,6 @@ void StyleBuilderFunctions::applyValueCSSPropertyJustifyItems(StyleResolverState
     } else {
         state.style()->setJustifyItems(*primitiveValue);
     }
-}
-
-void StyleBuilderFunctions::applyInitialCSSPropertyJustifyContent(StyleResolverState& state)
-{
-    state.style()->setJustifyContent(RenderStyle::initialJustifyContent());
-    state.style()->setJustifyContentOverflowAlignment(RenderStyle::initialJustifyContentOverflowAlignment());
-    state.style()->setJustifyContentDistribution(RenderStyle::initialJustifyContentDistribution());
-}
-
-void StyleBuilderFunctions::applyInheritCSSPropertyJustifyContent(StyleResolverState& state)
-{
-    state.style()->setJustifyContent(state.parentStyle()->justifyContent());
-    state.style()->setJustifyContentOverflowAlignment(state.parentStyle()->justifyContentOverflowAlignment());
-    state.style()->setJustifyContentDistribution(state.parentStyle()->justifyContentDistribution());
-}
-
-void StyleBuilderFunctions::applyValueCSSPropertyJustifyContent(StyleResolverState& state, CSSValue* value)
-{
-    CSSContentDistributionValue* contentValue = toCSSContentDistributionValue(value);
-    if (contentValue->distribution()->getValueID() != CSSValueInvalid)
-        state.style()->setJustifyContentDistribution(*contentValue->distribution());
-    if (contentValue->position()->getValueID() != CSSValueInvalid)
-        state.style()->setJustifyContent(*contentValue->position());
-    if (contentValue->overflow()->getValueID() != CSSValueInvalid)
-        state.style()->setJustifyContentOverflowAlignment(*contentValue->overflow());
 }
 
 void StyleBuilderFunctions::applyInitialCSSPropertyCursor(StyleResolverState& state)

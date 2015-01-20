@@ -41,8 +41,8 @@
 #include "core/dom/shadow/ShadowRoot.h"
 #include "core/editing/Editor.h"
 #include "core/editing/FrameSelection.h"
-#include "core/editing/TextIterator.h"
 #include "core/editing/htmlediting.h"
+#include "core/editing/iterators/TextIterator.h"
 #include "core/events/DOMWindowEventQueue.h"
 #include "core/events/EventPath.h"
 #include "core/events/KeyboardEvent.h"
@@ -647,7 +647,24 @@ bool EventHandler::handleMouseDraggedEvent(const MouseEventWithHitTestResults& e
 {
     TRACE_EVENT0("blink", "EventHandler::handleMouseDraggedEvent");
 
-    if (!m_mousePressed || event.event().button() != LeftButton)
+    // While resetting m_mousePressed here may seem out of place, it turns out
+    // to be needed to handle some bugs^Wfeatures in Blink mouse event handling:
+    // 1. Certain elements, such as <embed>, capture mouse events. They do not
+    //    bubble back up. One way for a <embed> to start capturing mouse events
+    //    is on a mouse press. The problem is the <embed> node only starts
+    //    capturing mouse events *after* m_mousePressed for the containing frame
+    //    has already been set to true. As a result, the frame's EventHandler
+    //    never sees the mouse release event, which is supposed to reset
+    //    m_mousePressed... so m_mousePressed ends up remaining true until the
+    //    event handler finally gets another mouse released event. Oops.
+    // 2. Dragging doesn't start until after a mouse press event, but a drag
+    //    that ends as a result of a mouse release does not send a mouse release
+    //    event. As a result, m_mousePressed also ends up remaining true until
+    //    the next mouse release event seen by the EventHandler.
+    if (event.event().button() != LeftButton)
+        m_mousePressed = false;
+
+    if (!m_mousePressed)
         return false;
 
     if (handleDrag(event, DragInitiator::Mouse))
@@ -1943,7 +1960,7 @@ bool EventHandler::handleMouseFocus(const MouseEventWithHitTestResults& targeted
         // clear swallowEvent if the page already set it (e.g., by canceling
         // default behavior).
         if (element) {
-            if (!page->focusController().setFocusedElement(element, m_frame, FocusTypeMouse))
+            if (!page->focusController().setFocusedElement(element, m_frame, WebFocusTypeMouse))
                 return true;
         } else {
             // We call setFocusedElement even with !element in order to blur
@@ -2237,6 +2254,7 @@ bool EventHandler::handleGestureTap(const GestureEventWithHitTestResults& target
     RefPtrWillBeRawPtr<FrameView> frameView(m_frame->view());
     const PlatformGestureEvent& gestureEvent = targetedEvent.event();
     HitTestRequest::HitTestRequestType hitType = getHitTypeForGestureType(gestureEvent.type());
+    uint64_t preDispatchDomTreeVersion = m_frame->document()->domTreeVersion();
 
     UserGestureIndicator gestureIndicator(DefinitelyProcessingUserGesture);
 
@@ -2268,6 +2286,11 @@ bool EventHandler::handleGestureTap(const GestureEventWithHitTestResults& target
         currentHitTest = hitTestResultInFrame(m_frame, adjustedPoint, hitType);
     }
     m_clickNode = currentHitTest.innerNode();
+
+    // Capture data for showUnhandledTapUIIfNeeded.
+    RefPtrWillBeRawPtr<Node> tappedNode = m_clickNode;
+    IntPoint tappedPosition = gestureEvent.position();
+
     if (m_clickNode && m_clickNode->isTextNode())
         m_clickNode = NodeRenderingTraversal::parent(*m_clickNode);
 
@@ -2314,7 +2337,12 @@ bool EventHandler::handleGestureTap(const GestureEventWithHitTestResults& target
     if (!swallowMouseUpEvent)
         swallowMouseUpEvent = handleMouseReleaseEvent(MouseEventWithHitTestResults(fakeMouseUp, currentHitTest));
 
-    return swallowMouseDownEvent | swallowMouseUpEvent | swallowClickEvent;
+    bool swallowed = swallowMouseDownEvent | swallowMouseUpEvent | swallowClickEvent;
+    if (!swallowed && tappedNode) {
+        bool pageChanged = preDispatchDomTreeVersion != m_frame->document()->domTreeVersion();
+        m_frame->chromeClient().showUnhandledTapUIIfNeeded(tappedPosition, tappedNode.get(), pageChanged);
+    }
+    return swallowed;
 }
 
 bool EventHandler::handleGestureLongPress(const GestureEventWithHitTestResults& targetedEvent)
@@ -2548,8 +2576,6 @@ bool EventHandler::isScrollbarHandlingGestures() const
 bool EventHandler::shouldApplyTouchAdjustment(const PlatformGestureEvent& event) const
 {
     if (m_frame->settings() && !m_frame->settings()->touchAdjustmentEnabled())
-        return false;
-    if (m_frame->page() && m_frame->page()->chrome().client().shouldDisableDesktopWorkarounds())
         return false;
     return !event.area().isEmpty();
 }
@@ -3100,23 +3126,23 @@ bool EventHandler::keyEvent(const PlatformKeyboardEvent& initialKeyEvent)
     return keydownResult || keypress->defaultPrevented() || keypress->defaultHandled();
 }
 
-static FocusType focusDirectionForKey(const AtomicString& keyIdentifier)
+static WebFocusType focusDirectionForKey(const AtomicString& keyIdentifier)
 {
     DEFINE_STATIC_LOCAL(AtomicString, Down, ("Down", AtomicString::ConstructFromLiteral));
     DEFINE_STATIC_LOCAL(AtomicString, Up, ("Up", AtomicString::ConstructFromLiteral));
     DEFINE_STATIC_LOCAL(AtomicString, Left, ("Left", AtomicString::ConstructFromLiteral));
     DEFINE_STATIC_LOCAL(AtomicString, Right, ("Right", AtomicString::ConstructFromLiteral));
 
-    FocusType retVal = FocusTypeNone;
+    WebFocusType retVal = WebFocusTypeNone;
 
     if (keyIdentifier == Down)
-        retVal = FocusTypeDown;
+        retVal = WebFocusTypeDown;
     else if (keyIdentifier == Up)
-        retVal = FocusTypeUp;
+        retVal = WebFocusTypeUp;
     else if (keyIdentifier == Left)
-        retVal = FocusTypeLeft;
+        retVal = WebFocusTypeLeft;
     else if (keyIdentifier == Right)
-        retVal = FocusTypeRight;
+        retVal = WebFocusTypeRight;
 
     return retVal;
 }
@@ -3139,8 +3165,8 @@ void EventHandler::defaultKeyboardEventHandler(KeyboardEvent* event)
         else if (event->keyIdentifier() == "U+001B")
             defaultEscapeEventHandler(event);
         else {
-            FocusType type = focusDirectionForKey(AtomicString(event->keyIdentifier()));
-            if (type != FocusTypeNone)
+            WebFocusType type = focusDirectionForKey(AtomicString(event->keyIdentifier()));
+            if (type != WebFocusTypeNone)
                 defaultArrowEventHandler(type, event);
         }
     }
@@ -3151,11 +3177,6 @@ void EventHandler::defaultKeyboardEventHandler(KeyboardEvent* event)
         if (event->charCode() == ' ')
             defaultSpaceEventHandler(event);
     }
-}
-
-bool EventHandler::dragHysteresisExceeded(const FloatPoint& floatDragViewportLocation) const
-{
-    return dragHysteresisExceeded(flooredIntPoint(floatDragViewportLocation));
 }
 
 bool EventHandler::dragHysteresisExceeded(const IntPoint& dragViewportLocation) const
@@ -3392,7 +3413,7 @@ void EventHandler::defaultBackspaceEventHandler(KeyboardEvent* event)
         event->setDefaultHandled();
 }
 
-void EventHandler::defaultArrowEventHandler(FocusType focusType, KeyboardEvent* event)
+void EventHandler::defaultArrowEventHandler(WebFocusType focusType, KeyboardEvent* event)
 {
     ASSERT(event->type() == EventTypeNames::keydown);
 
@@ -3436,7 +3457,7 @@ void EventHandler::defaultTabEventHandler(KeyboardEvent* event)
     if (!page->tabKeyCyclesThroughElements())
         return;
 
-    FocusType focusType = event->shiftKey() ? FocusTypeBackward : FocusTypeForward;
+    WebFocusType focusType = event->shiftKey() ? WebFocusTypeBackward : WebFocusTypeForward;
 
     // Tabs can be used in design mode editing.
     if (m_frame->document()->inDesignMode())

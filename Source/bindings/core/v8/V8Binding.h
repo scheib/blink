@@ -70,8 +70,6 @@ v8::Local<v8::Value> createMinimumArityTypeErrorForMethod(v8::Isolate*, const ch
 v8::Local<v8::Value> createMinimumArityTypeErrorForConstructor(v8::Isolate*, const char* type, unsigned expected, unsigned provided);
 void setMinimumArityTypeError(ExceptionState&, unsigned expected, unsigned provided);
 
-v8::ArrayBuffer::Allocator* v8ArrayBufferAllocator();
-
 template<typename CallbackInfo, typename S>
 inline void v8SetReturnValue(const CallbackInfo& info, const v8::Persistent<S>& handle)
 {
@@ -918,23 +916,32 @@ public:
     static void onInterruptCallback(v8::Isolate* isolate, void* data)
     {
         V8IsolateInterruptor* interruptor = reinterpret_cast<V8IsolateInterruptor*>(data);
-        if (!interruptor->m_canceled)
+        if (!interruptor->canceled())
             interruptor->onInterrupted();
     }
 
     virtual void requestInterrupt() override
     {
+        MutexLocker locker(m_mutex);
         m_canceled = false;
         m_isolate->RequestInterrupt(&onInterruptCallback, this);
     }
 
     virtual void clearInterrupt() override
     {
+        MutexLocker locker(m_mutex);
         m_canceled = true;
+    }
+
+    bool canceled()
+    {
+        MutexLocker locker(m_mutex);
+        return m_canceled;
     }
 
 private:
     v8::Isolate* m_isolate;
+    Mutex m_mutex;
     bool m_canceled;
 };
 

@@ -361,7 +361,7 @@ inline bool isPageHeaderAddress(Address address)
 // is done.
 class BaseHeapPage {
 public:
-    BaseHeapPage(PageMemory*, ThreadState*);
+    BaseHeapPage(PageMemory*, ThreadHeap*);
     virtual ~BaseHeapPage() { }
 
     // virtual methods are slow. So performance-sensitive methods
@@ -370,7 +370,7 @@ public:
     virtual size_t objectPayloadSizeForTesting() = 0;
     virtual bool isEmpty() = 0;
     virtual void removeFromHeap(ThreadHeap*) = 0;
-    virtual void sweep(ThreadHeap*) = 0;
+    virtual void sweep() = 0;
     virtual void markUnmarkedObjectsDead() = 0;
     // Check if the given address points to an object in this
     // heap page. If so, find the start of that object and mark it
@@ -396,16 +396,38 @@ public:
 
     Address address() { return reinterpret_cast<Address>(this); }
     PageMemory* storage() const { return m_storage; }
-    ThreadState* threadState() const { return m_threadState; }
-    bool orphaned() { return !m_threadState; }
+    ThreadHeap* heap() const { return m_heap; }
+    bool orphaned() { return !m_heap; }
     bool terminating() { return m_terminating; }
     void setTerminating() { m_terminating = true; }
 
+    // Returns true if this page has been swept by the ongoing lazy sweep.
+    bool hasBeenSwept() const { return m_swept; }
+
+    void markAsSwept()
+    {
+        ASSERT(!m_swept);
+        m_swept = true;
+    }
+
+    void markAsUnswept()
+    {
+        ASSERT(m_swept);
+        m_swept = false;
+    }
+
 private:
     PageMemory* m_storage;
-    ThreadState* m_threadState;
+    ThreadHeap* m_heap;
     // Whether the page is part of a terminating thread or not.
     bool m_terminating;
+
+    // Track the sweeping state of a page. Set to true once
+    // the lazy sweep completes has processed it.
+    //
+    // Set to false at the start of a sweep, true  upon completion
+    // of lazy sweeping.
+    bool m_swept;
 };
 
 class HeapPage final : public BaseHeapPage {
@@ -438,7 +460,7 @@ public:
     virtual size_t objectPayloadSizeForTesting() override;
     virtual bool isEmpty() override;
     virtual void removeFromHeap(ThreadHeap*) override;
-    virtual void sweep(ThreadHeap*) override;
+    virtual void sweep() override;
     virtual void markUnmarkedObjectsDead() override;
     virtual void checkAndMarkPointer(Visitor*, Address) override;
     virtual void markOrphaned() override
@@ -503,8 +525,8 @@ private:
 // object.
 class LargeObject final : public BaseHeapPage {
 public:
-    LargeObject(PageMemory* storage, ThreadState* state, size_t payloadSize)
-        : BaseHeapPage(storage, state)
+    LargeObject(PageMemory* storage, ThreadHeap* heap, size_t payloadSize)
+        : BaseHeapPage(storage, heap)
         , m_payloadSize(payloadSize)
     {
     }
@@ -517,7 +539,7 @@ public:
     virtual size_t objectPayloadSizeForTesting() override;
     virtual bool isEmpty() override;
     virtual void removeFromHeap(ThreadHeap*) override;
-    virtual void sweep(ThreadHeap*) override;
+    virtual void sweep() override;
     virtual void markUnmarkedObjectsDead() override;
     virtual void checkAndMarkPointer(Visitor*, Address) override;
     virtual void markOrphaned() override
@@ -783,7 +805,7 @@ private:
 #endif
 
     bool coalesce();
-    void markUnmarkedObjectsDead();
+    void preparePagesForSweeping();
 
     Address m_currentAllocationPoint;
     size_t m_remainingAllocationSize;
@@ -806,6 +828,18 @@ private:
     size_t m_promptlyFreedSize;
 };
 
+// Mask an address down to the enclosing oilpan heap base page.  All oilpan heap
+// pages are aligned at blinkPageBase plus an OS page size.
+// FIXME: Remove PLATFORM_EXPORT once we get a proper public interface to our
+// typed heaps.  This is only exported to enable tests in HeapTest.cpp.
+PLATFORM_EXPORT inline BaseHeapPage* pageFromObject(const void* object)
+{
+    Address address = reinterpret_cast<Address>(const_cast<void*>(object));
+    BaseHeapPage* page = reinterpret_cast<BaseHeapPage*>(blinkPageAddress(address) + WTF::kSystemPageSize);
+    ASSERT(page->contains(address));
+    return page;
+}
+
 class PLATFORM_EXPORT Heap {
 public:
     static void init();
@@ -817,6 +851,32 @@ public:
     static BaseHeapPage* findPageFromAddress(void* pointer) { return findPageFromAddress(reinterpret_cast<Address>(pointer)); }
     static bool containedInHeapOrOrphanedPage(void*);
 #endif
+
+    // Is the finalizable GC object still alive? If no GC is in progress,
+    // it must be true. If a lazy sweep is in progress, it will be true if
+    // the object hasn't been swept yet and it is marked, or it has
+    // been swept and it is still alive.
+    //
+    // isFinalizedObjectAlive() must not be used with already-finalized object
+    // references.
+    //
+    template<typename T>
+    static bool isFinalizedObjectAlive(const T* objectPointer)
+    {
+        static_assert(IsGarbageCollectedType<T>::value, "only objects deriving from GarbageCollected can be used.");
+#if ENABLE(OILPAN)
+        BaseHeapPage* page = pageFromObject(objectPointer);
+        if (page->hasBeenSwept())
+            return true;
+        ASSERT(page->heap()->threadState()->isSweepingInProgress());
+
+        return ObjectAliveTrait<T>::isHeapObjectAlive(s_markingVisitor, const_cast<T*>(objectPointer));
+#else
+        // FIXME: remove when lazy sweeping is always on
+        // (cf. ThreadState::postGCProcessing()).
+        return true;
+#endif
+    }
 
     // Push a trace callback on the marking stack.
     static void pushTraceCallback(void* containerObject, TraceCallback);
@@ -1190,18 +1250,6 @@ private:
 #define GC_PLUGIN_IGNORE(bug)
 #endif
 
-// Mask an address down to the enclosing oilpan heap base page.  All oilpan heap
-// pages are aligned at blinkPageBase plus an OS page size.
-// FIXME: Remove PLATFORM_EXPORT once we get a proper public interface to our
-// typed heaps.  This is only exported to enable tests in HeapTest.cpp.
-PLATFORM_EXPORT inline BaseHeapPage* pageFromObject(const void* object)
-{
-    Address address = reinterpret_cast<Address>(const_cast<void*>(object));
-    BaseHeapPage* page = reinterpret_cast<BaseHeapPage*>(blinkPageAddress(address) + WTF::kSystemPageSize);
-    ASSERT(page->contains(address));
-    return page;
-}
-
 NO_SANITIZE_ADDRESS inline
 size_t HeapObjectHeader::size() const
 {
@@ -1319,25 +1367,9 @@ Address ThreadHeap::allocate(size_t size, size_t gcInfoIndex)
     return allocateObject(allocationSizeFromSize(size), gcInfoIndex);
 }
 
-// We use four heaps for general type objects depending on their object sizes.
-// Objects whose size is 1 - 3 words go to the first general type heap.
-// Objects whose size is 4 - 7 words go to the second general type heap.
-// Objects whose size is 8 - 15 words go to the third general type heap.
-// Objects whose size is more than 15 words go to the fourth general type heap.
 template<typename T>
 struct HeapIndexTrait {
-    static int index(size_t size)
-    {
-        static const int wordSize = sizeof(void*);
-        if (size < 8 * wordSize) {
-            if (size < 4 * wordSize)
-                return General1Heap;
-            return General2Heap;
-        }
-        if (size < 16 * wordSize)
-            return General3Heap;
-        return General4Heap;
-    };
+    static int index() { return GeneralHeap; };
 };
 
 // FIXME: The forward declaration is layering violation.
@@ -1345,7 +1377,7 @@ struct HeapIndexTrait {
     class Type;                                      \
     template<>                                       \
     struct HeapIndexTrait<class Type> {              \
-    static int index(size_t) { return Type##Heap; }; \
+    static int index() { return Type##Heap; }; \
     };
 FOR_EACH_TYPED_HEAP(DEFINE_TYPED_HEAP_TRAIT)
 #undef DEFINE_TYPED_HEAP_TRAIT
@@ -1361,7 +1393,7 @@ Address Heap::allocateOnHeapIndex(size_t size, int heapIndex, size_t gcInfoIndex
 template<typename T>
 Address Heap::allocate(size_t size)
 {
-    return allocateOnHeapIndex<T>(size, HeapIndexTrait<T>::index(size), GCInfoTrait<T>::index());
+    return allocateOnHeapIndex<T>(size, HeapIndexTrait<T>::index(), GCInfoTrait<T>::index());
 }
 
 template<typename T>
@@ -1372,7 +1404,7 @@ Address Heap::reallocate(void* previous, size_t size)
         // malloc(0).  In both cases we do nothing and return nullptr.
         return nullptr;
     }
-    Address address = Heap::allocateOnHeapIndex<T>(size, HeapIndexTrait<T>::index(size), GCInfoTrait<T>::index());
+    Address address = Heap::allocateOnHeapIndex<T>(size, HeapIndexTrait<T>::index(), GCInfoTrait<T>::index());
     if (!previous) {
         // This is equivalent to malloc(size).
         return address;
@@ -1537,9 +1569,9 @@ public:
     }
 
 private:
-    static void backingFree(void*, int heapIndex);
-    static bool backingExpand(void*, size_t, int heapIndex);
-    static void backingShrink(void*, size_t quantizedCurrentSize, size_t quantizedShrunkSize, int heapIndex);
+    static void backingFree(void*);
+    static bool backingExpand(void*, size_t);
+    static void backingShrink(void*, size_t quantizedCurrentSize, size_t quantizedShrunkSize);
     PLATFORM_EXPORT static void shrinkVectorBackingInternal(void*, size_t quantizedCurrentSize, size_t quantizedShrunkSize);
     PLATFORM_EXPORT static void shrinkInlineVectorBackingInternal(void*, size_t quantizedCurrentSize, size_t quantizedShrunkSize);
 
@@ -1616,31 +1648,31 @@ template<
     typename MappedArg,
     typename HashArg = typename DefaultHash<KeyArg>::Hash,
     typename KeyTraitsArg = HashTraits<KeyArg>,
-    typename MappedTraitsArg = HashTraits<MappedArg> >
+    typename MappedTraitsArg = HashTraits<MappedArg>>
 class HeapHashMap : public HashMap<KeyArg, MappedArg, HashArg, KeyTraitsArg, MappedTraitsArg, HeapAllocator> { };
 
 template<
     typename ValueArg,
     typename HashArg = typename DefaultHash<ValueArg>::Hash,
-    typename TraitsArg = HashTraits<ValueArg> >
+    typename TraitsArg = HashTraits<ValueArg>>
 class HeapHashSet : public HashSet<ValueArg, HashArg, TraitsArg, HeapAllocator> { };
 
 template<
     typename ValueArg,
     typename HashArg = typename DefaultHash<ValueArg>::Hash,
-    typename TraitsArg = HashTraits<ValueArg> >
+    typename TraitsArg = HashTraits<ValueArg>>
 class HeapLinkedHashSet : public LinkedHashSet<ValueArg, HashArg, TraitsArg, HeapAllocator> { };
 
 template<
     typename ValueArg,
     size_t inlineCapacity = 0, // The inlineCapacity is just a dummy to match ListHashSet (off-heap).
     typename HashArg = typename DefaultHash<ValueArg>::Hash>
-class HeapListHashSet : public ListHashSet<ValueArg, inlineCapacity, HashArg, HeapListHashSetAllocator<ValueArg, inlineCapacity> > { };
+class HeapListHashSet : public ListHashSet<ValueArg, inlineCapacity, HashArg, HeapListHashSetAllocator<ValueArg, inlineCapacity>> { };
 
 template<
     typename Value,
     typename HashFunctions = typename DefaultHash<Value>::Hash,
-    typename Traits = HashTraits<Value> >
+    typename Traits = HashTraits<Value>>
 class HeapHashCountedSet : public HashCountedSet<Value, HashFunctions, Traits, HeapAllocator> { };
 
 template<typename T, size_t inlineCapacity = 0>
@@ -2392,7 +2424,7 @@ struct GCInfoTrait<HeapHashSet<T, U, V>> : public GCInfoTrait<HashSet<T, U, V, H
 template<typename T, typename U, typename V>
 struct GCInfoTrait<HeapLinkedHashSet<T, U, V>> : public GCInfoTrait<LinkedHashSet<T, U, V, HeapAllocator>> { };
 template<typename T, size_t inlineCapacity, typename U>
-struct GCInfoTrait<HeapListHashSet<T, inlineCapacity, U>> : public GCInfoTrait<ListHashSet<T, inlineCapacity, U, HeapListHashSetAllocator<T, inlineCapacity>> > { };
+struct GCInfoTrait<HeapListHashSet<T, inlineCapacity, U>> : public GCInfoTrait<ListHashSet<T, inlineCapacity, U, HeapListHashSetAllocator<T, inlineCapacity>>> { };
 template<typename T, size_t inlineCapacity>
 struct GCInfoTrait<HeapVector<T, inlineCapacity>> : public GCInfoTrait<Vector<T, inlineCapacity, HeapAllocator>> { };
 template<typename T, size_t inlineCapacity>

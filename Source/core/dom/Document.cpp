@@ -663,6 +663,7 @@ void Document::mediaQueryAffectingValueChanged()
 {
     m_evaluateMediaQueriesOnStyleRecalc = true;
     styleEngine()->clearMediaQueryRuleSetStyleSheets();
+    InspectorInstrumentation::mediaQueryResultChanged(this);
 }
 
 void Document::setCompatibilityMode(CompatibilityMode mode)
@@ -1110,17 +1111,17 @@ void Document::setReadyState(ReadyState readyState)
 
     switch (readyState) {
     case Loading:
-        if (!m_documentTiming.domLoading) {
-            m_documentTiming.domLoading = monotonicallyIncreasingTime();
+        if (!m_documentTiming.domLoading()) {
+            m_documentTiming.setDomLoading(monotonicallyIncreasingTime());
         }
         break;
     case Interactive:
-        if (!m_documentTiming.domInteractive)
-            m_documentTiming.domInteractive = monotonicallyIncreasingTime();
+        if (!m_documentTiming.domInteractive())
+            m_documentTiming.setDomInteractive(monotonicallyIncreasingTime());
         break;
     case Complete:
-        if (!m_documentTiming.domComplete)
-            m_documentTiming.domComplete = monotonicallyIncreasingTime();
+        if (!m_documentTiming.domComplete())
+            m_documentTiming.setDomComplete(monotonicallyIncreasingTime());
         break;
     }
 
@@ -2744,6 +2745,11 @@ double Document::timerAlignmentInterval() const
     return p->timerAlignmentInterval();
 }
 
+DOMTimerCoordinator* Document::timers()
+{
+    return &m_timers;
+}
+
 EventTarget* Document::errorEventTarget()
 {
     return domWindow();
@@ -2999,19 +3005,19 @@ void Document::processHttpEquivSetCookie(const AtomicString& content)
 
 void Document::processHttpEquivXFrameOptions(const AtomicString& content)
 {
-    LocalFrame* frame = this->frame();
-    if (!frame)
+    if (!m_frame)
         return;
 
-    FrameLoader& frameLoader = frame->loader();
     unsigned long requestIdentifier = loader()->mainResourceIdentifier();
-    if (frameLoader.shouldInterruptLoadForXFrameOptions(content, url(), requestIdentifier)) {
+    if (m_frame->loader().shouldInterruptLoadForXFrameOptions(content, url(), requestIdentifier)) {
         String message = "Refused to display '" + url().elidedString() + "' in a frame because it set 'X-Frame-Options' to '" + content + "'.";
-        frameLoader.stopAllLoaders();
+        m_frame->loader().stopAllLoaders();
+        if (!m_frame)
+            return;
         // Stopping the loader isn't enough, as we're already parsing the document; to honor the header's
         // intent, we must navigate away from the possibly partially-rendered document to a location that
         // doesn't inherit the parent's SecurityOrigin.
-        frame->navigationScheduler().scheduleLocationChange(this, SecurityOrigin::urlWithUniqueSecurityOrigin());
+        m_frame->navigate(*this, SecurityOrigin::urlWithUniqueSecurityOrigin(), true);
         RefPtrWillBeRawPtr<ConsoleMessage> consoleMessage = ConsoleMessage::create(SecurityMessageSource, ErrorMessageLevel, message);
         consoleMessage->setRequestIdentifier(requestIdentifier);
         addConsoleMessage(consoleMessage.release());
@@ -3419,7 +3425,7 @@ void Document::setAnnotatedRegions(const Vector<AnnotatedRegionValue>& regions)
     setAnnotatedRegionsDirty(false);
 }
 
-bool Document::setFocusedElement(PassRefPtrWillBeRawPtr<Element> prpNewFocusedElement, FocusType type)
+bool Document::setFocusedElement(PassRefPtrWillBeRawPtr<Element> prpNewFocusedElement, WebFocusType type)
 {
     m_clearFocusedElementTimer.stop();
 
@@ -3474,9 +3480,9 @@ bool Document::setFocusedElement(PassRefPtrWillBeRawPtr<Element> prpNewFocusedEl
         if (view()) {
             Widget* oldWidget = widgetForElement(*oldFocusedElement);
             if (oldWidget)
-                oldWidget->setFocus(false);
+                oldWidget->setFocus(false, type);
             else
-                view()->setFocus(false);
+                view()->setFocus(false, type);
         }
     }
 
@@ -3538,9 +3544,9 @@ bool Document::setFocusedElement(PassRefPtrWillBeRawPtr<Element> prpNewFocusedEl
                 focusWidget = widgetForElement(*m_focusedElement);
             }
             if (focusWidget)
-                focusWidget->setFocus(true);
+                focusWidget->setFocus(true, type);
             else
-                view()->setFocus(true);
+                view()->setFocus(true, type);
         }
     }
 
@@ -4524,11 +4530,11 @@ void Document::finishedParsing()
 
     // FIXME: DOMContentLoaded is dispatched synchronously, but this should be dispatched in a queued task,
     // See https://crbug.com/425790
-    if (!m_documentTiming.domContentLoadedEventStart)
-        m_documentTiming.domContentLoadedEventStart = monotonicallyIncreasingTime();
+    if (!m_documentTiming.domContentLoadedEventStart())
+        m_documentTiming.setDomContentLoadedEventStart(monotonicallyIncreasingTime());
     dispatchEvent(Event::createBubble(EventTypeNames::DOMContentLoaded));
-    if (!m_documentTiming.domContentLoadedEventEnd)
-        m_documentTiming.domContentLoadedEventEnd = monotonicallyIncreasingTime();
+    if (!m_documentTiming.domContentLoadedEventEnd())
+        m_documentTiming.setDomContentLoadedEventEnd(monotonicallyIncreasingTime());
     setParsingState(FinishedParsing);
 
     // The microtask checkpoint or the loader's finishedParsing() method may invoke script that causes this object to
@@ -4679,6 +4685,9 @@ void Document::initSecurityContext(const DocumentInit& initializer)
         ASSERT(securityOrigin());
         return;
     }
+
+    if (initializer.isHostedInReservedIPRange())
+        setHostedInReservedIPRange();
 
     if (!initializer.hasSecurityContext()) {
         // No source for a security context.
@@ -5029,6 +5038,12 @@ Element* Document::pointerLockElement() const
     return 0;
 }
 
+void Document::suppressLoadEvent()
+{
+    if (!loadEventFinished())
+        m_loadEventProgress = LoadEventCompleted;
+}
+
 void Document::decrementLoadEventDelayCount()
 {
     ASSERT(m_loadEventDelayCount);
@@ -5206,14 +5221,6 @@ void Document::adjustFloatRectForScrollAndAbsoluteZoom(FloatRect& rect, RenderOb
 bool Document::hasActiveParser()
 {
     return m_activeParserCount || (m_parser && m_parser->processingData());
-}
-
-void Document::decrementActiveParserCount()
-{
-    --m_activeParserCount;
-    if (!frame())
-        return;
-    frame()->loader().checkLoadComplete();
 }
 
 void Document::setContextFeatures(ContextFeatures& features)
@@ -5740,6 +5747,7 @@ void Document::trace(Visitor* visitor)
     visitor->trace(m_associatedFormControls);
     visitor->trace(m_useElementsNeedingUpdate);
     visitor->trace(m_layerUpdateSVGFilterElements);
+    visitor->trace(m_timers);
     visitor->trace(m_templateDocument);
     visitor->trace(m_templateDocumentHost);
     visitor->trace(m_visibilityObservers);

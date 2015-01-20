@@ -204,7 +204,6 @@ destination-in
 destination-out
 destination-atop
 xor
-plus-darker
 // highlight
 plus-lighter
 //
@@ -542,7 +541,6 @@ wrap-reverse
 
 // grid-auto-flow
 dense
-stack
 
 //
 // -webkit-user-modify

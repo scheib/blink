@@ -30,6 +30,7 @@
 #include "bindings/core/v8/ScriptController.h"
 #include "core/dom/DOMStringList.h"
 #include "core/dom/Document.h"
+#include "core/dom/SandboxFlags.h"
 #include "core/events/SecurityPolicyViolationEvent.h"
 #include "core/frame/LocalDOMWindow.h"
 #include "core/frame/LocalFrame.h"
@@ -162,7 +163,10 @@ void ContentSecurityPolicy::applyPolicySideEffectsToExecutionContext()
     // If we're in a Document, set the referrer policy, mixed content checking, and sandbox
     // flags, then dump all the parsing error messages, then poke at histograms.
     if (Document* document = this->document()) {
-        document->enforceSandboxFlags(m_sandboxMask);
+        if (m_sandboxMask != SandboxNone) {
+            UseCounter::count(document, UseCounter::SandboxViaCSP);
+            document->enforceSandboxFlags(m_sandboxMask);
+        }
         if (m_enforceStrictMixedContentChecking)
             document->enforceStrictMixedContentChecking();
         if (didSetReferrerPolicy())
@@ -314,6 +318,16 @@ bool isAllowedByAllWithContext(const CSPDirectiveListVector& policies, const Str
     return true;
 }
 
+template<bool (CSPDirectiveList::*allowed)(const String&, const WTF::OrdinalNumber&, ContentSecurityPolicy::ReportingStatus, const String& content) const>
+bool isAllowedByAllWithContextAndContent(const CSPDirectiveListVector& policies, const String& contextURL, const WTF::OrdinalNumber& contextLine, ContentSecurityPolicy::ReportingStatus reportingStatus, const String& content)
+{
+    for (const auto& policy : policies) {
+        if (!(policy.get()->*allowed)(contextURL, contextLine, reportingStatus, content))
+            return false;
+    }
+    return true;
+}
+
 template<bool (CSPDirectiveList::*allowed)(const String&) const>
 bool isAllowedByAllWithNonce(const CSPDirectiveListVector& policies, const String& nonce)
 {
@@ -377,7 +391,7 @@ bool checkDigest(const String& source, uint8_t hashAlgorithmsUsed, const CSPDire
     if (hashAlgorithmsUsed == ContentSecurityPolicyHashAlgorithmNone)
         return false;
 
-    StringUTF8Adaptor normalizedSource(source, StringUTF8Adaptor::Normalize, WTF::EntitiesForUnencodables);
+    StringUTF8Adaptor normalizedSource = normalizeSource(source);
 
     for (const auto& algorithmMap : kAlgorithmMap) {
         DigestValue digest;
@@ -401,16 +415,16 @@ bool ContentSecurityPolicy::allowInlineEventHandlers(const String& contextURL, c
     return isAllowedByAllWithContext<&CSPDirectiveList::allowInlineEventHandlers>(m_policies, contextURL, contextLine, reportingStatus);
 }
 
-bool ContentSecurityPolicy::allowInlineScript(const String& contextURL, const WTF::OrdinalNumber& contextLine, ContentSecurityPolicy::ReportingStatus reportingStatus) const
+bool ContentSecurityPolicy::allowInlineScript(const String& contextURL, const WTF::OrdinalNumber& contextLine, const String& scriptContent, ContentSecurityPolicy::ReportingStatus reportingStatus) const
 {
-    return isAllowedByAllWithContext<&CSPDirectiveList::allowInlineScript>(m_policies, contextURL, contextLine, reportingStatus);
+    return isAllowedByAllWithContextAndContent<&CSPDirectiveList::allowInlineScript>(m_policies, contextURL, contextLine, reportingStatus, scriptContent);
 }
 
-bool ContentSecurityPolicy::allowInlineStyle(const String& contextURL, const WTF::OrdinalNumber& contextLine, ContentSecurityPolicy::ReportingStatus reportingStatus) const
+bool ContentSecurityPolicy::allowInlineStyle(const String& contextURL, const WTF::OrdinalNumber& contextLine, const String& styleContent, ContentSecurityPolicy::ReportingStatus reportingStatus) const
 {
     if (m_overrideInlineStyleAllowed)
         return true;
-    return isAllowedByAllWithContext<&CSPDirectiveList::allowInlineStyle>(m_policies, contextURL, contextLine, reportingStatus);
+    return isAllowedByAllWithContextAndContent<&CSPDirectiveList::allowInlineStyle>(m_policies, contextURL, contextLine, reportingStatus, styleContent);
 }
 
 bool ContentSecurityPolicy::allowEval(ScriptState* scriptState, ContentSecurityPolicy::ReportingStatus reportingStatus) const
@@ -792,6 +806,8 @@ void ContentSecurityPolicy::reportInvalidPluginTypes(const String& pluginType)
     String message;
     if (pluginType.isNull())
         message = "'plugin-types' Content Security Policy directive is empty; all plugins will be blocked.\n";
+    else if (pluginType == "'none'")
+        message = "Invalid plugin type in 'plugin-types' Content Security Policy directive: '" + pluginType + "'. Did you mean to set the object-src directive to 'none'?\n";
     else
         message = "Invalid plugin type in 'plugin-types' Content Security Policy directive: '" + pluginType + "'.\n";
     logToConsole(message);

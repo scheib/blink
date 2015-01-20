@@ -438,11 +438,27 @@ bool GraphicsContext::couldUseLCDRenderedText() const
     return m_isCertainlyOpaque && m_shouldSmoothFonts;
 }
 
-void GraphicsContext::setCompositeOperation(CompositeOperator compositeOperation, WebBlendMode blendMode)
+void GraphicsContext::setCompositeOperation(SkXfermode::Mode xferMode)
 {
     if (contextDisabled())
         return;
-    mutableState()->setCompositeOperation(compositeOperation, blendMode);
+    mutableState()->setCompositeOperation(xferMode);
+}
+
+void GraphicsContext::setCompositeOperation(CompositeOperator compositeOperation, WebBlendMode blendMode)
+{
+    SkXfermode::Mode xferMode = WebCoreCompositeToSkiaComposite(compositeOperation, blendMode);
+    setCompositeOperation(xferMode);
+}
+
+CompositeOperator GraphicsContext::compositeOperation() const
+{
+    return compositeOperatorFromSkia(immutableState()->compositeOperation());
+}
+
+WebBlendMode GraphicsContext::blendModeOperation() const
+{
+    return blendModeFromSkia(immutableState()->compositeOperation());
 }
 
 SkColorFilter* GraphicsContext::colorFilter() const
@@ -494,17 +510,17 @@ void GraphicsContext::concat(const SkMatrix& matrix)
 
 void GraphicsContext::beginTransparencyLayer(float opacity, const FloatRect* bounds)
 {
-    beginLayer(opacity, immutableState()->compositeOperator(), bounds);
+    beginLayer(opacity, immutableState()->compositeOperation(), bounds);
 }
 
-void GraphicsContext::beginLayer(float opacity, CompositeOperator op, const FloatRect* bounds, ColorFilter colorFilter, ImageFilter* imageFilter)
+void GraphicsContext::beginLayer(float opacity, SkXfermode::Mode xfermode, const FloatRect* bounds, ColorFilter colorFilter, ImageFilter* imageFilter)
 {
     if (contextDisabled())
         return;
 
     SkPaint layerPaint;
     layerPaint.setAlpha(static_cast<unsigned char>(opacity * 255));
-    layerPaint.setXfermodeMode(WebCoreCompositeToSkiaComposite(op, m_paintState->blendMode()));
+    layerPaint.setXfermodeMode(xfermode);
     layerPaint.setColorFilter(WebCoreColorFilterToSkiaColorFilter(colorFilter).get());
     layerPaint.setImageFilter(imageFilter);
 
@@ -1763,31 +1779,6 @@ void GraphicsContext::adjustLineToPixelBoundaries(FloatPoint& p1, FloatPoint& p2
     }
 }
 
-PassOwnPtr<ImageBuffer> GraphicsContext::createRasterBuffer(const IntSize& size, OpacityMode opacityMode) const
-{
-    // Make the buffer larger if the context's transform is scaling it so we need a higher
-    // resolution than one pixel per unit. Also set up a corresponding scale factor on the
-    // graphics context.
-    SkScalar ctmScaleX = 1.0;
-    SkScalar ctmScaleY = 1.0;
-    if (!RuntimeEnabledFeatures::slimmingPaintEnabled()) {
-        AffineTransform transform = getCTM();
-        ctmScaleX = transform.xScale();
-        ctmScaleY = transform.yScale();
-    }
-    IntSize scaledSize(static_cast<int>(ceil(size.width() * ctmScaleX)), static_cast<int>(ceil(size.height() * ctmScaleY)));
-
-    OwnPtr<ImageBufferSurface> surface = adoptPtr(new UnacceleratedImageBufferSurface(scaledSize, opacityMode));
-    if (!surface->isValid())
-        return nullptr;
-    OwnPtr<ImageBuffer> buffer = adoptPtr(new ImageBuffer(surface.release()));
-
-    buffer->context()->scale(static_cast<float>(scaledSize.width()) / size.width(),
-        static_cast<float>(scaledSize.height()) / size.height());
-
-    return buffer.release();
-}
-
 void GraphicsContext::setPathFromPoints(SkPath* path, size_t numPoints, const FloatPoint* points)
 {
     path->incReserve(numPoints);
@@ -1930,7 +1921,7 @@ void GraphicsContext::didDrawTextInRect(const SkRect& textRect)
     }
 }
 
-PassOwnPtr<GraphicsContext::AutoCanvasRestorer> GraphicsContext::preparePaintForDrawRectToRect(
+int GraphicsContext::preparePaintForDrawRectToRect(
     SkPaint* paint,
     const SkRect& srcRect,
     const SkRect& destRect,
@@ -1940,9 +1931,10 @@ PassOwnPtr<GraphicsContext::AutoCanvasRestorer> GraphicsContext::preparePaintFor
     bool isLazyDecoded,
     bool isDataComplete) const
 {
+    int initialSaveCount = m_canvas->getSaveCount();
+
     paint->setColorFilter(this->colorFilter());
     paint->setAlpha(this->getNormalizedAlpha());
-    OwnPtr<AutoCanvasRestorer> restorer;
     bool usingImageFilter = false;
     if (dropShadowImageFilter() && isBitmapWithAlpha) {
         SkMatrix ctm = getTotalMatrix();
@@ -1965,8 +1957,6 @@ PassOwnPtr<GraphicsContext::AutoCanvasRestorer> GraphicsContext::preparePaintFor
             layerPaint.setImageFilter(dropShadowImageFilter());
             m_canvas->saveLayer(&filteredBounds, &layerPaint);
             m_canvas->concat(ctm);
-            // Need two calls to restore to undo state setup performed here
-            restorer = adoptPtr(new AutoCanvasRestorer(m_canvas, 2));
         }
     }
 
@@ -2005,16 +1995,8 @@ PassOwnPtr<GraphicsContext::AutoCanvasRestorer> GraphicsContext::preparePaintFor
     }
     resampling = limitInterpolationQuality(this, resampling);
     paint->setFilterLevel(static_cast<SkPaint::FilterLevel>(resampling));
-    return restorer.release();
-}
 
-GraphicsContext::AutoCanvasRestorer::~AutoCanvasRestorer()
-{
-    while (m_restoreCount) {
-        m_canvas->restore();
-        m_restoreCount--;
-    }
-
+    return initialSaveCount;
 }
 
 } // namespace blink

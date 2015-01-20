@@ -14,6 +14,7 @@
 #include "core/css/parser/CSSParserValues.h"
 #include "core/css/parser/CSSPropertyParser.h"
 #include "core/css/parser/CSSSelectorParser.h"
+#include "core/css/parser/CSSSupportsParser.h"
 #include "core/css/parser/CSSTokenizer.h"
 #include "core/css/parser/MediaQueryParser.h"
 #include "core/dom/Document.h"
@@ -130,6 +131,15 @@ PassOwnPtr<Vector<double>> CSSParserImpl::parseKeyframeKeyList(const String& key
     return consumeKeyframeKeyList(tokens);
 }
 
+bool CSSParserImpl::supportsDeclaration(CSSParserTokenRange& range)
+{
+    ASSERT(m_parsedProperties.isEmpty());
+    consumeDeclaration(range, CSSRuleSourceData::STYLE_RULE);
+    bool result = !m_parsedProperties.isEmpty();
+    m_parsedProperties.clear();
+    return result;
+}
+
 WillBeHeapVector<RefPtrWillBeMember<StyleRuleBase>> CSSParserImpl::consumeRuleList(CSSParserTokenRange range, RuleListType ruleListType)
 {
     WillBeHeapVector<RefPtrWillBeMember<StyleRuleBase>> result;
@@ -159,8 +169,14 @@ WillBeHeapVector<RefPtrWillBeMember<StyleRuleBase>> CSSParserImpl::consumeRuleLi
             if (PassRefPtrWillBeRawPtr<StyleRuleBase> rule = consumeAtRule(range, allowedRules))
                 result.append(rule);
             break;
+        case CDOToken:
+        case CDCToken:
+            if (ruleListType == TopLevelRuleList) {
+                range.consume();
+                break;
+            }
+            // fallthrough
         default:
-            // FIXME: TopLevelRuleList should skip <CDO-token> and <CDC-token>
             if (PassRefPtrWillBeRawPtr<StyleRuleBase> rule = consumeQualifiedRule(range, allowedRules))
                 result.append(rule);
             break;
@@ -209,6 +225,8 @@ PassRefPtrWillBeRawPtr<StyleRuleBase> CSSParserImpl::consumeAtRule(CSSParserToke
 
     if (equalIgnoringCase(name, "media"))
         return consumeMediaRule(prelude, block);
+    if (equalIgnoringCase(name, "supports"))
+        return consumeSupportsRule(prelude, block);
     if (equalIgnoringCase(name, "viewport"))
         return consumeViewportRule(prelude, block);
     if (equalIgnoringCase(name, "font-face"))
@@ -293,6 +311,16 @@ PassRefPtrWillBeRawPtr<StyleRuleMedia> CSSParserImpl::consumeMediaRule(CSSParser
 {
     WillBeHeapVector<RefPtrWillBeMember<StyleRuleBase>> rules = consumeRuleList(block, RegularRuleList);
     return StyleRuleMedia::create(MediaQueryParser::parseMediaQuerySet(prelude), rules);
+}
+
+PassRefPtrWillBeRawPtr<StyleRuleSupports> CSSParserImpl::consumeSupportsRule(CSSParserTokenRange prelude, CSSParserTokenRange block)
+{
+    CSSSupportsParser::SupportsResult supported = CSSSupportsParser::supportsCondition(prelude, *this);
+    if (supported == CSSSupportsParser::Invalid)
+        return nullptr; // Parse error, invalid @supports condition
+    // FIXME: Serialize the condition text for the CSSOM
+    WillBeHeapVector<RefPtrWillBeMember<StyleRuleBase>> rules = consumeRuleList(block, RegularRuleList);
+    return StyleRuleSupports::create(String(""), supported, rules);
 }
 
 PassRefPtrWillBeRawPtr<StyleRuleViewport> CSSParserImpl::consumeViewportRule(CSSParserTokenRange prelude, CSSParserTokenRange block)
@@ -423,10 +451,11 @@ void CSSParserImpl::consumeDeclarationList(CSSParserTokenRange range, CSSRuleSou
 void CSSParserImpl::consumeDeclaration(CSSParserTokenRange range, CSSRuleSourceData::Type ruleType)
 {
     ASSERT(range.peek().type() == IdentToken);
-    CSSPropertyID id = range.consume().parseAsCSSPropertyID();
-    range.consumeWhitespaceAndComments();
+    CSSPropertyID id = range.consumeIncludingWhitespaceAndComments().parseAsCSSPropertyID();
+    if (id == CSSPropertyInvalid)
+        return;
     if (range.consume().type() != ColonToken)
-        return; // Parser error
+        return; // Parse error
 
     // FIXME: We shouldn't allow !important in @keyframes or @font-face
     const CSSParserToken* last = range.end() - 1;

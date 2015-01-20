@@ -724,7 +724,9 @@ public:
     float flexGrow() const { return rareNonInheritedData->m_flexibleBox->m_flexGrow; }
     float flexShrink() const { return rareNonInheritedData->m_flexibleBox->m_flexShrink; }
     const Length& flexBasis() const { return rareNonInheritedData->m_flexibleBox->m_flexBasis; }
-    EAlignContent alignContent() const { return static_cast<EAlignContent>(rareNonInheritedData->m_alignContent); }
+    ContentPosition alignContent() const { return static_cast<ContentPosition>(rareNonInheritedData->m_alignContent); }
+    ContentDistributionType alignContentDistribution() const { return static_cast<ContentDistributionType>(rareNonInheritedData->m_alignContentDistribution); }
+    OverflowAlignment alignContentOverflowAlignment() const { return static_cast<OverflowAlignment>(rareNonInheritedData->m_alignContentOverflowAlignment); }
     ItemPosition alignItems() const { return static_cast<ItemPosition>(rareNonInheritedData->m_alignItems); }
     OverflowAlignment alignItemsOverflowAlignment() const { return static_cast<OverflowAlignment>(rareNonInheritedData->m_alignItemsOverflowAlignment); }
     ItemPosition alignSelf() const { return static_cast<ItemPosition>(rareNonInheritedData->m_alignSelf); }
@@ -756,7 +758,6 @@ public:
     bool isGridAutoFlowDirectionColumn() const { return (rareNonInheritedData->m_grid->m_gridAutoFlow & InternalAutoFlowDirectionColumn) == InternalAutoFlowDirectionColumn; }
     bool isGridAutoFlowAlgorithmSparse() const { return (rareNonInheritedData->m_grid->m_gridAutoFlow & InternalAutoFlowAlgorithmSparse) == InternalAutoFlowAlgorithmSparse; }
     bool isGridAutoFlowAlgorithmDense() const { return (rareNonInheritedData->m_grid->m_gridAutoFlow & InternalAutoFlowAlgorithmDense) == InternalAutoFlowAlgorithmDense; }
-    bool isGridAutoFlowAlgorithmStack() const { return (rareNonInheritedData->m_grid->m_gridAutoFlow & InternalAutoFlowAlgorithmStack) == InternalAutoFlowAlgorithmStack; }
     const GridTrackSize& gridAutoColumns() const { return rareNonInheritedData->m_grid->m_gridAutoColumns; }
     const GridTrackSize& gridAutoRows() const { return rareNonInheritedData->m_grid->m_gridAutoRows; }
 
@@ -809,6 +810,7 @@ public:
     EBorderStyle columnRuleStyle() const { return rareNonInheritedData->m_multiCol->m_rule.style(); }
     unsigned short columnRuleWidth() const { return rareNonInheritedData->m_multiCol->ruleWidth(); }
     bool columnRuleIsTransparent() const { return rareNonInheritedData->m_multiCol->m_rule.isTransparent(); }
+    bool columnRuleEquivalent(const RenderStyle* otherStyle) const;
     ColumnSpan columnSpan() const { return static_cast<ColumnSpan>(rareNonInheritedData->m_multiCol->m_columnSpan); }
     EPageBreak columnBreakBefore() const { return static_cast<EPageBreak>(rareNonInheritedData->m_multiCol->m_breakBefore); }
     EPageBreak columnBreakInside() const { return static_cast<EPageBreak>(rareNonInheritedData->m_multiCol->m_breakInside); }
@@ -1211,7 +1213,9 @@ public:
     // We restrict the smallest value to int min + 2 because we use int min and int min + 1 as special values in a hash set.
     void setOrder(int o) { SET_VAR(rareNonInheritedData, m_order, max(std::numeric_limits<int>::min() + 2, o)); }
     void addCallbackSelector(const String& selector);
-    void setAlignContent(EAlignContent p) { SET_VAR(rareNonInheritedData, m_alignContent, p); }
+    void setAlignContent(ContentPosition p) { SET_VAR(rareNonInheritedData, m_alignContent, p); }
+    void setAlignContentDistribution(ContentDistributionType p) { SET_VAR(rareNonInheritedData, m_alignContentDistribution, p); }
+    void setAlignContentOverflowAlignment(OverflowAlignment overflowAlignment) { SET_VAR(rareNonInheritedData, m_alignContentOverflowAlignment, overflowAlignment); }
     void setAlignItems(ItemPosition a) { SET_VAR(rareNonInheritedData, m_alignItems, a); }
     void setAlignItemsOverflowAlignment(OverflowAlignment overflowAlignment) { SET_VAR(rareNonInheritedData, m_alignItemsOverflowAlignment, overflowAlignment); }
     void setAlignSelf(ItemPosition a) { SET_VAR(rareNonInheritedData, m_alignSelf, a); }
@@ -1543,7 +1547,9 @@ public:
     static float initialFlexShrink() { return 1; }
     static Length initialFlexBasis() { return Length(Auto); }
     static int initialOrder() { return 0; }
-    static EAlignContent initialAlignContent() { return AlignContentStretch; }
+    static ContentPosition initialAlignContent() { return ContentPositionAuto; }
+    static ContentDistributionType initialAlignContentDistribution() { return ContentDistributionDefault; }
+    static OverflowAlignment initialAlignContentOverflowAlignment() { return OverflowAlignmentDefault; }
     static ItemPosition initialAlignItems() { return ItemPositionAuto; }
     static OverflowAlignment initialAlignItemsOverflowAlignment() { return OverflowAlignmentDefault; }
     static ItemPosition initialAlignSelf() { return ItemPositionAuto; }

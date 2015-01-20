@@ -1194,7 +1194,7 @@ PassRefPtrWillBeRawPtr<CSSValue> RenderStyleCSSValueMapping::valueForShadowList(
     return list.release();
 }
 
-PassRefPtrWillBeRawPtr<CSSValue> RenderStyleCSSValueMapping::valueForFilter(const RenderObject* renderer, const RenderStyle& style)
+PassRefPtrWillBeRawPtr<CSSValue> RenderStyleCSSValueMapping::valueForFilter(const RenderStyle& style)
 {
     if (style.filter().operations().isEmpty())
         return cssValuePool().createIdentifierValue(CSSValueNone);
@@ -1494,7 +1494,7 @@ PassRefPtrWillBeRawPtr<CSSValue> RenderStyleCSSValueMapping::get(CSSPropertyID p
     case CSSPropertyEmptyCells:
         return cssValuePool().createValue(style.emptyCells());
     case CSSPropertyAlignContent:
-        return cssValuePool().createValue(style.alignContent());
+        return valueForContentPositionAndDistributionWithOverflowAlignment(resolveContentAlignmentAuto(style.alignContent(), style.alignContentDistribution(), styledNode), style.alignContentOverflowAlignment(), style.alignContentDistribution());
     case CSSPropertyAlignItems:
         return valueForItemPositionWithOverflowAlignment(resolveAlignmentAuto(style.alignItems(), styledNode), style.alignItemsOverflowAlignment(), NonLegacyPosition);
     case CSSPropertyAlignSelf:
@@ -1573,10 +1573,6 @@ PassRefPtrWillBeRawPtr<CSSValue> RenderStyleCSSValueMapping::get(CSSPropertyID p
         case AutoFlowColumnDense:
             list->append(cssValuePool().createIdentifierValue(CSSValueColumn));
             break;
-        case AutoFlowStackRow:
-        case AutoFlowStackColumn:
-            list->append(cssValuePool().createIdentifierValue(CSSValueStack));
-            break;
         default:
             ASSERT_NOT_REACHED();
         }
@@ -1585,12 +1581,6 @@ PassRefPtrWillBeRawPtr<CSSValue> RenderStyleCSSValueMapping::get(CSSPropertyID p
         case AutoFlowRowDense:
         case AutoFlowColumnDense:
             list->append(cssValuePool().createIdentifierValue(CSSValueDense));
-            break;
-        case AutoFlowStackRow:
-            list->append(cssValuePool().createIdentifierValue(CSSValueRow));
-            break;
-        case AutoFlowStackColumn:
-            list->append(cssValuePool().createIdentifierValue(CSSValueColumn));
             break;
         default:
             // Do nothing.
@@ -2288,7 +2278,7 @@ PassRefPtrWillBeRawPtr<CSSValue> RenderStyleCSSValueMapping::get(CSSPropertyID p
     case CSSPropertyShapeOutside:
         return valueForShape(style, style.shapeOutside());
     case CSSPropertyWebkitFilter:
-        return valueForFilter(renderer, style);
+        return valueForFilter(style);
     case CSSPropertyMixBlendMode:
         return cssValuePool().createValue(style.blendMode());
 

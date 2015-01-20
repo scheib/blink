@@ -423,6 +423,7 @@ WebInspector.NetworkLogView.prototype = {
         this._dataGrid.setResizeMethod(WebInspector.DataGrid.ResizeMethod.Last);
         this._dataGrid.element.classList.add("network-log-grid");
         this._dataGrid.element.addEventListener("contextmenu", this._contextMenu.bind(this), true);
+        this._dataGrid.element.addEventListener("mousedown", this._dataGridMouseDown.bind(this), true);
         this._dataGrid.show(this.element);
 
         // Event listeners need to be added _after_ we attach to the document, so that owner document is properly update.
@@ -431,6 +432,15 @@ WebInspector.NetworkLogView.prototype = {
 
         this._patchTimelineHeader();
         this._dataGrid.sortNodes(this._sortingFunctions.startTime, false);
+    },
+
+    /**
+     * @param {!Event} event
+     */
+    _dataGridMouseDown: function(event)
+    {
+        if (!this._dataGrid.selectedNode && event.button)
+            event.consume();
     },
 
     /**
@@ -931,7 +941,7 @@ WebInspector.NetworkLogView.prototype = {
         if (!this._nodesByRequestId.get(request.requestId))
             return;
 
-        this._suggestionBuilder.addItem(WebInspector.NetworkLogView.FilterType.Domain, request.domain);
+        WebInspector.NetworkLogView._subdomains(request.domain).forEach(this._suggestionBuilder.addItem.bind(this._suggestionBuilder, WebInspector.NetworkLogView.FilterType.Domain));
         this._suggestionBuilder.addItem(WebInspector.NetworkLogView.FilterType.Method, request.requestMethod);
         this._suggestionBuilder.addItem(WebInspector.NetworkLogView.FilterType.MimeType, request.mimeType);
         this._suggestionBuilder.addItem(WebInspector.NetworkLogView.FilterType.Scheme, "" + request.scheme);
@@ -1008,6 +1018,12 @@ WebInspector.NetworkLogView.prototype = {
         this._updateColumns();
     },
 
+    revealSelectedItem: function()
+    {
+        if (this._dataGrid.selectedNode)
+            this._dataGrid.selectedNode.reveal();
+    },
+
     /**
      * @return {number}
      */
@@ -1022,6 +1038,7 @@ WebInspector.NetworkLogView.prototype = {
         this._rowHeight = largeRows ? 41 : 21;
         this._dataGrid.element.classList.toggle("small", !largeRows);
         this._timelineGrid.element.classList.toggle("small", !largeRows);
+        this._dataGrid.scheduleUpdate();
     },
 
     /**
@@ -1148,9 +1165,6 @@ WebInspector.NetworkLogView.prototype = {
 
         if (request) {
             contextMenu.appendApplicableItems(request);
-            contextMenu.appendItem(WebInspector.openLinkExternallyLabel(), openResourceInNewTab.bind(null, request.url));
-            contextMenu.appendSeparator();
-            contextMenu.appendItem(WebInspector.copyLinkAddressLabel(), this._copyLocation.bind(this, request));
             if (request.requestHeadersText())
                 contextMenu.appendItem(WebInspector.UIString.capitalize("Copy ^request ^headers"), this._copyRequestHeaders.bind(this, request));
             if (request.responseHeadersText)
@@ -1492,7 +1506,7 @@ WebInspector.NetworkLogView.prototype = {
     {
         switch (type) {
         case WebInspector.NetworkLogView.FilterType.Domain:
-            return WebInspector.NetworkLogView._requestDomainFilter.bind(null, value);
+            return WebInspector.NetworkLogView._createRequestDomainFilter(value);
 
         case WebInspector.NetworkLogView.FilterType.HasResponseHeader:
             return WebInspector.NetworkLogView._requestResponseHeaderFilter.bind(null, value);
@@ -1743,13 +1757,46 @@ WebInspector.NetworkLogView._requestNameOrPathFilter = function(regex, request)
 }
 
 /**
+ * @param {string} domain
+ * @return {!Array.<string>}
+ */
+WebInspector.NetworkLogView._subdomains = function(domain)
+{
+    var result = [domain];
+    var indexOfPeriod = domain.indexOf(".");
+    while (indexOfPeriod !== -1) {
+        result.push("*" + domain.substring(indexOfPeriod));
+        indexOfPeriod = domain.indexOf(".", indexOfPeriod + 1);
+    }
+    return result;
+}
+
+/**
  * @param {string} value
+ * @return {!WebInspector.NetworkLogView.Filter}
+ */
+WebInspector.NetworkLogView._createRequestDomainFilter = function(value)
+{
+    /**
+     * @param {string} string
+     * @return {string}
+     */
+    function escapeForRegExp(string)
+    {
+        return string.escapeForRegExp();
+    }
+    var escapedPattern = value.split("*").map(escapeForRegExp).join(".*");
+    return WebInspector.NetworkLogView._requestDomainFilter.bind(null, new RegExp("^" + escapedPattern + "$", "i"));
+}
+
+/**
+ * @param {!RegExp} regex
  * @param {!WebInspector.NetworkRequest} request
  * @return {boolean}
  */
-WebInspector.NetworkLogView._requestDomainFilter = function(value, request)
+WebInspector.NetworkLogView._requestDomainFilter = function(regex, request)
 {
-    return request.domain === value;
+    return regex.test(request.domain);
 }
 
 /**

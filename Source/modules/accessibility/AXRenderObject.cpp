@@ -35,9 +35,10 @@
 #include "core/dom/shadow/ShadowRoot.h"
 #include "core/editing/FrameSelection.h"
 #include "core/editing/RenderedPosition.h"
-#include "core/editing/TextIterator.h"
 #include "core/editing/VisibleUnits.h"
 #include "core/editing/htmlediting.h"
+#include "core/editing/iterators/CharacterIterator.h"
+#include "core/editing/iterators/TextIterator.h"
 #include "core/frame/LocalFrame.h"
 #include "core/frame/Settings.h"
 #include "core/html/HTMLImageElement.h"
@@ -2366,8 +2367,11 @@ bool AXRenderObject::inheritsPresentationalRole() const
         return false;
 
     QualifiedName tagName = toElement(elementNode)->tagQName();
-    if (tagName == ulTag || tagName == olTag || tagName == dlTag)
-        return (parent->roleValue() == NoneRole || parent->roleValue() == PresentationalRole);
+    if (tagName != ulTag && tagName != olTag && tagName != dlTag)
+        return false;
+
+    if (parent->roleValue() == NoneRole || parent->roleValue() == PresentationalRole)
+        return ariaRoleAttribute() == UnknownRole;
 
     return false;
 }

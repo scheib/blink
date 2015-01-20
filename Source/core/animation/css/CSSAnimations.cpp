@@ -343,7 +343,7 @@ void CSSAnimations::maybeApplyPendingUpdate(Element* element)
         OwnPtrWillBeRawPtr<AnimationEventDelegate> eventDelegate = adoptPtrWillBeNoop(new AnimationEventDelegate(element, entry.name));
         RefPtrWillBeRawPtr<Animation> animation = Animation::create(element, inertAnimation->effect(), inertAnimation->specifiedTiming(), Animation::DefaultPriority, eventDelegate.release());
         animation->setName(inertAnimation->name());
-        RefPtrWillBeRawPtr<AnimationPlayer> player = element->document().timeline().createAnimationPlayer(animation.get());
+        RefPtrWillBeRawPtr<AnimationPlayer> player = element->document().timeline().play(animation.get());
         if (inertAnimation->paused())
             player->pause();
         player->update(TimingUpdateOnDemand);
@@ -405,7 +405,7 @@ void CSSAnimations::maybeApplyPendingUpdate(Element* element)
 
         RefPtrWillBeRawPtr<Animation> transition = Animation::create(element, effect, inertAnimation->specifiedTiming(), Animation::TransitionPriority, eventDelegate.release());
         transition->setName(inertAnimation->name());
-        RefPtrWillBeRawPtr<AnimationPlayer> player = element->document().timeline().createAnimationPlayer(transition.get());
+        RefPtrWillBeRawPtr<AnimationPlayer> player = element->document().timeline().play(transition.get());
         player->update(TimingUpdateOnDemand);
         runningTransition.player = player;
         m_transitions.set(id, runningTransition);
@@ -525,7 +525,7 @@ void CSSAnimations::calculateTransitionUpdate(CSSAnimationUpdate* update, const 
         for (const auto& entry : *activeTransitions) {
             const AnimationPlayer& player = *entry.value.player;
             CSSPropertyID id = entry.key;
-            if (player.playStateInternal() == AnimationPlayer::Finished || (!anyTransitionHadTransitionAll && !animationStyleRecalc && !listedProperties.get(id))) {
+            if (player.finishedInternal() || (!anyTransitionHadTransitionAll && !animationStyleRecalc && !listedProperties.get(id))) {
                 // TODO: Figure out why this fails on Chrome OS login page. crbug.com/365507
                 // ASSERT(player.playStateInternal() == AnimationPlayer::Finished || !(activeAnimations && activeAnimations->isAnimationStyleChange()));
                 update->cancelTransition(id);

@@ -182,23 +182,6 @@ void FrameLoader::setDefersLoading(bool defers)
     }
 }
 
-void FrameLoader::stopLoading()
-{
-    if (m_frame->document() && m_frame->document()->parsing()) {
-        finishedParsing();
-        m_frame->document()->setParsingState(Document::FinishedParsing);
-    }
-
-    if (Document* doc = m_frame->document()) {
-        // FIXME: HTML5 doesn't tell us to set the state to complete when aborting, but we do anyway to match legacy behavior.
-        // http://www.w3.org/Bugs/Public/show_bug.cgi?id=10537
-        doc->setReadyState(Document::Complete);
-    }
-
-    // FIXME: This will cancel redirection timer, which really needs to be restarted when restoring the frame from b/f cache.
-    m_frame->navigationScheduler().cancel();
-}
-
 void FrameLoader::saveScrollState()
 {
     if (!m_currentItem || !m_frame->view())
@@ -230,18 +213,15 @@ void FrameLoader::clearScrollPositionAndViewState()
     m_currentItem->setPageScaleFactor(0);
 }
 
-bool FrameLoader::closeURL()
+void FrameLoader::dispatchUnloadEvent()
 {
     saveScrollState();
 
-    // Should only send the pagehide event here if the current document exists.
     if (m_frame->document())
         m_frame->document()->dispatchUnloadEvents();
-    stopLoading();
 
     if (Page* page = m_frame->page())
         page->undoStack().didUnloadFrame(*m_frame);
-    return true;
 }
 
 void FrameLoader::didExplicitOpen()
@@ -442,17 +422,10 @@ void FrameLoader::loadDone()
     checkCompleted();
 }
 
-bool FrameLoader::allChildrenAreComplete() const
+static bool allDescendantsAreComplete(Frame* frame)
 {
-    for (Frame* child = m_frame->tree().firstChild(); child; child = child->tree().nextSibling()) {
-        if (!child->isLocalFrame()) {
-            if (!child->checkLoadComplete()) {
-                return false;
-            }
-            continue;
-        }
-        LocalFrame* frame = toLocalFrame(child);
-        if (!frame->document()->isLoadCompleted() || frame->loader().m_provisionalDocumentLoader)
+    for (Frame* child = frame->tree().firstChild(); child; child = child->tree().traverseNext(frame)) {
+        if (child->isLoadingAsChild())
             return false;
     }
     return true;
@@ -461,44 +434,57 @@ bool FrameLoader::allChildrenAreComplete() const
 bool FrameLoader::allAncestorsAreComplete() const
 {
     for (Frame* ancestor = m_frame; ancestor; ancestor = ancestor->tree().parent()) {
-        if (ancestor->isLocalFrame()) {
-            if (!toLocalFrame(ancestor)->document()->loadEventFinished())
-                return false;
-        } else {
-            if (!ancestor->checkLoadComplete()) {
-                return false;
-            }
-        }
-
+        if (ancestor->isLoading())
+            return false;
     }
+    return true;
+}
+
+static bool shouldComplete(Document* document)
+{
+    if (document->parsing() || document->isInDOMContentLoaded())
+        return false;
+    if (!document->haveImportsLoaded())
+        return false;
+    if (document->fetcher()->requestCount())
+        return false;
+    if (document->isDelayingLoadEvent())
+        return false;
+    return allDescendantsAreComplete(document->frame());
+}
+
+static bool shouldSendCompleteNotifications(LocalFrame* frame)
+{
+    // Don't send stop notifications for inital empty documents, since they don't generate start notifications.
+    if (!frame->loader().stateMachine()->committedFirstRealDocumentLoad())
+        return false;
+
+    // FIXME: We might have already sent stop notifications and be re-completing.
+    if (!frame->isLoading())
+        return false;
+
+    // The readystatechanged or load event may have disconnected this frame.
+    if (!frame->client())
+        return false;
+
+    // An event might have restarted a child frame.
+    if (!allDescendantsAreComplete(frame))
+        return false;
+
+    // An event might have restarted this frame by scheduling a new navigation.
+    if (frame->loader().provisionalDocumentLoader())
+        return false;
+
+    // We might have declined to run the load event due to an imminent content-initiated navigation.
+    if (!frame->document()->loadEventFinished())
+        return false;
     return true;
 }
 
 void FrameLoader::checkCompleted()
 {
     RefPtrWillBeRawPtr<LocalFrame> protect(m_frame.get());
-
-    if (m_frame->document()->isLoadCompleted() && m_stateMachine.committedFirstRealDocumentLoad())
-        return;
-
-    // Are we still parsing?
-    if (m_frame->document()->parsing() || m_frame->document()->isInDOMContentLoaded())
-        return;
-
-    // Still waiting imports?
-    if (!m_frame->document()->haveImportsLoaded())
-        return;
-
-    // Still waiting for images/scripts?
-    if (m_frame->document()->fetcher()->requestCount())
-        return;
-
-    // Still waiting for elements that don't go through a FrameLoader?
-    if (m_frame->document()->isDelayingLoadEvent())
-        return;
-
-    // Any frame that hasn't completed yet?
-    if (!allChildrenAreComplete())
+    if (!shouldComplete(m_frame->document()))
         return;
 
     // OK, completed.
@@ -514,11 +500,20 @@ void FrameLoader::checkCompleted()
     if (m_frame->view())
         m_frame->view()->handleLoadCompleted();
 
+    if (shouldSendCompleteNotifications(m_frame)) {
+        m_loadType = FrameLoadTypeStandard;
+        m_progressTracker->progressCompleted();
+        m_frame->localDOMWindow()->finishedLoading();
+
+        // Report mobile vs. desktop page statistics. This will only report on Android.
+        if (m_frame->isMainFrame())
+            m_frame->document()->viewportDescription().reportMobilePageStats(m_frame);
+        client()->dispatchDidFinishLoad();
+    }
+
     Frame* parent = m_frame->tree().parent();
     if (parent && parent->isLocalFrame())
         toLocalFrame(parent)->loader().checkCompleted();
-    if (m_frame->page())
-        checkLoadComplete();
 }
 
 void FrameLoader::checkTimerFired(Timer<FrameLoader>*)
@@ -892,6 +887,13 @@ void FrameLoader::stopAllLoaders()
     }
 
     m_frame->document()->suppressLoadEvent();
+    // FIXME: This is an odd set of steps to shut down parsing and it's unclear why it works.
+    // It's also unclear why other steps don't work.
+    if (m_frame->document()->parsing()) {
+        finishedParsing();
+        m_frame->document()->setParsingState(Document::FinishedParsing);
+    }
+    m_frame->document()->setReadyState(Document::Complete);
     if (m_provisionalDocumentLoader)
         m_provisionalDocumentLoader->stopLoading();
     if (m_documentLoader)
@@ -902,6 +904,7 @@ void FrameLoader::stopAllLoaders()
     m_provisionalDocumentLoader = nullptr;
 
     m_checkTimer.stop();
+    m_frame->navigationScheduler().cancel();
 
     m_inStopAllLoaders = false;
 
@@ -947,13 +950,13 @@ void FrameLoader::commitProvisionalLoad()
         pdl->timing()->setHasSameOriginAsPreviousDocument(securityOrigin->canRequest(m_frame->document()->url()));
     }
 
-    // The call to closeURL() invokes the unload event handler, which can execute arbitrary
-    // JavaScript. If the script initiates a new load, we need to abandon the current load,
+    // The call to dispatchUnloadEvent() can execute arbitrary JavaScript.
+    // If the script initiates a new load, we need to abandon the current load,
     // or the two will stomp each other.
     // detachChildren will similarly trigger child frame unload event handlers.
     if (m_documentLoader) {
         client()->dispatchWillClose();
-        closeURL();
+        dispatchUnloadEvent();
     }
     m_frame->detachChildren();
     if (pdl != m_provisionalDocumentLoader)
@@ -987,39 +990,6 @@ bool FrameLoader::isLoadingMainFrame() const
 FrameLoadType FrameLoader::loadType() const
 {
     return m_loadType;
-}
-
-bool FrameLoader::checkLoadCompleteForThisFrame()
-{
-    ASSERT(client()->hasWebView());
-    RefPtrWillBeRawPtr<LocalFrame> protect(m_frame.get());
-
-    bool allChildrenAreDoneLoading = true;
-    for (RefPtrWillBeRawPtr<Frame> child = m_frame->tree().firstChild(); child; child = child->tree().nextSibling()) {
-        allChildrenAreDoneLoading &= child->checkLoadComplete();
-    }
-    if (!allChildrenAreDoneLoading)
-        return false;
-
-    if (!m_frame->isLoading())
-        return true;
-    if (m_provisionalDocumentLoader || !m_documentLoader)
-        return false;
-    if (!m_frame->document()->loadEventFinished())
-        return false;
-    if (!m_stateMachine.committedFirstRealDocumentLoad())
-        return true;
-
-    m_progressTracker->progressCompleted();
-    m_frame->localDOMWindow()->finishedLoading();
-
-    // Report mobile vs. desktop page statistics. This will only report on Android.
-    if (m_frame->isMainFrame())
-        m_frame->document()->viewportDescription().reportMobilePageStats(m_frame);
-
-    client()->dispatchDidFinishLoad();
-    m_loadType = FrameLoadTypeStandard;
-    return true;
 }
 
 void FrameLoader::restoreScrollPositionAndViewState()
@@ -1067,13 +1037,6 @@ void FrameLoader::restoreScrollPositionAndViewState()
         if (ScrollingCoordinator* scrollingCoordinator = m_frame->page()->scrollingCoordinator())
             scrollingCoordinator->frameViewRootLayerDidChange(view);
     }
-}
-
-// Called every time a resource is completely loaded or an error is received.
-void FrameLoader::checkLoadComplete()
-{
-    ASSERT(client()->hasWebView());
-    m_frame->page()->mainFrame()->checkLoadComplete();
 }
 
 String FrameLoader::userAgent(const KURL& url) const
@@ -1132,10 +1095,7 @@ void FrameLoader::receivedMainResourceError(DocumentLoader* loader, const Resour
             m_progressTracker->progressCompleted();
         }
     }
-
     checkCompleted();
-    if (m_frame->page())
-        checkLoadComplete();
 }
 
 bool FrameLoader::shouldPerformFragmentNavigation(bool isFormSubmission, const String& httpMethod, FrameLoadType loadType, const KURL& url)
@@ -1264,7 +1224,6 @@ void FrameLoader::startLoad(FrameLoadRequest& frameLoadRequest, FrameLoadType ty
     if ((!m_policyDocumentLoader->shouldContinueForNavigationPolicy(request, frameLoadRequest.shouldCheckMainWorldContentSecurityPolicy(), navigationPolicy, isTransitionNavigation) || !shouldClose()) && m_policyDocumentLoader) {
         m_policyDocumentLoader->detachFromFrame();
         m_policyDocumentLoader = nullptr;
-        checkCompleted();
         return;
     }
 

@@ -513,7 +513,6 @@ public:
         WindowPostMessage = 574,
         WindowPostMessageWithLegacyTargetOriginArgument = 575,
         RenderRuby = 576,
-        CanvasRenderingContext2DCompositeOperationDarker = 577,
         ScriptElementWithInvalidTypeHasSrc = 578,
         TimelineStart = 579,
         ElementBaseURIFromXMLBase = 580,
@@ -610,6 +609,11 @@ public:
         DeviceMotionSecureOrigin = 669,
         DeviceOrientationInsecureOrigin = 670,
         DeviceOrientationSecureOrigin = 671,
+        SandboxViaIFrame = 672,
+        SandboxViaCSP = 673,
+        BlockedSniffingImageToScript = 674,
+        Fetch = 675,
+        FetchBodyStream = 676,
 
         // Add new features immediately above this line. Don't change assigned
         // numbers of any item, and don't reuse removed slots.

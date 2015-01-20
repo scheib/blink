@@ -293,10 +293,8 @@ void FrameView::prepareForDetach()
     // right now, otherwise it won't be able to reach the topDocument()'s axObject cache later.
     removeFromAXObjectCache();
 
-    if (m_frame->page()) {
-        if (ScrollingCoordinator* scrollingCoordinator = m_frame->page()->scrollingCoordinator())
-            scrollingCoordinator->willDestroyScrollableArea(this);
-    }
+    if (ScrollingCoordinator* scrollingCoordinator = this->scrollingCoordinator())
+        scrollingCoordinator->willDestroyScrollableArea(this);
 
 #if ENABLE(OILPAN)
     // FIXME: once/if dust settles, do this always (non-Oilpan)?
@@ -448,6 +446,12 @@ Page* FrameView::page() const
 RenderView* FrameView::renderView() const
 {
     return frame().contentRenderer();
+}
+
+ScrollingCoordinator* FrameView::scrollingCoordinator()
+{
+    Page* p = page();
+    return p ? p->scrollingCoordinator() : 0;
 }
 
 void FrameView::setCanHaveScrollbars(bool canHaveScrollbars)
@@ -815,10 +819,6 @@ void FrameView::performPreLayoutTasks()
     if (!document->styleResolver() || document->styleResolver()->mediaQueryAffectedByViewportChange()) {
         document->styleResolverChanged();
         document->mediaQueryAffectingValueChanged();
-
-        // FIXME: This instrumentation event is not strictly accurate since cached media query results
-        //        do not persist across StyleResolver rebuilds.
-        InspectorInstrumentation::mediaQueryResultChanged(document);
     } else {
         document->evaluateMediaQueryList();
     }
@@ -1220,10 +1220,8 @@ bool FrameView::contentsInCompositedLayer() const
 void FrameView::addSlowRepaintObject()
 {
     if (!m_slowRepaintObjectCount++) {
-        if (Page* page = m_frame->page()) {
-            if (ScrollingCoordinator* scrollingCoordinator = page->scrollingCoordinator())
-                scrollingCoordinator->frameViewHasSlowRepaintObjectsDidChange(this);
-        }
+        if (ScrollingCoordinator* scrollingCoordinator = this->scrollingCoordinator())
+            scrollingCoordinator->frameViewHasSlowRepaintObjectsDidChange(this);
     }
 }
 
@@ -1232,10 +1230,8 @@ void FrameView::removeSlowRepaintObject()
     ASSERT(m_slowRepaintObjectCount > 0);
     m_slowRepaintObjectCount--;
     if (!m_slowRepaintObjectCount) {
-        if (Page* page = m_frame->page()) {
-            if (ScrollingCoordinator* scrollingCoordinator = page->scrollingCoordinator())
-                scrollingCoordinator->frameViewHasSlowRepaintObjectsDidChange(this);
-        }
+        if (ScrollingCoordinator* scrollingCoordinator = this->scrollingCoordinator())
+            scrollingCoordinator->frameViewHasSlowRepaintObjectsDidChange(this);
     }
 }
 
@@ -1247,10 +1243,8 @@ void FrameView::addViewportConstrainedObject(RenderObject* object)
     if (!m_viewportConstrainedObjects->contains(object)) {
         m_viewportConstrainedObjects->add(object);
 
-        if (Page* page = m_frame->page()) {
-            if (ScrollingCoordinator* scrollingCoordinator = page->scrollingCoordinator())
-                scrollingCoordinator->frameViewFixedObjectsDidChange(this);
-        }
+        if (ScrollingCoordinator* scrollingCoordinator = this->scrollingCoordinator())
+            scrollingCoordinator->frameViewFixedObjectsDidChange(this);
     }
 }
 
@@ -1259,10 +1253,8 @@ void FrameView::removeViewportConstrainedObject(RenderObject* object)
     if (m_viewportConstrainedObjects && m_viewportConstrainedObjects->contains(object)) {
         m_viewportConstrainedObjects->remove(object);
 
-        if (Page* page = m_frame->page()) {
-            if (ScrollingCoordinator* scrollingCoordinator = page->scrollingCoordinator())
-                scrollingCoordinator->frameViewFixedObjectsDidChange(this);
-        }
+        if (ScrollingCoordinator* scrollingCoordinator = this->scrollingCoordinator())
+            scrollingCoordinator->frameViewFixedObjectsDidChange(this);
     }
 }
 
@@ -2098,10 +2090,8 @@ void FrameView::performPostLayoutTasks()
 
     scheduleUpdateWidgetsIfNecessary();
 
-    if (Page* page = m_frame->page()) {
-        if (ScrollingCoordinator* scrollingCoordinator = page->scrollingCoordinator())
-            scrollingCoordinator->notifyLayoutUpdated();
-    }
+    if (ScrollingCoordinator* scrollingCoordinator = this->scrollingCoordinator())
+        scrollingCoordinator->notifyLayoutUpdated();
 
     scrollToAnchor();
 
@@ -2573,7 +2563,7 @@ void FrameView::updateLayoutAndStyleForPainting()
         view->compositor()->updateIfNeededRecursive();
 
         if (view->compositor()->inCompositingMode() && m_frame->isLocalRoot())
-            m_frame->page()->scrollingCoordinator()->updateAfterCompositingChangeIfNeeded();
+            scrollingCoordinator()->updateAfterCompositingChangeIfNeeded();
 
         updateCompositedSelectionBoundsIfNeeded();
 
@@ -2918,6 +2908,9 @@ void FrameView::addScrollableArea(ScrollableArea* scrollableArea)
     if (!m_scrollableAreas)
         m_scrollableAreas = adoptPtr(new ScrollableAreaSet);
     m_scrollableAreas->add(scrollableArea);
+
+    if (ScrollingCoordinator* scrollingCoordinator = this->scrollingCoordinator())
+        scrollingCoordinator->scrollableAreasDidChange();
 }
 
 void FrameView::removeScrollableArea(ScrollableArea* scrollableArea)
@@ -2925,6 +2918,9 @@ void FrameView::removeScrollableArea(ScrollableArea* scrollableArea)
     if (!m_scrollableAreas)
         return;
     m_scrollableAreas->remove(scrollableArea);
+
+    if (ScrollingCoordinator* scrollingCoordinator = this->scrollingCoordinator())
+        scrollingCoordinator->scrollableAreasDidChange();
 }
 
 void FrameView::addAnimatingScrollableArea(ScrollableArea* scrollableArea)

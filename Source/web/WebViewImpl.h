@@ -191,16 +191,14 @@ public:
     virtual void zoomLimitsChanged(double minimumZoomLevel, double maximumZoomLevel) override;
     virtual float textZoomFactor() override;
     virtual float setTextZoomFactor(float) override;
-    virtual void setInitialPageScaleOverride(float) override;
     virtual bool zoomToMultipleTargetsRect(const WebRect&) override;
     virtual float pageScaleFactor() const override;
-    virtual void setPageScaleFactorLimits(float minPageScale, float maxPageScale) override;
+    virtual void setDefaultPageScaleLimits(float minScale, float maxScale) override;
+    virtual void setInitialPageScaleOverride(float) override;
     virtual void setMainFrameScrollOffset(const WebPoint&) override;
     virtual void setPageScaleFactor(float) override;
     virtual void setPinchViewportOffset(const WebFloatPoint&) override;
     virtual WebFloatPoint pinchViewportOffset() const override;
-    virtual float minimumPageScaleFactor() const override;
-    virtual float maximumPageScaleFactor() const override;
     virtual void resetScrollAndScaleState() override;
     virtual void setIgnoreViewportTagScaleLimits(bool) override;
     virtual WebSize contentsPreferredMinimumSize() override;
@@ -273,6 +271,11 @@ public:
     virtual void acceptLanguagesChanged() override;
 
     // WebViewImpl
+
+    float defaultMinimumPageScaleFactor() const;
+    float defaultMaximumPageScaleFactor() const;
+    float minimumPageScaleFactor() const;
+    float maximumPageScaleFactor() const;
 
     HitTestResult coreHitTestResultAt(const WebPoint&);
     void suppressInvalidations(bool enable);
@@ -527,8 +530,8 @@ private:
     float clampPageScaleFactorToLimits(float) const;
     IntSize contentsSize() const;
 
-    void updateMainFrameScrollPosition(const IntPoint& scrollPosition, bool programmaticScroll);
-    void updateRootLayerScrollPosition(const IntPoint& scrollPosition);
+    void updateMainFrameScrollPosition(const DoublePoint& scrollPosition, bool programmaticScroll);
+    void updateRootLayerScrollPosition(const DoublePoint& scrollPosition);
 
     void performResize();
 

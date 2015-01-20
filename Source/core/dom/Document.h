@@ -45,16 +45,17 @@
 #include "core/dom/UserActionElementSet.h"
 #include "core/dom/ViewportDescription.h"
 #include "core/dom/custom/CustomElement.h"
+#include "core/frame/DOMTimerCoordinator.h"
 #include "core/frame/LocalDOMWindow.h"
 #include "core/html/CollectionType.h"
 #include "core/html/parser/ParserSynchronizationPolicy.h"
-#include "core/page/FocusType.h"
 #include "core/page/PageVisibilityState.h"
 #include "platform/Length.h"
 #include "platform/Timer.h"
 #include "platform/heap/Handle.h"
 #include "platform/weborigin/KURL.h"
 #include "platform/weborigin/ReferrerPolicy.h"
+#include "public/platform/WebFocusType.h"
 #include "wtf/HashSet.h"
 #include "wtf/OwnPtr.h"
 #include "wtf/PassOwnPtr.h"
@@ -617,7 +618,7 @@ public:
     String selectedStylesheetSet() const;
     void setSelectedStylesheetSet(const String&);
 
-    bool setFocusedElement(PassRefPtrWillBeRawPtr<Element>, FocusType = FocusTypeNone);
+    bool setFocusedElement(PassRefPtrWillBeRawPtr<Element>, WebFocusType = WebFocusTypeNone);
     Element* focusedElement() const { return m_focusedElement.get(); }
     UserActionElementSet& userActionElements()  { return m_userActionElements; }
     const UserActionElementSet& userActionElements() const { return m_userActionElements; }
@@ -908,7 +909,7 @@ public:
     bool loadEventFinished() const { return m_loadEventProgress >= LoadEventCompleted; }
     bool unloadStarted() const { return m_loadEventProgress >= PageHideInProgress; }
     bool processingBeforeUnload() const { return m_loadEventProgress == BeforeUnloadEventInProgress; }
-    void suppressLoadEvent() { m_loadEventProgress = LoadEventCompleted; }
+    void suppressLoadEvent();
 
     void setContainsPlugins() { m_containsPlugins = true; }
     bool containsPlugins() const { return m_containsPlugins; }
@@ -981,7 +982,7 @@ public:
     bool hasActiveParser();
     unsigned activeParserCount() { return m_activeParserCount; }
     void incrementActiveParserCount() { ++m_activeParserCount; }
-    void decrementActiveParserCount();
+    void decrementActiveParserCount() { --m_activeParserCount; }
 
     void setContextFeatures(ContextFeatures&);
     ContextFeatures& contextFeatures() const { return *m_contextFeatures; }
@@ -1053,6 +1054,8 @@ public:
     AtomicString convertLocalName(const AtomicString&);
 
     void platformColorsChanged();
+
+    virtual DOMTimerCoordinator* timers() override final;
 
     virtual v8::Handle<v8::Object> wrap(v8::Handle<v8::Object> creationContext, v8::Isolate*) override;
     virtual v8::Handle<v8::Object> associateWithWrapper(v8::Isolate*, const WrapperTypeInfo*, v8::Handle<v8::Object> wrapper) override;
@@ -1377,6 +1380,8 @@ private:
 
     WillBeHeapHashSet<RawPtrWillBeMember<SVGUseElement>> m_useElementsNeedingUpdate;
     WillBeHeapHashSet<RawPtrWillBeMember<Element>> m_layerUpdateSVGFilterElements;
+
+    DOMTimerCoordinator m_timers;
 
     bool m_hasViewportUnits;
 

@@ -55,7 +55,6 @@ void SVGShapePainter::paint(const PaintInfo& paintInfo)
     PaintInfo childPaintInfo(paintInfo);
     FloatRect boundingBox = m_renderSVGShape.paintInvalidationRectInLocalCoordinates();
 
-    GraphicsContextStateSaver stateSaver(*childPaintInfo.context);
     TransformRecorder transformRecorder(*childPaintInfo.context, m_renderSVGShape.displayItemClient(), m_renderSVGShape.localTransform());
     SVGRenderingContext renderingContext(&m_renderSVGShape, childPaintInfo);
     if (renderingContext.isRenderingPrepared()) {
@@ -106,7 +105,7 @@ void SVGShapePainter::paint(const PaintInfo& paintInfo)
     }
 
     if (m_renderSVGShape.style()->outlineWidth())
-        ObjectPainter(m_renderSVGShape).paintOutline(childPaintInfo, IntRect(boundingBox));
+        ObjectPainter(m_renderSVGShape).paintOutline(childPaintInfo, LayoutRect(boundingBox));
 }
 
 void SVGShapePainter::fillShape(GraphicsContext* context)

@@ -28,13 +28,13 @@
 #include "core/loader/NavigationPolicy.h"
 #include "core/frame/ConsoleTypes.h"
 #include "core/html/forms/PopupMenuClient.h"
-#include "core/page/FocusType.h"
 #include "core/rendering/style/RenderStyleConstants.h"
 #include "platform/Cursor.h"
 #include "platform/HostWindow.h"
 #include "platform/PopupMenu.h"
 #include "platform/heap/Handle.h"
 #include "platform/scroll/ScrollTypes.h"
+#include "public/platform/WebFocusType.h"
 #include "wtf/Forward.h"
 #include "wtf/PassOwnPtr.h"
 #include "wtf/Vector.h"
@@ -81,8 +81,8 @@ public:
 
     virtual void focus() = 0;
 
-    virtual bool canTakeFocus(FocusType) = 0;
-    virtual void takeFocus(FocusType) = 0;
+    virtual bool canTakeFocus(WebFocusType) = 0;
+    virtual void takeFocus(WebFocusType) = 0;
 
     virtual void focusedNodeChanged(Node*) = 0;
 
@@ -214,11 +214,6 @@ public:
     virtual bool requestPointerLock() { return false; }
     virtual void requestPointerUnlock() { }
 
-    // Heuristic-based function for determining if we should disable workarounds
-    // for viewing websites that are not optimized for mobile devices, e.g.,
-    // for disabling touch adjustment or link disambiguation.
-    virtual bool shouldDisableDesktopWorkarounds() { return false; }
-
     virtual FloatSize minimumWindowSize() const { return FloatSize(100, 100); }
 
     virtual bool isChromeClientImpl() const { return false; }
@@ -236,6 +231,8 @@ public:
     virtual void showImeIfNeeded() { }
 
     virtual void registerViewportLayers() const { }
+
+    virtual void showUnhandledTapUIIfNeeded(IntPoint, Node*, bool) { }
 
 protected:
     virtual ~ChromeClient() { }

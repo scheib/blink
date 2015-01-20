@@ -320,7 +320,7 @@ bool CSSPropertyParser::validUnit(CSSParserValue* value, Units unitflags, CSSPar
         break;
     case CSSPrimitiveValue::CSS_HZ:
     case CSSPrimitiveValue::CSS_KHZ:
-    case CSSPrimitiveValue::CSS_DIMENSION:
+    case CSSParserValue::Dimension:
     default:
         break;
     }
@@ -1529,6 +1529,10 @@ bool CSSPropertyParser::parseValue(CSSPropertyID propId, bool important)
 
     case CSSPropertyScrollBlocksOn:
         parsedValue = parseScrollBlocksOn();
+        break;
+
+    case CSSPropertyAlignContent:
+        parsedValue = parseContentDistributionOverflowPosition();
         break;
 
     case CSSPropertyAlignSelf:
@@ -3816,7 +3820,7 @@ PassRefPtrWillBeRawPtr<CSSValue> CSSPropertyParser::parseGridTemplateAreas()
 
 PassRefPtrWillBeRawPtr<CSSValue> CSSPropertyParser::parseGridAutoFlow(CSSParserValueList& list)
 {
-    // [ row | column ] && dense? | stack && [ row | column ]?
+    // [ row | column ] || dense
     ASSERT(RuntimeEnabledFeatures::cssGridLayoutEnabled());
 
     CSSParserValue* value = list.current();
@@ -3827,24 +3831,20 @@ PassRefPtrWillBeRawPtr<CSSValue> CSSPropertyParser::parseGridAutoFlow(CSSParserV
 
     // First parameter.
     CSSValueID firstId = value->id;
-    if (firstId != CSSValueRow && firstId != CSSValueColumn && firstId != CSSValueDense && firstId != CSSValueStack)
+    if (firstId != CSSValueRow && firstId != CSSValueColumn && firstId != CSSValueDense)
         return nullptr;
     parsedValues->append(cssValuePool().createIdentifierValue(firstId));
 
     // Second parameter, if any.
     value = list.next();
-    if (!value && firstId == CSSValueDense)
-        return nullptr;
-
     if (value) {
         switch (firstId) {
         case CSSValueRow:
         case CSSValueColumn:
-            if (value->id != CSSValueDense && value->id != CSSValueStack)
+            if (value->id != CSSValueDense)
                 return parsedValues;
             break;
         case CSSValueDense:
-        case CSSValueStack:
             if (value->id != CSSValueRow && value->id != CSSValueColumn)
                 return parsedValues;
             break;
@@ -4140,7 +4140,7 @@ bool CSSPropertyParser::parseLegacyPosition(CSSPropertyID propId, bool important
 
 PassRefPtrWillBeRawPtr<CSSValue> CSSPropertyParser::parseContentDistributionOverflowPosition()
 {
-    // auto | <baseline-position> | [ <content-distribution>? && <content-position>? ]! && <overflow-position>?
+    // auto | <baseline-position> | <content-distribution> || [ <overflow-position>? && <content-position> ]
     // <baseline-position> = baseline | last-baseline;
     // <content-distribution> = space-between | space-around | space-evenly | stretch;
     // <content-position> = center | start | end | flex-start | flex-end | left | right;
@@ -4156,27 +4156,32 @@ PassRefPtrWillBeRawPtr<CSSValue> CSSPropertyParser::parseContentDistributionOver
     CSSValueID distribution = CSSValueInvalid;
     CSSValueID position = CSSValueInvalid;
     CSSValueID overflow = CSSValueInvalid;
-    if (isAlignmentOverflowKeyword(value->id)) {
-        overflow = value->id;
-        value = m_valueList->next();
-    }
-    if (value && isContentDistributionKeyword(value->id)) {
-        distribution = value->id;
-        value = m_valueList->next();
-    }
-    if (value && isContentPositionKeyword(value->id)) {
-        position = value->id;
-        value = m_valueList->next();
-    }
-    if (value) {
-        if (overflow != CSSValueInvalid || !isAlignmentOverflowKeyword(value->id))
+    while (value) {
+        if (isContentDistributionKeyword(value->id)) {
+            if (distribution != CSSValueInvalid)
+                return nullptr;
+            distribution = value->id;
+        } else if (isContentPositionKeyword(value->id)) {
+            if (position != CSSValueInvalid)
+                return nullptr;
+            position = value->id;
+        } else if (isAlignmentOverflowKeyword(value->id)) {
+            if (overflow != CSSValueInvalid)
+                return nullptr;
+            overflow = value->id;
+        } else {
             return nullptr;
-        overflow = value->id;
+        }
+        value = m_valueList->next();
     }
 
     // The grammar states that we should have at least <content-distribution> or
-    // <content-position> ([ <content-distribution>? && <content-position>? ]!).
-    if (m_valueList->next() || (position == CSSValueInvalid && distribution == CSSValueInvalid))
+    // <content-position> ( <content-distribution> || <content-position> ).
+    if (position == CSSValueInvalid && distribution == CSSValueInvalid)
+        return nullptr;
+
+    // The grammar states that <overflow-position> must be associated to <content-position>.
+    if (overflow != CSSValueInvalid && position == CSSValueInvalid)
         return nullptr;
 
     return CSSContentDistributionValue::create(distribution, position, overflow);
@@ -5389,9 +5394,22 @@ bool CSSPropertyParser::parseColorFromValue(CSSParserValue* value, RGBA32& c, bo
         // FIXME: This should be strict parsing for SVG as well.
         if (!fastParseColor(c, str, !acceptQuirkyColors))
             return false;
-    } else if (value->unit == CSSPrimitiveValue::CSS_PARSER_HEXCOLOR
+    } else if (acceptQuirkyColors && value->unit == CSSParserValue::DimensionList) {
+        CSSParserValue* numberToken = value->valueList->valueAt(0);
+        CSSParserValue* unitToken = value->valueList->valueAt(1);
+        ASSERT(numberToken->unit == CSSPrimitiveValue::CSS_NUMBER);
+        ASSERT(unitToken->unit == CSSPrimitiveValue::CSS_IDENT);
+        if (!numberToken->isInt || numberToken->fValue < 0)
+            return false;
+        String color = String::number(numberToken->fValue) + String(unitToken->string);
+        if (color.length() > 6)
+            return false;
+        while (color.length() < 6)
+            color = "0" + color;
+        return fastParseColor(c, color, false);
+    } else if (value->unit == CSSParserValue::HexColor
         || value->unit == CSSPrimitiveValue::CSS_IDENT
-        || (acceptQuirkyColors && value->unit == CSSPrimitiveValue::CSS_DIMENSION)) {
+        || (acceptQuirkyColors && value->unit == CSSParserValue::Dimension)) {
         if (!fastParseColor(c, value->string, !acceptQuirkyColors && value->unit == CSSPrimitiveValue::CSS_IDENT))
             return false;
     } else if (value->unit == CSSParserValue::Function &&
@@ -7141,20 +7159,28 @@ PassRefPtrWillBeRawPtr<CSSValue> CSSPropertyParser::parseImageSet(CSSParserValue
         imageSet->append(image);
 
         arg = functionArgs->next();
-        if (!arg || arg->unit != CSSPrimitiveValue::CSS_DIMENSION)
+        if (!arg)
             return nullptr;
 
         double imageScaleFactor = 0;
-        const String& string = arg->string;
-        unsigned length = string.length();
-        if (!length)
-            return nullptr;
-        if (string.is8Bit()) {
-            const LChar* start = string.characters8();
-            parseDouble(start, start + length, 'x', imageScaleFactor);
-        } else {
-            const UChar* start = string.characters16();
-            parseDouble(start, start + length, 'x', imageScaleFactor);
+        if (arg->unit == CSSParserValue::Dimension) {
+            const String& string = arg->string;
+            unsigned length = string.length();
+            if (!length)
+                return nullptr;
+            if (string.is8Bit()) {
+                const LChar* start = string.characters8();
+                parseDouble(start, start + length, 'x', imageScaleFactor);
+            } else {
+                const UChar* start = string.characters16();
+                parseDouble(start, start + length, 'x', imageScaleFactor);
+            }
+        } else if (arg->unit == CSSParserValue::DimensionList) {
+            ASSERT(arg->valueList->valueAt(0)->unit == CSSPrimitiveValue::CSS_NUMBER);
+            ASSERT(arg->valueList->valueAt(1)->unit == CSSPrimitiveValue::CSS_IDENT);
+            if (String(arg->valueList->valueAt(1)->string) != "x")
+                return nullptr;
+            imageScaleFactor = arg->valueList->valueAt(0)->fValue;
         }
         if (imageScaleFactor <= 0)
             return nullptr;

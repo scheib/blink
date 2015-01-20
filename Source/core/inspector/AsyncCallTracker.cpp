@@ -78,12 +78,17 @@ public:
     virtual void contextDestroyed() override
     {
         ASSERT(executionContext());
-        // It is possible that resetAsyncCallChains() is already called and thus
-        // this ExecutionContextData is removed from m_executionContextDataMap.
-        if (m_tracker->m_executionContextDataMap.take(executionContext())) {
-            dispose();
-        }
+        OwnPtrWillBeRawPtr<ExecutionContextData> self = m_tracker->m_executionContextDataMap.take(executionContext());
+        ASSERT_UNUSED(self, self == this);
         ContextLifecycleObserver::contextDestroyed();
+        clearLifecycleContext();
+        disposeCallChains();
+    }
+
+    void unobserve()
+    {
+        disposeCallChains();
+        dispose();
     }
 
     int nextAsyncOperationUniqueId()
@@ -111,17 +116,6 @@ public:
         ContextLifecycleObserver::trace(visitor);
     }
 
-    void dispose()
-    {
-        m_timerCallChains.dispose();
-        m_animationFrameCallChains.dispose();
-        m_eventCallChains.dispose();
-        m_xhrCallChains.dispose();
-        m_mutationObserverCallChains.dispose();
-        m_executionContextTaskCallChains.dispose();
-        m_asyncOperationCallChains.dispose();
-    }
-
     RawPtrWillBeMember<AsyncCallTracker> m_tracker;
     HashSet<int> m_intervalTimerIds;
     AsyncCallChainMap<int> m_timerCallChains;
@@ -133,6 +127,17 @@ public:
     AsyncCallChainMap<int> m_asyncOperationCallChains;
 
 private:
+    void disposeCallChains()
+    {
+        m_timerCallChains.dispose();
+        m_animationFrameCallChains.dispose();
+        m_eventCallChains.dispose();
+        m_xhrCallChains.dispose();
+        m_mutationObserverCallChains.dispose();
+        m_executionContextTaskCallChains.dispose();
+        m_asyncOperationCallChains.dispose();
+    }
+
     int m_circularSequentialId;
 };
 
@@ -165,7 +170,7 @@ void AsyncCallTracker::asyncCallTrackingStateChanged(bool tracking)
 void AsyncCallTracker::resetAsyncCallChains()
 {
     for (auto& it : m_executionContextDataMap)
-        it.value->dispose();
+        it.value->unobserve();
     m_executionContextDataMap.clear();
 }
 
@@ -173,7 +178,7 @@ void AsyncCallTracker::didInstallTimer(ExecutionContext* context, int timerId, i
 {
     ASSERT(context);
     ASSERT(m_debuggerAgent->trackingAsyncCalls());
-    RefPtrWillBeRawPtr<AsyncCallChain> callChain = m_debuggerAgent->createAsyncCallChain(singleShot ? setTimeoutName : setIntervalName);
+    RefPtrWillBeRawPtr<AsyncCallChain> callChain = m_debuggerAgent->traceAsyncOperationStarting(singleShot ? setTimeoutName : setIntervalName);
     if (!callChain)
         return;
     ASSERT(timerId > 0);
@@ -216,7 +221,7 @@ void AsyncCallTracker::didRequestAnimationFrame(ExecutionContext* context, int c
 {
     ASSERT(context);
     ASSERT(m_debuggerAgent->trackingAsyncCalls());
-    RefPtrWillBeRawPtr<AsyncCallChain> callChain = m_debuggerAgent->createAsyncCallChain(requestAnimationFrameName);
+    RefPtrWillBeRawPtr<AsyncCallChain> callChain = m_debuggerAgent->traceAsyncOperationStarting(requestAnimationFrameName);
     if (!callChain)
         return;
     ASSERT(callbackId > 0);
@@ -253,7 +258,7 @@ void AsyncCallTracker::didEnqueueEvent(EventTarget* eventTarget, Event* event)
 {
     ASSERT(eventTarget->executionContext());
     ASSERT(m_debuggerAgent->trackingAsyncCalls());
-    RefPtrWillBeRawPtr<AsyncCallChain> callChain = m_debuggerAgent->createAsyncCallChain(event->type());
+    RefPtrWillBeRawPtr<AsyncCallChain> callChain = m_debuggerAgent->traceAsyncOperationStarting(event->type());
     if (!callChain)
         return;
     ExecutionContextData* data = createContextDataIfNeeded(eventTarget->executionContext());
@@ -289,7 +294,7 @@ void AsyncCallTracker::willLoadXHR(XMLHttpRequest* xhr, ThreadableLoaderClient*,
     ASSERT(m_debuggerAgent->trackingAsyncCalls());
     if (!async)
         return;
-    RefPtrWillBeRawPtr<AsyncCallChain> callChain = m_debuggerAgent->createAsyncCallChain(xhrSendName);
+    RefPtrWillBeRawPtr<AsyncCallChain> callChain = m_debuggerAgent->traceAsyncOperationStarting(xhrSendName);
     if (!callChain)
         return;
     ExecutionContextData* data = createContextDataIfNeeded(xhr->executionContext());
@@ -322,7 +327,7 @@ void AsyncCallTracker::didEnqueueMutationRecord(ExecutionContext* context, Mutat
     ExecutionContextData* data = createContextDataIfNeeded(context);
     if (data->m_mutationObserverCallChains.contains(observer))
         return;
-    RefPtrWillBeRawPtr<AsyncCallChain> callChain = m_debuggerAgent->createAsyncCallChain(enqueueMutationRecordName);
+    RefPtrWillBeRawPtr<AsyncCallChain> callChain = m_debuggerAgent->traceAsyncOperationStarting(enqueueMutationRecordName);
     if (!callChain)
         return;
     data->m_mutationObserverCallChains.set(observer, callChain.release());
@@ -354,7 +359,7 @@ void AsyncCallTracker::didPostExecutionContextTask(ExecutionContext* context, Ex
     ASSERT(m_debuggerAgent->trackingAsyncCalls());
     if (task->taskNameForInstrumentation().isEmpty())
         return;
-    RefPtrWillBeRawPtr<AsyncCallChain> callChain = m_debuggerAgent->createAsyncCallChain(task->taskNameForInstrumentation());
+    RefPtrWillBeRawPtr<AsyncCallChain> callChain = m_debuggerAgent->traceAsyncOperationStarting(task->taskNameForInstrumentation());
     if (!callChain)
         return;
     ExecutionContextData* data = createContextDataIfNeeded(context);
@@ -387,7 +392,7 @@ int AsyncCallTracker::traceAsyncOperationStarting(ExecutionContext* context, con
     ASSERT(m_debuggerAgent->trackingAsyncCalls());
     if (prevOperationId)
         traceAsyncOperationCompleted(context, prevOperationId);
-    RefPtrWillBeRawPtr<AsyncCallChain> callChain = m_debuggerAgent->createAsyncCallChain(operationName);
+    RefPtrWillBeRawPtr<AsyncCallChain> callChain = m_debuggerAgent->traceAsyncOperationStarting(operationName);
     if (!callChain)
         return 0;
     ExecutionContextData* data = createContextDataIfNeeded(context);
@@ -424,12 +429,12 @@ void AsyncCallTracker::traceAsyncCallbackStarting(ExecutionContext* context, int
 
 void AsyncCallTracker::didFireAsyncCall()
 {
-    m_debuggerAgent->clearCurrentAsyncCallChain();
+    m_debuggerAgent->traceAsyncCallbackCompleted();
 }
 
 void AsyncCallTracker::setCurrentAsyncCallChain(ExecutionContext* context, PassRefPtrWillBeRawPtr<AsyncCallChain> chain)
 {
-    m_debuggerAgent->setCurrentAsyncCallChain(toIsolate(context), chain);
+    m_debuggerAgent->traceAsyncCallbackStarting(toIsolate(context), chain);
 }
 
 AsyncCallTracker::ExecutionContextData* AsyncCallTracker::createContextDataIfNeeded(ExecutionContext* context)

@@ -35,6 +35,7 @@
 #include "core/dom/XMLDocument.h"
 #include "core/editing/markup.h"
 #include "core/events/Event.h"
+#include "core/fetch/CrossOriginAccessControl.h"
 #include "core/fetch/FetchUtils.h"
 #include "core/fileapi/Blob.h"
 #include "core/fileapi/File.h"
@@ -539,12 +540,12 @@ void XMLHttpRequest::setResponseType(const String& responseType, ExceptionState&
     } else if (responseType == "arraybuffer") {
         m_responseTypeCode = ResponseTypeArrayBuffer;
     } else if (responseType == "legacystream") {
-        if (RuntimeEnabledFeatures::streamEnabled())
+        if (RuntimeEnabledFeatures::experimentalStreamEnabled())
             m_responseTypeCode = ResponseTypeLegacyStream;
         else
             return;
     } else if (responseType == "stream") {
-        if (RuntimeEnabledFeatures::streamEnabled())
+        if (RuntimeEnabledFeatures::experimentalStreamEnabled())
             m_responseTypeCode = ResponseTypeStream;
         else
             return;

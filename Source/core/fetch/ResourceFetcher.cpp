@@ -889,6 +889,8 @@ void ResourceFetcher::addAdditionalRequestHeaders(ResourceRequest& request, Reso
         determineRequestContext(request, type);
     if (type == Resource::LinkPrefetch || type == Resource::LinkSubresource)
         request.setHTTPHeaderField("Purpose", "prefetch");
+    if (frame()->document())
+        request.setOriginatesFromReservedIPRange(frame()->document()->isHostedInReservedIPRange());
 
     context().addAdditionalRequestHeaders(document(), request, (type == Resource::MainResource) ? FetchMainResource : FetchSubresource);
 }
@@ -1395,9 +1397,6 @@ void ResourceFetcher::willTerminateResourceLoader(ResourceLoader* loader)
         m_nonBlockingLoaders->remove(loader);
     else
         ASSERT_NOT_REACHED();
-
-    if (LocalFrame* frame = this->frame())
-        frame->loader().checkLoadComplete();
 }
 
 void ResourceFetcher::willStartLoadingResource(Resource* resource, ResourceRequest& request)
