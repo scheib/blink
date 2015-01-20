@@ -14,19 +14,23 @@ struct WebBluetoothDevice {
     // FIXME: Remove after http://crrev.com/XXXXXXXXXXXXX-Content-Side
     WebBluetoothDevice(const WebString& instanceId)
         : instanceId(instanceId)
+        , device_class(0)
     {
     }
 
     WebBluetoothDevice(const WebString& instanceId,
-                       const WebString& name)
+                       const WebString& name,
+                       int32_t device_class)
         : instanceId(instanceId)
         , name(name)
+        , device_class(device_class)
     {
     }
 
     // Members corresponding to BluetoothDevice attributes as specified in IDL.
     const WebString instanceId;
     const WebString name;
+    const int32_t device_class;
 };
 
 } // namespace blink

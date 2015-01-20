@@ -21,7 +21,7 @@
 // Implement BluetoothDevice interface: http://crbug.com/421668
     readonly    attribute DOMString       instanceId;
     readonly    attribute DOMString?      name;
-//    readonly    attribute long?           deviceClass;
+    readonly    attribute long?           deviceClass;
 //    readonly    attribute VendorIdSource? vendorIdSource;
 //    readonly    attribute long?           vendorId;
 //    readonly    attribute long?           productId;

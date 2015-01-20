@@ -10,22 +10,27 @@
 
 namespace blink {
 
+// TODO: REMOVE ON FIRST LAND?
 BluetoothDevice::BluetoothDevice(const String& instanceId)
     : m_instanceId(instanceId)
+    , m_deviceClass(0)
 {
 }
 
 BluetoothDevice::BluetoothDevice(const String& instanceId,
-                                 const String& name)
+                                 const String& name,
+                                 const int32_t device_class)
     : m_instanceId(instanceId)
     , m_name(name)
+    , m_deviceClass(device_class)
 {
 }
 
 BluetoothDevice* BluetoothDevice::create(const WebBluetoothDevice& webDevice)
 {
     return new BluetoothDevice(webDevice.instanceId,
-                               webDevice.name);
+                               webDevice.name,
+                               webDevice.device_class);
 }
 
 BluetoothDevice* BluetoothDevice::take(ScriptPromiseResolver*, WebBluetoothDevice* webDeviceRawPointer)

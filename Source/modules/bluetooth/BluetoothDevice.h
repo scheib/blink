@@ -28,7 +28,8 @@ public:
     // FIXME: Remove after http://crrev.com/XXXXXXXXXXXXX-Content-Side
     BluetoothDevice(const String& instanceId);
     BluetoothDevice(const String& instanceId,
-                    const String& name);
+                    const String& name,
+                    const int32_t device_class);
 
     static BluetoothDevice* create(const WebBluetoothDevice&);
 
@@ -43,10 +44,12 @@ public:
     // IDL exposed interface:
     String instanceId() { return m_instanceId; }
     String name() { return m_name; }
+    int32_t deviceClass(bool& isNull) { return m_deviceClass; }
 
 private:
-    String m_instanceId;
-    String m_name;
+    const String m_instanceId;
+    const String m_name;
+    const int32_t m_deviceClass;
 };
 
 } // namespace blink
