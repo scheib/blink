@@ -25,8 +25,6 @@ class BluetoothDevice final
     , public ScriptWrappable {
     DEFINE_WRAPPERTYPEINFO();
 public:
-    // FIXME: Remove after http://crrev.com/XXXXXXXXXXXXX-Content-Side
-    BluetoothDevice(const String& instanceId);
     BluetoothDevice(const String& instanceId,
                     const String& name,
                     const int32_t device_class);

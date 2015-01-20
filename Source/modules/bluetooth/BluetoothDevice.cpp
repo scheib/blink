@@ -10,13 +10,6 @@
 
 namespace blink {
 
-// TODO: REMOVE ON FIRST LAND?
-BluetoothDevice::BluetoothDevice(const String& instanceId)
-    : m_instanceId(instanceId)
-    , m_deviceClass(0)
-{
-}
-
 BluetoothDevice::BluetoothDevice(const String& instanceId,
                                  const String& name,
                                  const int32_t device_class)
