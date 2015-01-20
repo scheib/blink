@@ -21,6 +21,8 @@ async_test(function(t) {
         // Attempt (and fail) to clear all members, verifying they are readonly.
         device.instanceId = ""
         assert_equals(device.instanceId, "Empty Mock deviceId");
+        assert_equals(device.name, "");  // TODO?
+        assert_equals(device.deviceClass, 0x1F00);
         t.done();
       }),
       t.step_func(function() { assert_unreached('Mock was set to resolve.'); }));

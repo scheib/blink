@@ -44,7 +44,7 @@ public:
     // IDL exposed interface:
     String instanceId() { return m_instanceId; }
     String name() { return m_name; }
-    int32_t deviceClass(bool& isNull) { return m_deviceClass; }
+    int32_t deviceClass(bool& isNull) { isNull = false; return m_deviceClass; }
 
 private:
     const String m_instanceId;
