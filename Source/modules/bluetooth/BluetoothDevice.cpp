@@ -12,10 +12,18 @@ namespace blink {
 
 BluetoothDevice::BluetoothDevice(const String& instanceId,
                                  const String& name,
-                                 const int32_t device_class)
+                                 int32_t device_class,
+                                 uint16_t vendorId,
+                                 uint16_t productId,
+                                 bool paired,
+                                 bool connected)
     : m_instanceId(instanceId)
     , m_name(name)
     , m_deviceClass(device_class)
+    , m_vendorId(vendorId)
+    , m_productId(productId)
+    , m_paired(paired)
+    , m_connected(connected)
 {
 }
 
@@ -23,7 +31,11 @@ BluetoothDevice* BluetoothDevice::create(const WebBluetoothDevice& webDevice)
 {
     return new BluetoothDevice(webDevice.instanceId,
                                webDevice.name,
-                               webDevice.device_class);
+                               webDevice.device_class,
+                               webDevice.vendorId,
+                               webDevice.productId,
+                               webDevice.paired,
+                               webDevice.connected);
 }
 
 BluetoothDevice* BluetoothDevice::take(ScriptPromiseResolver*, WebBluetoothDevice* webDeviceRawPointer)

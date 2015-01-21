@@ -15,15 +15,27 @@ struct WebBluetoothDevice {
     WebBluetoothDevice(const WebString& instanceId)
         : instanceId(instanceId)
         , device_class(0)
+        , vendorId(0)
+        , productId(0)
+        , paired(false)
+        , connected(false)
     {
     }
 
     WebBluetoothDevice(const WebString& instanceId,
                        const WebString& name,
-                       int32_t device_class)
+                       int32_t device_class,
+                       uint16_t vendorId,
+                       uint16_t productId,
+                       bool paired,
+                       bool connected)
         : instanceId(instanceId)
         , name(name)
         , device_class(device_class)
+        , vendorId(vendorId)
+        , productId(productId)
+        , paired(paired)
+        , connected(connected)
     {
     }
 
@@ -31,6 +43,10 @@ struct WebBluetoothDevice {
     const WebString instanceId;
     const WebString name;
     const int32_t device_class;
+    const uint16_t vendorId;
+    const uint16_t productId;
+    const bool paired;
+    const bool connected;
 };
 
 } // namespace blink

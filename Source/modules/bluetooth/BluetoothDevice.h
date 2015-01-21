@@ -27,7 +27,11 @@ class BluetoothDevice final
 public:
     BluetoothDevice(const String& instanceId,
                     const String& name,
-                    const int32_t device_class);
+                    int32_t device_class,
+                    uint16_t vendorId,
+                    uint16_t productId,
+                    bool paired,
+                    bool connected);
 
     static BluetoothDevice* create(const WebBluetoothDevice&);
 
@@ -43,11 +47,19 @@ public:
     String instanceId() { return m_instanceId; }
     String name() { return m_name; }
     int32_t deviceClass(bool& isNull) { isNull = false; return m_deviceClass; }
+    int16_t vendorId(bool& isNull) { isNull = false; return m_vendorId; }
+    int16_t productId(bool& isNull) { isNull = false; return m_productId; }
+    bool paired(bool& isNull) { isNull = false; return m_paired; }
+    bool connected(bool& isNull) { isNull = false; return m_connected; }
 
 private:
     const String m_instanceId;
     const String m_name;
     const int32_t m_deviceClass;
+    const uint16_t m_vendorId;
+    const uint16_t m_productId;
+    const bool m_paired;
+    const bool m_connected;
 };
 
 } // namespace blink

@@ -25,6 +25,7 @@ ScriptPromise BluetoothDiscovery::requestDevice(ScriptState* scriptState)
 
     RefPtrWillBeRawPtr<ScriptPromiseResolver> resolver = ScriptPromiseResolver::create(scriptState);
     ScriptPromise promise = resolver->promise();
+    fprintf(stderr, "%s:%s:%d\n", __FILE__, __FUNCTION__, __LINE__);
     webbluetooth->requestDevice(new CallbackPromiseAdapter<BluetoothDevice, BluetoothError>(resolver));
     return promise;
 }
