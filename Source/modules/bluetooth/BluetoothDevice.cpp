@@ -15,6 +15,7 @@ BluetoothDevice::BluetoothDevice(const String& instanceId,
                                  int32_t device_class,
                                  uint16_t vendorId,
                                  uint16_t productId,
+                                 uint16_t productVersion,
                                  bool paired,
                                  bool connected)
     : m_instanceId(instanceId)
@@ -22,6 +23,7 @@ BluetoothDevice::BluetoothDevice(const String& instanceId,
     , m_deviceClass(device_class)
     , m_vendorId(vendorId)
     , m_productId(productId)
+    , m_productVersion(productVersion)
     , m_paired(paired)
     , m_connected(connected)
 {
@@ -34,6 +36,7 @@ BluetoothDevice* BluetoothDevice::create(const WebBluetoothDevice& webDevice)
                                webDevice.device_class,
                                webDevice.vendorId,
                                webDevice.productId,
+                               webDevice.productVersion,
                                webDevice.paired,
                                webDevice.connected);
 }

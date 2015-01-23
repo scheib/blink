@@ -17,6 +17,7 @@ struct WebBluetoothDevice {
         , device_class(0)
         , vendorId(0)
         , productId(0)
+        , productVersion(0)
         , paired(false)
         , connected(false)
     {
@@ -27,6 +28,7 @@ struct WebBluetoothDevice {
                        int32_t device_class,
                        uint16_t vendorId,
                        uint16_t productId,
+                       uint16_t productVersion,
                        bool paired,
                        bool connected)
         : instanceId(instanceId)
@@ -34,6 +36,7 @@ struct WebBluetoothDevice {
         , device_class(device_class)
         , vendorId(vendorId)
         , productId(productId)
+        , productVersion(productVersion)
         , paired(paired)
         , connected(connected)
     {
@@ -45,6 +48,7 @@ struct WebBluetoothDevice {
     const int32_t device_class;
     const uint16_t vendorId;
     const uint16_t productId;
+    const uint16_t productVersion;
     const bool paired;
     const bool connected;
 };

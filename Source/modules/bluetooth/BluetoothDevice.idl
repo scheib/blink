@@ -25,7 +25,7 @@
 //    readonly    attribute VendorIdSource? vendorIdSource;
     readonly    attribute long?           vendorId;
     readonly    attribute long?           productId;
-//    readonly    attribute long?           productVersion;
+    readonly    attribute long?           productVersion;
     readonly    attribute boolean?        paired;
     readonly    attribute boolean?        connected;
 //    readonly    attribute sequence<UUID>? uuids;

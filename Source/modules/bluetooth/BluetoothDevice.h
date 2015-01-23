@@ -30,6 +30,7 @@ public:
                     int32_t device_class,
                     uint16_t vendorId,
                     uint16_t productId,
+                    uint16_t productVersion,
                     bool paired,
                     bool connected);
 
@@ -49,6 +50,7 @@ public:
     int32_t deviceClass(bool& isNull) { isNull = false; return m_deviceClass; }
     int16_t vendorId(bool& isNull) { isNull = false; return m_vendorId; }
     int16_t productId(bool& isNull) { isNull = false; return m_productId; }
+    int16_t productVersion(bool& isNull) { isNull = false; return m_productVersion; }
     bool paired(bool& isNull) { isNull = false; return m_paired; }
     bool connected(bool& isNull) { isNull = false; return m_connected; }
 
@@ -58,6 +60,7 @@ private:
     const int32_t m_deviceClass;
     const uint16_t m_vendorId;
     const uint16_t m_productId;
+    const uint16_t m_productVersion;
     const bool m_paired;
     const bool m_connected;
 };
