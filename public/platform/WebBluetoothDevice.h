@@ -14,7 +14,7 @@ struct WebBluetoothDevice {
     // FIXME: Remove after http://crrev.com/XXXXXXXXXXXXX-Content-Side
     WebBluetoothDevice(const WebString& instanceId)
         : instanceId(instanceId)
-        , device_class(0)
+        , deviceClass(0)
         , vendorId(0)
         , productId(0)
         , productVersion(0)
@@ -25,7 +25,7 @@ struct WebBluetoothDevice {
 
     WebBluetoothDevice(const WebString& instanceId,
                        const WebString& name,
-                       int32_t device_class,
+                       int32_t deviceClass,
                        uint16_t vendorId,
                        uint16_t productId,
                        uint16_t productVersion,
@@ -33,7 +33,7 @@ struct WebBluetoothDevice {
                        bool connected)
         : instanceId(instanceId)
         , name(name)
-        , device_class(device_class)
+        , deviceClass(deviceClass)
         , vendorId(vendorId)
         , productId(productId)
         , productVersion(productVersion)
@@ -45,7 +45,7 @@ struct WebBluetoothDevice {
     // Members corresponding to BluetoothDevice attributes as specified in IDL.
     const WebString instanceId;
     const WebString name;
-    const int32_t device_class;
+    const int32_t deviceClass;
     const uint16_t vendorId;
     const uint16_t productId;
     const uint16_t productVersion;

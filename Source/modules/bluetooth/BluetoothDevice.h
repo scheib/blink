@@ -7,12 +7,12 @@
 
 #include "bindings/core/v8/ScriptWrappable.h"
 #include "platform/heap/Heap.h"
+#include "public/platform/WebBluetoothDevice.h"
 #include "wtf/text/WTFString.h"
 
 namespace blink {
 
 class ScriptPromiseResolver;
-struct WebBluetoothDevice;
 
 // BluetoothDevice represents a physical bluetooth device in the DOM. See IDL.
 //
@@ -25,14 +25,7 @@ class BluetoothDevice final
     , public ScriptWrappable {
     DEFINE_WRAPPERTYPEINFO();
 public:
-    BluetoothDevice(const String& instanceId,
-                    const String& name,
-                    int32_t device_class,
-                    uint16_t vendorId,
-                    uint16_t productId,
-                    uint16_t productVersion,
-                    bool paired,
-                    bool connected);
+    BluetoothDevice(const WebBluetoothDevice&);
 
     static BluetoothDevice* create(const WebBluetoothDevice&);
 
@@ -45,24 +38,17 @@ public:
     void trace(Visitor*) { }
 
     // IDL exposed interface:
-    String instanceId() { return m_instanceId; }
-    String name() { return m_name; }
-    int32_t deviceClass(bool& isNull) { isNull = false; return m_deviceClass; }
-    int16_t vendorId(bool& isNull) { isNull = false; return m_vendorId; }
-    int16_t productId(bool& isNull) { isNull = false; return m_productId; }
-    int16_t productVersion(bool& isNull) { isNull = false; return m_productVersion; }
-    bool paired(bool& isNull) { isNull = false; return m_paired; }
-    bool connected(bool& isNull) { isNull = false; return m_connected; }
+    String instanceId() { return m_webDevice.instanceId; }
+    String name() { return m_webDevice.name; }
+    int32_t deviceClass(bool& isNull) { isNull = false; return m_webDevice.deviceClass; }
+    int16_t vendorId(bool& isNull) { isNull = false; return m_webDevice.vendorId; }
+    int16_t productId(bool& isNull) { isNull = false; return m_webDevice.productId; }
+    int16_t productVersion(bool& isNull) { isNull = false; return m_webDevice.productVersion; }
+    bool paired(bool& isNull) { isNull = false; return m_webDevice.paired; }
+    bool connected(bool& isNull) { isNull = false; return m_webDevice.connected; }
 
 private:
-    const String m_instanceId;
-    const String m_name;
-    const int32_t m_deviceClass;
-    const uint16_t m_vendorId;
-    const uint16_t m_productId;
-    const uint16_t m_productVersion;
-    const bool m_paired;
-    const bool m_connected;
+    WebBluetoothDevice m_webDevice;
 };
 
 } // namespace blink
