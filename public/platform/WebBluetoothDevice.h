@@ -11,11 +11,18 @@ namespace blink {
 
 // Information describing a Bluetooth device provided by the platform.
 struct WebBluetoothDevice {
+    enum class VendorIDSource {
+        Unknown,
+        Bluetooth,
+        USB
+    };
+
     // FIXME: Remove after http://crrev.com/XXXXXXXXXXXXX-Content-Side
     WebBluetoothDevice(const WebString& instanceId)
         : instanceId(instanceId)
         , deviceClass(0)
-        , vendorId(0)
+        , vendorIDSource(VendorIDSource::Unknown)
+        , vendorID(0)
         , productId(0)
         , productVersion(0)
         , paired(false)
@@ -26,7 +33,8 @@ struct WebBluetoothDevice {
     WebBluetoothDevice(const WebString& instanceId,
                        const WebString& name,
                        int32_t deviceClass,
-                       uint16_t vendorId,
+                       VendorIDSource vendorIDSource,
+                       uint16_t vendorID,
                        uint16_t productId,
                        uint16_t productVersion,
                        bool paired,
@@ -34,7 +42,8 @@ struct WebBluetoothDevice {
         : instanceId(instanceId)
         , name(name)
         , deviceClass(deviceClass)
-        , vendorId(vendorId)
+        , vendorIDSource(vendorIDSource)
+        , vendorID(vendorID)
         , productId(productId)
         , productVersion(productVersion)
         , paired(paired)
@@ -46,7 +55,8 @@ struct WebBluetoothDevice {
     const WebString instanceId;
     const WebString name;
     const int32_t deviceClass;
-    const uint16_t vendorId;
+    const VendorIDSource vendorIDSource;
+    const uint16_t vendorID;
     const uint16_t productId;
     const uint16_t productVersion;
     const bool paired;

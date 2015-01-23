@@ -30,5 +30,16 @@ void BluetoothDevice::dispose(WebBluetoothDevice* webDeviceRaw)
     delete webDeviceRaw;
 }
 
+String BluetoothDevice::vendorIDSource() {
+    switch (m_webDevice.vendorIDSource) {
+        // FIXME: Should return undefined when Unknown. http://crbug.com/451604
+        case WebBluetoothDevice::VendorIDSource::Unknown: return "";
+        case WebBluetoothDevice::VendorIDSource::Bluetooth: return "bluetooth";
+        case WebBluetoothDevice::VendorIDSource::USB: return "usb";
+    }
+    ASSERT_NOT_REACHED();
+    return "";
+}
+
 } // namespace blink
 
