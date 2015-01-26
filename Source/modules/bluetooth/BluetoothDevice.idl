@@ -22,11 +22,11 @@ enum VendorIDSource {
 // Implement BluetoothDevice interface: http://crbug.com/421668
     readonly    attribute DOMString       instanceId;
     readonly    attribute DOMString?      name;
-    readonly    attribute long?           deviceClass;
+    readonly    attribute unsigned long?  deviceClass;
     readonly    attribute VendorIDSource? vendorIDSource;
-    readonly    attribute long?           vendorID;
-    readonly    attribute long?           productID;
-    readonly    attribute long?           productVersion;
+    readonly    attribute unsigned long?  vendorID;
+    readonly    attribute unsigned long?  productID;
+    readonly    attribute unsigned long?  productVersion;
     readonly    attribute boolean?        paired;
     readonly    attribute boolean?        connected;
 //    readonly    attribute sequence<UUID>? uuids;
