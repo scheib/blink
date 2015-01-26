@@ -40,11 +40,11 @@ public:
     // IDL exposed interface:
     String instanceId() { return m_webDevice.instanceId; }
     String name() { return m_webDevice.name; }
-    int32_t deviceClass(bool& isNull) { isNull = false; return m_webDevice.deviceClass; }
+    unsigned deviceClass(bool& isNull) { isNull = false; return m_webDevice.deviceClass; }
     String vendorIDSource();
-    int16_t vendorID(bool& isNull) { isNull = false; return m_webDevice.vendorID; }
-    int16_t productId(bool& isNull) { isNull = false; return m_webDevice.productId; }
-    int16_t productVersion(bool& isNull) { isNull = false; return m_webDevice.productVersion; }
+    unsigned vendorID(bool& isNull) { isNull = false; return m_webDevice.vendorID; }
+    unsigned productID(bool& isNull) { isNull = false; return m_webDevice.productID; }
+    unsigned productVersion(bool& isNull) { isNull = false; return m_webDevice.productVersion; }
     bool paired(bool& isNull) { isNull = false; return m_webDevice.paired; }
     bool connected(bool& isNull) { isNull = false; return m_webDevice.connected; }
 

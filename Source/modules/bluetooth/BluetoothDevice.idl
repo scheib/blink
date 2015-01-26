@@ -25,7 +25,7 @@ enum VendorIDSource {
     readonly    attribute long?           deviceClass;
     readonly    attribute VendorIDSource? vendorIDSource;
     readonly    attribute long?           vendorID;
-    readonly    attribute long?           productId;
+    readonly    attribute long?           productID;
     readonly    attribute long?           productVersion;
     readonly    attribute boolean?        paired;
     readonly    attribute boolean?        connected;

@@ -19,14 +19,20 @@ async_test(function(t) {
       t.step_func(function(device) {
         assert_equals(device.constructor.name, "BluetoothDevice");
         // Attempt (and fail) to overwrite all members, verifying they are readonly.
-        device.instanceId = "overwrite";
-        device.name = "overwrite";
-        device.deviceClass = -1;
-        device.vendorIDSource = "overwrite";
+        device.instanceId = "overwriten";
+        device.name = "overwriten";
+        device.deviceClass = "overwriten";
+        device.vendorIDSource = "overwriten";
+        device.vendorID = "overwriten";
+        device.productId = "overwriten";
+        device.productVersion = "overwriten";
         assert_equals(device.instanceId, "Empty Mock deviceId");
         assert_equals(device.name, "Empty Mock Device Name");
         assert_equals(device.deviceClass, 0x1F00);
         assert_equals(device.vendorIDSource, "bluetooth");
+        assert_equals(device.vendorID, 0xFFFF);
+        assert_equals(device.productID, 1);
+        assert_equals(device.productVersion, 2);
         t.done();
       }),
       t.step_func(function() { assert_unreached('Mock was set to resolve.'); }));
